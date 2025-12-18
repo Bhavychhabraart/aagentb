@@ -1,1 +1,7 @@
 project_id = "pldwciocbdaigkauwzzs"
+
+[functions.generate-render]
+verify_jwt = false
+
+[functions.analyze-room]
+verify_jwt = false

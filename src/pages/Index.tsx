@@ -1,13 +1,464 @@
-// Update this page (the content is just a fallback if you fail to update the page)
+import { useState, useEffect, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useAuth } from '@/hooks/useAuth';
+import { supabase } from '@/integrations/supabase/client';
+import { useToast } from '@/hooks/use-toast';
+import { AppSidebar } from '@/components/layout/AppSidebar';
+import { ChatPanel, ChatMessage } from '@/components/canvas/ChatPanel';
+import { RenderViewer } from '@/components/canvas/RenderViewer';
+import { UploadDialog } from '@/components/canvas/UploadDialog';
+import { SidebarProvider } from '@/components/ui/sidebar';
+
+interface RoomUpload {
+  id: string;
+  file_url: string;
+  analysis_status: string;
+  analysis_result: Record<string, unknown> | null;
+}
 
 const Index = () => {
-  return (
-    <div className="flex min-h-screen items-center justify-center bg-background">
-      <div className="text-center">
-        <h1 className="mb-4 text-4xl font-bold">Welcome to Your Blank App</h1>
-        <p className="text-xl text-muted-foreground">Start building your amazing project here!</p>
+  const { user, loading: authLoading } = useAuth();
+  const navigate = useNavigate();
+  const { toast } = useToast();
+
+  const [currentProjectId, setCurrentProjectId] = useState<string | null>(null);
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [currentRenderUrl, setCurrentRenderUrl] = useState<string | null>(null);
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
+  const [currentUpload, setCurrentUpload] = useState<RoomUpload | null>(null);
+
+  // Redirect to auth if not logged in
+  useEffect(() => {
+    if (!authLoading && !user) {
+      navigate('/auth');
+    }
+  }, [user, authLoading, navigate]);
+
+  // Auto-create or load first project
+  useEffect(() => {
+    if (user && !currentProjectId) {
+      loadOrCreateProject();
+    }
+  }, [user, currentProjectId]);
+
+  // Load messages when project changes
+  useEffect(() => {
+    if (currentProjectId) {
+      loadMessages();
+      loadLatestUpload();
+      loadLatestRender();
+    }
+  }, [currentProjectId]);
+
+  const loadOrCreateProject = async () => {
+    const { data: projects, error } = await supabase
+      .from('projects')
+      .select('id')
+      .order('updated_at', { ascending: false })
+      .limit(1);
+
+    if (error) {
+      console.error('Failed to load projects:', error);
+      return;
+    }
+
+    if (projects && projects.length > 0) {
+      setCurrentProjectId(projects[0].id);
+    } else {
+      // Create first project
+      const { data: newProject, error: createError } = await supabase
+        .from('projects')
+        .insert({ user_id: user!.id, name: 'My First Project' })
+        .select('id')
+        .single();
+
+      if (createError) {
+        console.error('Failed to create project:', createError);
+        toast({ variant: 'destructive', title: 'Error', description: 'Failed to create project.' });
+      } else {
+        setCurrentProjectId(newProject.id);
+      }
+    }
+  };
+
+  const loadMessages = async () => {
+    const { data, error } = await supabase
+      .from('chat_messages')
+      .select('*')
+      .eq('project_id', currentProjectId)
+      .order('created_at', { ascending: true });
+
+    if (error) {
+      console.error('Failed to load messages:', error);
+    } else {
+      const formattedMessages: ChatMessage[] = (data || []).map((msg) => ({
+        id: msg.id,
+        role: msg.role as 'user' | 'assistant',
+        content: msg.content,
+        metadata: msg.metadata as ChatMessage['metadata'],
+        created_at: msg.created_at,
+      }));
+      setMessages(formattedMessages);
+    }
+  };
+
+  const loadLatestUpload = async () => {
+    const { data, error } = await supabase
+      .from('room_uploads')
+      .select('*')
+      .eq('project_id', currentProjectId)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (!error && data) {
+      setCurrentUpload({
+        id: data.id,
+        file_url: data.file_url,
+        analysis_status: data.analysis_status,
+        analysis_result: data.analysis_result as Record<string, unknown> | null,
+      });
+    }
+  };
+
+  const loadLatestRender = async () => {
+    const { data, error } = await supabase
+      .from('renders')
+      .select('render_url')
+      .eq('project_id', currentProjectId)
+      .eq('status', 'completed')
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (!error && data?.render_url) {
+      setCurrentRenderUrl(data.render_url);
+    }
+  };
+
+  const handleNewProject = async () => {
+    if (!user) return;
+
+    const { data, error } = await supabase
+      .from('projects')
+      .insert({ user_id: user.id, name: 'Untitled Project' })
+      .select('id')
+      .single();
+
+    if (error) {
+      toast({ variant: 'destructive', title: 'Error', description: 'Failed to create project.' });
+    } else {
+      setCurrentProjectId(data.id);
+      setMessages([]);
+      setCurrentRenderUrl(null);
+      setCurrentUpload(null);
+      toast({ title: 'Project created', description: 'New project ready.' });
+    }
+  };
+
+  const handleProjectSelect = (projectId: string) => {
+    setCurrentProjectId(projectId);
+    setMessages([]);
+    setCurrentRenderUrl(null);
+    setCurrentUpload(null);
+  };
+
+  const addMessage = async (role: 'user' | 'assistant', content: string, metadata?: ChatMessage['metadata']) => {
+    if (!currentProjectId || !user) return null;
+
+    const { data, error } = await supabase
+      .from('chat_messages')
+      .insert({
+        project_id: currentProjectId,
+        user_id: user.id,
+        role,
+        content,
+        metadata: metadata || null,
+      })
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Failed to save message:', error);
+      return null;
+    }
+
+    const newMessage: ChatMessage = {
+      id: data.id,
+      role: data.role as 'user' | 'assistant',
+      content: data.content,
+      metadata: data.metadata as ChatMessage['metadata'],
+      created_at: data.created_at,
+    };
+
+    setMessages((prev) => [...prev, newMessage]);
+    return newMessage;
+  };
+
+  const handleUpload = async (file: File) => {
+    if (!user || !currentProjectId) return;
+
+    setIsUploading(true);
+
+    try {
+      const fileName = `${user.id}/${currentProjectId}/${Date.now()}-${file.name}`;
+      
+      const { error: uploadError } = await supabase.storage
+        .from('room-uploads')
+        .upload(fileName, file);
+
+      if (uploadError) throw uploadError;
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('room-uploads')
+        .getPublicUrl(fileName);
+
+      // Create room upload record
+      const { data: uploadRecord, error: recordError } = await supabase
+        .from('room_uploads')
+        .insert({
+          project_id: currentProjectId,
+          user_id: user.id,
+          file_name: file.name,
+          file_url: publicUrl,
+          analysis_status: 'pending',
+        })
+        .select()
+        .single();
+
+      if (recordError) throw recordError;
+
+      setCurrentUpload({
+        id: uploadRecord.id,
+        file_url: publicUrl,
+        analysis_status: 'pending',
+        analysis_result: null,
+      });
+
+      // Add user message with image
+      await addMessage('user', `Uploaded room image: ${file.name}`, {
+        type: 'upload',
+        imageUrl: publicUrl,
+        status: 'pending',
+      });
+
+      toast({ title: 'Upload complete', description: 'Analyzing room...' });
+
+      // Trigger room analysis
+      analyzeRoom(uploadRecord.id, publicUrl);
+
+    } catch (error) {
+      console.error('Upload failed:', error);
+      toast({ variant: 'destructive', title: 'Upload failed', description: 'Could not upload image.' });
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  const analyzeRoom = async (uploadId: string, imageUrl: string) => {
+    setIsProcessing(true);
+
+    try {
+      // Update status to analyzing
+      await supabase
+        .from('room_uploads')
+        .update({ analysis_status: 'analyzing' })
+        .eq('id', uploadId);
+
+      setCurrentUpload((prev) => prev ? { ...prev, analysis_status: 'analyzing' } : null);
+
+      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/analyze-room`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+        },
+        body: JSON.stringify({ imageUrl }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Analysis failed');
+      }
+
+      const { analysis } = await response.json();
+
+      // Update upload record
+      await supabase
+        .from('room_uploads')
+        .update({
+          analysis_status: 'completed',
+          analysis_result: analysis,
+        })
+        .eq('id', uploadId);
+
+      setCurrentUpload((prev) => prev ? {
+        ...prev,
+        analysis_status: 'completed',
+        analysis_result: analysis,
+      } : null);
+
+      // Add assistant message with analysis
+      const analysisText = `
+Room Analysis Complete:
+• Type: ${analysis.roomType}
+• Style: ${analysis.currentStyle}
+• Dimensions: ${analysis.dimensions}
+• Lighting: ${analysis.lighting}
+
+Key Elements: ${analysis.keyElements?.join(', ') || 'N/A'}
+
+Suggestions:
+${analysis.suggestedImprovements?.map((s: string) => `• ${s}`).join('\n') || 'N/A'}
+
+Ready to generate a render! Describe your vision.`;
+
+      await addMessage('assistant', analysisText.trim(), { type: 'text', status: 'ready' });
+
+    } catch (error) {
+      console.error('Analysis failed:', error);
+      
+      await supabase
+        .from('room_uploads')
+        .update({ analysis_status: 'failed' })
+        .eq('id', uploadId);
+
+      setCurrentUpload((prev) => prev ? { ...prev, analysis_status: 'failed' } : null);
+
+      await addMessage('assistant', 'Sorry, I could not analyze the room image. Please try uploading again.', {
+        type: 'text',
+        status: 'failed',
+      });
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const handleSendMessage = useCallback(async (content: string) => {
+    if (!user || !currentProjectId) return;
+
+    // Add user message
+    await addMessage('user', content, { type: 'text' });
+
+    // Check if we have a room upload to reference
+    const roomImageUrl = currentUpload?.file_url || null;
+
+    setIsGenerating(true);
+
+    try {
+      // Create render record
+      const { data: renderRecord, error: renderError } = await supabase
+        .from('renders')
+        .insert({
+          project_id: currentProjectId,
+          user_id: user.id,
+          prompt: content,
+          room_upload_id: currentUpload?.id || null,
+          status: 'generating',
+        })
+        .select()
+        .single();
+
+      if (renderError) throw renderError;
+
+      await addMessage('assistant', 'Generating your render...', { type: 'text', status: 'pending' });
+
+      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-render`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+        },
+        body: JSON.stringify({
+          prompt: content,
+          roomImageUrl,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || 'Generation failed');
+      }
+
+      const { imageUrl } = await response.json();
+
+      // Update render record
+      await supabase
+        .from('renders')
+        .update({ render_url: imageUrl, status: 'completed' })
+        .eq('id', renderRecord.id);
+
+      setCurrentRenderUrl(imageUrl);
+
+      await addMessage('assistant', 'Your render is ready! You can download it using the controls above.', {
+        type: 'render',
+        imageUrl,
+        status: 'ready',
+      });
+
+      toast({ title: 'Render complete', description: 'Your design is ready to view.' });
+
+    } catch (error) {
+      console.error('Render generation failed:', error);
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      await addMessage('assistant', `Sorry, generation failed: ${message}`, { type: 'text', status: 'failed' });
+      toast({ variant: 'destructive', title: 'Generation failed', description: message });
+    } finally {
+      setIsGenerating(false);
+    }
+  }, [user, currentProjectId, currentUpload]);
+
+  // Loading state
+  if (authLoading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background">
+        <div className="text-center">
+          <div className="h-12 w-12 rounded-full bg-gradient-brand mx-auto mb-4 animate-pulse" />
+          <p className="text-sm text-muted-foreground">Loading...</p>
+        </div>
       </div>
-    </div>
+    );
+  }
+
+  if (!user) {
+    return null;
+  }
+
+  return (
+    <SidebarProvider>
+      <div className="flex h-screen w-full bg-background">
+        <AppSidebar
+          currentProjectId={currentProjectId}
+          onProjectSelect={handleProjectSelect}
+          onNewProject={handleNewProject}
+        />
+        
+        <div className="flex flex-1 overflow-hidden">
+          <RenderViewer
+            imageUrl={currentRenderUrl}
+            isGenerating={isGenerating}
+          />
+          
+          <div className="w-80 shrink-0">
+            <ChatPanel
+              messages={messages}
+              isLoading={isProcessing || isGenerating}
+              onSendMessage={handleSendMessage}
+              onUploadClick={() => setUploadDialogOpen(true)}
+            />
+          </div>
+        </div>
+
+        <UploadDialog
+          open={uploadDialogOpen}
+          onOpenChange={setUploadDialogOpen}
+          onUpload={handleUpload}
+          isUploading={isUploading}
+        />
+      </div>
+    </SidebarProvider>
   );
 };
 
