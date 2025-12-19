@@ -1,5 +1,5 @@
-import { useState, useEffect, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -19,6 +19,7 @@ interface RoomUpload {
 const Index = () => {
   const { user, loading: authLoading } = useAuth();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { toast } = useToast();
 
   const [currentProjectId, setCurrentProjectId] = useState<string | null>(null);
@@ -29,6 +30,7 @@ const Index = () => {
   const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [currentUpload, setCurrentUpload] = useState<RoomUpload | null>(null);
+  const hasTriggeredGeneration = useRef(false);
 
   // Redirect to auth if not logged in
   useEffect(() => {
@@ -37,12 +39,17 @@ const Index = () => {
     }
   }, [user, authLoading, navigate]);
 
-  // Auto-create or load first project
+  // Load project from URL or auto-create
   useEffect(() => {
-    if (user && !currentProjectId) {
-      loadOrCreateProject();
+    if (user) {
+      const projectIdFromUrl = searchParams.get('project');
+      if (projectIdFromUrl && projectIdFromUrl !== currentProjectId) {
+        setCurrentProjectId(projectIdFromUrl);
+      } else if (!currentProjectId) {
+        loadOrCreateProject();
+      }
     }
-  }, [user, currentProjectId]);
+  }, [user, searchParams, currentProjectId]);
 
   // Load messages when project changes
   useEffect(() => {
@@ -102,6 +109,23 @@ const Index = () => {
         created_at: msg.created_at,
       }));
       setMessages(formattedMessages);
+
+      // Check if we should auto-trigger generation (coming from Landing page)
+      const shouldGenerate = searchParams.get('generate') === 'true';
+      if (shouldGenerate && !hasTriggeredGeneration.current && formattedMessages.length > 0) {
+        hasTriggeredGeneration.current = true;
+        // Remove the generate param from URL
+        const newParams = new URLSearchParams(searchParams);
+        newParams.delete('generate');
+        setSearchParams(newParams, { replace: true });
+        
+        // Get the last user message to trigger generation
+        const lastUserMessage = formattedMessages.filter(m => m.role === 'user').pop();
+        if (lastUserMessage) {
+          // Trigger generation with the prompt
+          triggerGeneration(lastUserMessage.content);
+        }
+      }
     }
   };
 
@@ -166,7 +190,7 @@ const Index = () => {
     setCurrentUpload(null);
   };
 
-  const addMessage = async (role: 'user' | 'assistant', content: string, metadata?: ChatMessage['metadata']) => {
+  const addMessage = useCallback(async (role: 'user' | 'assistant', content: string, metadata?: ChatMessage['metadata']) => {
     if (!currentProjectId || !user) return null;
 
     const { data, error } = await supabase
@@ -196,7 +220,7 @@ const Index = () => {
 
     setMessages((prev) => [...prev, newMessage]);
     return newMessage;
-  };
+  }, [currentProjectId, user]);
 
   const handleUpload = async (file: File) => {
     if (!user || !currentProjectId) return;
@@ -336,11 +360,8 @@ Ready to generate a render! Describe your vision.`;
     }
   };
 
-  const handleSendMessage = useCallback(async (content: string) => {
+  const triggerGeneration = useCallback(async (content: string, skipUserMessage = false) => {
     if (!user || !currentProjectId) return;
-
-    // Add user message
-    await addMessage('user', content, { type: 'text' });
 
     // Check if we have a room upload to reference
     const roomImageUrl = currentUpload?.file_url || null;
@@ -408,7 +429,17 @@ Ready to generate a render! Describe your vision.`;
     } finally {
       setIsGenerating(false);
     }
-  }, [user, currentProjectId, currentUpload]);
+  }, [user, currentProjectId, currentUpload, addMessage, toast]);
+
+  const handleSendMessage = useCallback(async (content: string) => {
+    if (!user || !currentProjectId) return;
+
+    // Add user message
+    await addMessage('user', content, { type: 'text' });
+
+    // Trigger generation
+    triggerGeneration(content);
+  }, [user, currentProjectId, addMessage, triggerGeneration]);
 
   // Loading state
   if (authLoading) {
