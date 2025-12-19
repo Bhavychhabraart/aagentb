@@ -1,10 +1,11 @@
 import { useState, useRef, useEffect } from 'react';
-import { Send, Upload, Loader2, Image as ImageIcon, Sparkles, FileImage, Clock } from 'lucide-react';
+import { Send, Upload, Loader2, Image as ImageIcon, Sparkles, FileImage, Clock, X, Package } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
+import { CatalogFurnitureItem } from '@/services/catalogService';
 
 export interface ChatMessage {
   id: string;
@@ -14,6 +15,7 @@ export interface ChatMessage {
     type?: 'text' | 'upload' | 'render';
     imageUrl?: string;
     status?: string;
+    stagedFurniture?: { id: string; name: string }[];
   };
   created_at: string;
 }
@@ -23,6 +25,8 @@ interface ChatPanelProps {
   isLoading: boolean;
   onSendMessage: (content: string) => void;
   onUploadClick: () => void;
+  stagedItems?: CatalogFurnitureItem[];
+  onClearStagedItems?: () => void;
 }
 
 function getMessageIcon(metadata?: ChatMessage['metadata']) {
@@ -40,7 +44,7 @@ function formatTimestamp(dateString: string) {
   }
 }
 
-export function ChatPanel({ messages, isLoading, onSendMessage, onUploadClick }: ChatPanelProps) {
+export function ChatPanel({ messages, isLoading, onSendMessage, onUploadClick, stagedItems = [], onClearStagedItems }: ChatPanelProps) {
   const [input, setInput] = useState('');
   const scrollRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -169,6 +173,44 @@ export function ChatPanel({ messages, isLoading, onSendMessage, onUploadClick }:
 
       {/* Input */}
       <div className="p-4 border-t border-border">
+        {/* Staged items display */}
+        {stagedItems.length > 0 && (
+          <div className="mb-3 p-2 rounded-lg bg-primary/5 border border-primary/20">
+            <div className="flex items-center justify-between mb-2">
+              <div className="flex items-center gap-1.5 text-xs font-medium text-primary">
+                <Package className="h-3.5 w-3.5" />
+                <span>Staged Furniture ({stagedItems.length})</span>
+              </div>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={onClearStagedItems}
+                className="h-6 px-2 text-xs text-muted-foreground hover:text-foreground"
+              >
+                Clear all
+              </Button>
+            </div>
+            <div className="flex flex-wrap gap-1.5">
+              {stagedItems.map((item) => (
+                <div
+                  key={item.id}
+                  className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-primary/10 text-xs text-primary"
+                >
+                  {item.imageUrl && (
+                    <img 
+                      src={item.imageUrl} 
+                      alt={item.name}
+                      className="h-4 w-4 rounded object-cover"
+                    />
+                  )}
+                  <span className="truncate max-w-[100px]">{item.name}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+        
         <form onSubmit={handleSubmit} className="flex flex-col gap-2">
           <div className="flex gap-2">
             <Button
@@ -186,7 +228,7 @@ export function ChatPanel({ messages, isLoading, onSendMessage, onUploadClick }:
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={handleKeyDown}
-              placeholder="Describe your vision..."
+              placeholder={stagedItems.length > 0 ? "Describe your design with staged furniture..." : "Describe your vision..."}
               disabled={isLoading}
               className="min-h-[44px] max-h-[120px] resize-none"
               rows={1}

@@ -17,9 +17,12 @@ interface AssetsPanelProps {
   projectId: string | null;
   onAssetSelect?: (asset: Asset) => void;
   onCatalogItemSelect?: (item: CatalogFurnitureItem) => void;
+  stagedItemIds?: string[];
 }
 
-export function AssetsPanel({ projectId, onAssetSelect, onCatalogItemSelect }: AssetsPanelProps) {
+export type { CatalogFurnitureItem };
+
+export function AssetsPanel({ projectId, onAssetSelect, onCatalogItemSelect, stagedItemIds = [] }: AssetsPanelProps) {
   const [assets, setAssets] = useState<Asset[]>([]);
   const [catalogItems, setCatalogItems] = useState<CatalogFurnitureItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -283,7 +286,7 @@ export function AssetsPanel({ projectId, onAssetSelect, onCatalogItemSelect }: A
                         <CatalogThumbnail
                           key={item.id}
                           item={item}
-                          isSelected={selectedCatalogItem?.id === item.id}
+                          isSelected={stagedItemIds.includes(item.id)}
                           onClick={() => handleCatalogItemClick(item)}
                         />
                       ))}
@@ -356,6 +359,14 @@ function CatalogThumbnail({ item, isSelected, onClick }: CatalogThumbnailProps) 
         alt={item.name}
         className="w-full h-full object-cover"
       />
+      {/* Selected checkmark */}
+      {isSelected && (
+        <div className="absolute top-0.5 right-0.5 p-0.5 rounded-full bg-primary text-primary-foreground">
+          <svg className="h-2.5 w-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+          </svg>
+        </div>
+      )}
       {/* Category indicator */}
       <div className="absolute bottom-0.5 right-0.5 p-0.5 rounded bg-black/60 text-white">
         <ShoppingBag className="h-2.5 w-2.5" />
