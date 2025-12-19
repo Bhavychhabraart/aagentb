@@ -14,8 +14,15 @@ import { CatalogFurnitureItem } from '@/services/catalogService';
 interface RoomUpload {
   id: string;
   file_url: string;
+  upload_type: string;
   analysis_status: string;
   analysis_result: Record<string, unknown> | null;
+}
+
+interface ProjectReferences {
+  layoutUrl: string | null;
+  roomPhotoUrl: string | null;
+  styleRefUrls: string[];
 }
 
 const Index = () => {
@@ -211,6 +218,7 @@ const Index = () => {
       setCurrentUpload({
         id: data.id,
         file_url: data.file_url,
+        upload_type: data.upload_type,
         analysis_status: data.analysis_status,
         analysis_result: data.analysis_result as Record<string, unknown> | null,
       });
@@ -231,6 +239,27 @@ const Index = () => {
       setCurrentRenderUrl(data.render_url);
       setCurrentRenderId(data.id);
     }
+  };
+
+  // Fetch all project reference images (layout, room photo, style refs)
+  const fetchProjectReferences = async (projectId: string): Promise<ProjectReferences> => {
+    // Get layout and room photos from room_uploads
+    const { data: uploads } = await supabase
+      .from('room_uploads')
+      .select('file_url, upload_type')
+      .eq('project_id', projectId);
+    
+    // Get style references from style_uploads
+    const { data: styleRefs } = await supabase
+      .from('style_uploads')
+      .select('file_url')
+      .eq('project_id', projectId);
+    
+    return {
+      layoutUrl: uploads?.find(u => u.upload_type === 'layout')?.file_url || null,
+      roomPhotoUrl: uploads?.find(u => u.upload_type === 'room_photo')?.file_url || null,
+      styleRefUrls: styleRefs?.map(s => s.file_url) || [],
+    };
   };
 
   const handleNewProject = async () => {
@@ -330,6 +359,7 @@ const Index = () => {
       setCurrentUpload({
         id: uploadRecord.id,
         file_url: publicUrl,
+        upload_type: 'room_photo',
         analysis_status: 'pending',
         analysis_result: null,
       });
@@ -439,6 +469,9 @@ Ready to generate a render! Describe your vision.`;
     setIsGenerating(true);
 
     try {
+      // Fetch project references for layout and style consistency
+      const references = await fetchProjectReferences(currentProjectId);
+
       // Create render record with parent reference
       const { data: renderRecord, error: renderError } = await supabase
         .from('renders')
@@ -475,6 +508,9 @@ Ready to generate a render! Describe your vision.`;
             description: item.description,
             imageUrl: item.imageUrl,
           })),
+          // Pass layout and style references for consistency
+          layoutImageUrl: references.layoutUrl,
+          styleRefUrls: references.styleRefUrls,
         }),
       });
 
@@ -516,12 +552,18 @@ Ready to generate a render! Describe your vision.`;
   const triggerGeneration = useCallback(async (content: string, furnitureItems: CatalogFurnitureItem[] = []) => {
     if (!user || !currentProjectId) return;
 
-    // Check if we have a room upload to reference
-    const roomImageUrl = currentUpload?.file_url || null;
-
     setIsGenerating(true);
 
     try {
+      // Fetch all project reference images
+      const references = await fetchProjectReferences(currentProjectId);
+      
+      console.log('Generation references:', {
+        hasLayout: !!references.layoutUrl,
+        hasRoomPhoto: !!references.roomPhotoUrl,
+        styleCount: references.styleRefUrls.length,
+      });
+
       // Build enhanced prompt with furniture context
       let enhancedPrompt = content;
       if (furnitureItems.length > 0) {
@@ -546,9 +588,15 @@ Ready to generate a render! Describe your vision.`;
 
       if (renderError) throw renderError;
 
+      const refInfo = [
+        references.layoutUrl ? 'layout' : null,
+        references.roomPhotoUrl ? 'room photo' : null,
+        references.styleRefUrls.length > 0 ? `${references.styleRefUrls.length} style ref${references.styleRefUrls.length > 1 ? 's' : ''}` : null,
+      ].filter(Boolean).join(', ');
+
       await addMessage('assistant', furnitureItems.length > 0 
-        ? `Generating your render with ${furnitureItems.length} furniture piece${furnitureItems.length > 1 ? 's' : ''}...`
-        : 'Generating your render...', 
+        ? `Generating your render with ${furnitureItems.length} furniture piece${furnitureItems.length > 1 ? 's' : ''}${refInfo ? ` using ${refInfo}` : ''}...`
+        : `Generating your render${refInfo ? ` using ${refInfo}` : ''}...`, 
         { type: 'text', status: 'pending' }
       );
 
@@ -560,7 +608,10 @@ Ready to generate a render! Describe your vision.`;
         },
         body: JSON.stringify({
           prompt: enhancedPrompt,
-          roomImageUrl,
+          // Pass all reference images
+          layoutImageUrl: references.layoutUrl,
+          roomPhotoUrl: references.roomPhotoUrl,
+          styleRefUrls: references.styleRefUrls,
           furnitureItems: furnitureItems.map(item => ({
             name: item.name,
             category: item.category,
