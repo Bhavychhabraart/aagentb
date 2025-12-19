@@ -231,6 +231,53 @@ export type Database = {
           },
         ]
       }
+      staged_furniture: {
+        Row: {
+          catalog_item_id: string
+          created_at: string
+          id: string
+          item_category: string
+          item_description: string | null
+          item_image_url: string | null
+          item_name: string
+          item_price: number | null
+          project_id: string
+          user_id: string
+        }
+        Insert: {
+          catalog_item_id: string
+          created_at?: string
+          id?: string
+          item_category: string
+          item_description?: string | null
+          item_image_url?: string | null
+          item_name: string
+          item_price?: number | null
+          project_id: string
+          user_id: string
+        }
+        Update: {
+          catalog_item_id?: string
+          created_at?: string
+          id?: string
+          item_category?: string
+          item_description?: string | null
+          item_image_url?: string | null
+          item_name?: string
+          item_price?: number | null
+          project_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "staged_furniture_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       style_uploads: {
         Row: {
           created_at: string
