@@ -100,32 +100,53 @@ const Index = () => {
 
     if (error) {
       console.error('Failed to load messages:', error);
-    } else {
-      const formattedMessages: ChatMessage[] = (data || []).map((msg) => ({
-        id: msg.id,
-        role: msg.role as 'user' | 'assistant',
-        content: msg.content,
-        metadata: msg.metadata as ChatMessage['metadata'],
-        created_at: msg.created_at,
-      }));
-      setMessages(formattedMessages);
+      return;
+    }
 
-      // Check if we should auto-trigger generation (coming from Landing page)
-      const shouldGenerate = searchParams.get('generate') === 'true';
-      if (shouldGenerate && !hasTriggeredGeneration.current && formattedMessages.length > 0) {
-        hasTriggeredGeneration.current = true;
-        // Remove the generate param from URL
-        const newParams = new URLSearchParams(searchParams);
-        newParams.delete('generate');
-        setSearchParams(newParams, { replace: true });
-        
-        // Get the last user message to trigger generation
-        const lastUserMessage = formattedMessages.filter(m => m.role === 'user').pop();
-        if (lastUserMessage) {
-          // Trigger generation with the prompt
-          triggerGeneration(lastUserMessage.content);
-        }
-      }
+    const formattedMessages: ChatMessage[] = (data || []).map((msg) => ({
+      id: msg.id,
+      role: msg.role as 'user' | 'assistant',
+      content: msg.content,
+      metadata: msg.metadata as ChatMessage['metadata'],
+      created_at: msg.created_at,
+    }));
+    setMessages(formattedMessages);
+
+    // Check if we should auto-trigger generation (coming from Landing page with prompt in URL)
+    const shouldGenerate = searchParams.get('generate') === 'true';
+    const promptFromUrl = searchParams.get('prompt');
+    
+    if (shouldGenerate && !hasTriggeredGeneration.current && promptFromUrl) {
+      hasTriggeredGeneration.current = true;
+      const decodedPrompt = decodeURIComponent(promptFromUrl);
+      
+      // Remove the generate and prompt params from URL
+      const newParams = new URLSearchParams(searchParams);
+      newParams.delete('generate');
+      newParams.delete('prompt');
+      setSearchParams(newParams, { replace: true });
+      
+      // Add the prompt as a user message and show it immediately
+      const tempMessage: ChatMessage = {
+        id: `temp-${Date.now()}`,
+        role: 'user',
+        content: decodedPrompt,
+        metadata: { type: 'text' },
+        created_at: new Date().toISOString(),
+      };
+      setMessages(prev => [...prev, tempMessage]);
+      
+      // Save to database (fire and forget, we already show it in UI)
+      supabase.from('chat_messages').insert({
+        project_id: currentProjectId,
+        user_id: user!.id,
+        role: 'user',
+        content: decodedPrompt,
+        metadata: { type: 'text' },
+      });
+      
+      // Trigger generation
+      triggerGeneration(decodedPrompt);
     }
   };
 
