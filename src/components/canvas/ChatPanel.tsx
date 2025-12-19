@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { Send, Upload, Loader2, Image as ImageIcon, Sparkles, FileImage, Clock, X, Package } from 'lucide-react';
+import { Send, Upload, Loader2, Image as ImageIcon, Sparkles, FileImage, Clock, X, Package, Edit3 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -27,6 +27,7 @@ interface ChatPanelProps {
   onUploadClick: () => void;
   stagedItems?: CatalogFurnitureItem[];
   onClearStagedItems?: () => void;
+  isEditMode?: boolean;
 }
 
 function getMessageIcon(metadata?: ChatMessage['metadata']) {
@@ -44,7 +45,15 @@ function formatTimestamp(dateString: string) {
   }
 }
 
-export function ChatPanel({ messages, isLoading, onSendMessage, onUploadClick, stagedItems = [], onClearStagedItems }: ChatPanelProps) {
+export function ChatPanel({ 
+  messages, 
+  isLoading, 
+  onSendMessage, 
+  onUploadClick, 
+  stagedItems = [], 
+  onClearStagedItems,
+  isEditMode = false 
+}: ChatPanelProps) {
   const [input, setInput] = useState('');
   const scrollRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -80,6 +89,13 @@ export function ChatPanel({ messages, isLoading, onSendMessage, onUploadClick, s
             {messages.length}
           </span>
         </div>
+        {/* Edit Mode Indicator */}
+        {isEditMode && (
+          <div className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-amber-500/10 border border-amber-500/30">
+            <Edit3 className="h-3 w-3 text-amber-500" />
+            <span className="text-xs font-medium text-amber-500">Edit Mode</span>
+          </div>
+        )}
       </div>
 
       {/* Messages */}
@@ -175,11 +191,28 @@ export function ChatPanel({ messages, isLoading, onSendMessage, onUploadClick, s
       <div className="p-4 border-t border-border">
         {/* Staged items display */}
         {stagedItems.length > 0 && (
-          <div className="mb-3 p-2 rounded-lg bg-primary/5 border border-primary/20">
+          <div className={cn(
+            "mb-3 p-2 rounded-lg border",
+            isEditMode 
+              ? "bg-amber-500/5 border-amber-500/30" 
+              : "bg-primary/5 border-primary/20"
+          )}>
             <div className="flex items-center justify-between mb-2">
-              <div className="flex items-center gap-1.5 text-xs font-medium text-primary">
-                <Package className="h-3.5 w-3.5" />
-                <span>Staged Furniture ({stagedItems.length})</span>
+              <div className={cn(
+                "flex items-center gap-1.5 text-xs font-medium",
+                isEditMode ? "text-amber-500" : "text-primary"
+              )}>
+                {isEditMode ? (
+                  <>
+                    <Edit3 className="h-3.5 w-3.5" />
+                    <span>Replace Furniture ({stagedItems.length})</span>
+                  </>
+                ) : (
+                  <>
+                    <Package className="h-3.5 w-3.5" />
+                    <span>Staged Furniture ({stagedItems.length})</span>
+                  </>
+                )}
               </div>
               <Button
                 type="button"
@@ -195,7 +228,12 @@ export function ChatPanel({ messages, isLoading, onSendMessage, onUploadClick, s
               {stagedItems.map((item) => (
                 <div
                   key={item.id}
-                  className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-primary/10 text-xs text-primary"
+                  className={cn(
+                    "flex items-center gap-1.5 px-2 py-1 rounded-full text-xs",
+                    isEditMode 
+                      ? "bg-amber-500/10 text-amber-600" 
+                      : "bg-primary/10 text-primary"
+                  )}
                 >
                   {item.imageUrl && (
                     <img 
@@ -204,10 +242,16 @@ export function ChatPanel({ messages, isLoading, onSendMessage, onUploadClick, s
                       className="h-4 w-4 rounded object-cover"
                     />
                   )}
-                  <span className="truncate max-w-[100px]">{item.name}</span>
+                  <span className="truncate max-w-[80px]">{item.name}</span>
+                  <span className="text-[10px] opacity-60">→ {item.category}</span>
                 </div>
               ))}
             </div>
+            {isEditMode && (
+              <p className="text-[10px] text-amber-600/70 mt-2">
+                Products will replace matching furniture in the current render
+              </p>
+            )}
           </div>
         )}
         
@@ -228,7 +272,13 @@ export function ChatPanel({ messages, isLoading, onSendMessage, onUploadClick, s
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={handleKeyDown}
-              placeholder={stagedItems.length > 0 ? "Describe your design with staged furniture..." : "Describe your vision..."}
+              placeholder={
+                isEditMode 
+                  ? "Describe changes to make (staged items will replace furniture)..." 
+                  : stagedItems.length > 0 
+                    ? "Describe your design with staged furniture..." 
+                    : "Describe your vision..."
+              }
               disabled={isLoading}
               className="min-h-[44px] max-h-[120px] resize-none"
               rows={1}
@@ -237,9 +287,12 @@ export function ChatPanel({ messages, isLoading, onSendMessage, onUploadClick, s
               type="submit"
               size="icon"
               disabled={!input.trim() || isLoading}
-              className="shrink-0"
+              className={cn(
+                "shrink-0",
+                isEditMode && "bg-amber-500 hover:bg-amber-600"
+              )}
             >
-              <Send className="h-4 w-4" />
+              {isEditMode ? <Edit3 className="h-4 w-4" /> : <Send className="h-4 w-4" />}
             </Button>
           </div>
         </form>

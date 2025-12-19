@@ -143,6 +143,7 @@ export type Database = {
         Row: {
           created_at: string
           id: string
+          parent_render_id: string | null
           project_id: string
           prompt: string
           render_url: string | null
@@ -153,6 +154,7 @@ export type Database = {
         Insert: {
           created_at?: string
           id?: string
+          parent_render_id?: string | null
           project_id: string
           prompt: string
           render_url?: string | null
@@ -163,6 +165,7 @@ export type Database = {
         Update: {
           created_at?: string
           id?: string
+          parent_render_id?: string | null
           project_id?: string
           prompt?: string
           render_url?: string | null
@@ -171,6 +174,13 @@ export type Database = {
           user_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "renders_parent_render_id_fkey"
+            columns: ["parent_render_id"]
+            isOneToOne: false
+            referencedRelation: "renders"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "renders_project_id_fkey"
             columns: ["project_id"]
