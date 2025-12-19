@@ -128,23 +128,49 @@ serve(async (req) => {
 `;
     }
 
-    // Add furniture replacement instructions
+    // Add furniture replacement instructions - ULTRA STRICT MATCHING
     if (furnitureImageIndices.length > 0) {
-      editInstruction += `FURNITURE PRODUCTS TO PLACE (replace existing furniture with these EXACT products):\n\n`;
+      editInstruction += `FURNITURE PRODUCTS TO PLACE - EXACT MATCHING REQUIRED:\n\n`;
       
       for (const { name, category, index } of furnitureImageIndices) {
         const categoryTarget = getCategoryReplacementInstruction(category);
         editInstruction += `IMAGE ${index}: "${name}"
-→ Find any ${categoryTarget} in the room (IMAGE ${currentRenderIndex}) and REPLACE it with this EXACT product
-→ Copy the precise shape, color, material, texture, and design PIXEL-FOR-PIXEL from IMAGE ${index}
-→ Do NOT generate a similar-looking product - use THIS EXACT product image
-→ Place the product in a natural position that fits the room layout
+
+⚠️ ABSOLUTE REQUIREMENTS FOR THIS PRODUCT:
+- Find any ${categoryTarget} in the room (IMAGE ${currentRenderIndex}) and REPLACE it with this EXACT product
+- COPY this product EXACTLY as shown - zero modifications allowed
+- The product shape, silhouette, and proportions must be IDENTICAL to IMAGE ${index}
+- Colors must match EXACTLY - do not adjust, enhance, or correct
+- Material textures must be preserved PERFECTLY
+- Any unique design features (curves, patterns, buttons, stitching, legs, handles) must appear IDENTICALLY
+- Do NOT "improve", "adapt", or "harmonize" this product
+- Do NOT generate a similar product - use THIS EXACT image
+
+🚫 FORBIDDEN MODIFICATIONS:
+- No color shifts or adjustments
+- No shape modifications  
+- No material changes
+- No design "improvements"
+- No style adaptations
+
+VISUAL IDENTITY TO PRESERVE:
+- If this product has a unique shape (curved, angular, organic) → KEEP THAT EXACT SHAPE
+- If this product has specific colors → KEEP THOSE EXACT COLORS (no white-balancing)
+- If this product has visible textures → REPLICATE THOSE EXACT TEXTURES
+- If this product has design details (buttons, stitching, patterns) → INCLUDE ALL DETAILS
+
+The staged product should look like it was CUT from IMAGE ${index} and PASTED into the room.
+${layoutIndex !== null ? `Place according to the floor plan in IMAGE ${layoutIndex}.` : ''}
 
 `;
       }
       
-      editInstruction += `CRITICAL REQUIREMENTS:
-1. Products MUST appear IDENTICALLY to their reference images
+      editInstruction += `⚠️ ACCURACY CHECK WARNING:
+After editing, the rendered products will be compared side-by-side with their catalog images.
+The match must be PIXEL-PERFECT. Any visible differences will be flagged as errors.
+
+CRITICAL REQUIREMENTS:
+1. Products MUST appear IDENTICALLY to their reference images - this is the #1 priority
 2. MAINTAIN the original 16:9 LANDSCAPE aspect ratio - output must be wide, not square
 3. Replace furniture category-by-category (sofa with sofa, table with table)
 4. Keep room architecture completely unchanged
