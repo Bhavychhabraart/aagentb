@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react';
-import { Image, Palette, Package, ChevronDown, ChevronUp, X } from 'lucide-react';
-import { Button } from '@/components/ui/button';
+import { Image, Palette, Package, ChevronDown, ChevronUp, ShoppingBag, Loader2 } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { supabase } from '@/integrations/supabase/client';
 import { cn } from '@/lib/utils';
+import { fetchFurnitureCatalog, CatalogFurnitureItem } from '@/services/catalogService';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 interface Asset {
   id: string;
@@ -15,18 +16,25 @@ interface Asset {
 interface AssetsPanelProps {
   projectId: string | null;
   onAssetSelect?: (asset: Asset) => void;
+  onCatalogItemSelect?: (item: CatalogFurnitureItem) => void;
 }
 
-export function AssetsPanel({ projectId, onAssetSelect }: AssetsPanelProps) {
+export function AssetsPanel({ projectId, onAssetSelect, onCatalogItemSelect }: AssetsPanelProps) {
   const [assets, setAssets] = useState<Asset[]>([]);
+  const [catalogItems, setCatalogItems] = useState<CatalogFurnitureItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [catalogLoading, setCatalogLoading] = useState(true);
   const [isExpanded, setIsExpanded] = useState(true);
   const [selectedAsset, setSelectedAsset] = useState<Asset | null>(null);
+  const [selectedCatalogItem, setSelectedCatalogItem] = useState<CatalogFurnitureItem | null>(null);
+  const [activeTab, setActiveTab] = useState('project');
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
 
   useEffect(() => {
     if (projectId) {
       fetchAssets();
     }
+    fetchCatalog();
   }, [projectId]);
 
   const fetchAssets = async () => {
@@ -75,25 +83,28 @@ export function AssetsPanel({ projectId, onAssetSelect }: AssetsPanelProps) {
     }
   };
 
+  const fetchCatalog = async () => {
+    setCatalogLoading(true);
+    try {
+      const items = await fetchFurnitureCatalog();
+      setCatalogItems(items);
+    } catch (error) {
+      console.error('Failed to fetch catalog:', error);
+    } finally {
+      setCatalogLoading(false);
+    }
+  };
+
   const handleAssetClick = (asset: Asset) => {
     setSelectedAsset(asset);
+    setSelectedCatalogItem(null);
     onAssetSelect?.(asset);
   };
 
-  const getAssetIcon = (type: Asset['type']) => {
-    switch (type) {
-      case 'room': return <Image className="h-3 w-3" />;
-      case 'style': return <Palette className="h-3 w-3" />;
-      case 'product': return <Package className="h-3 w-3" />;
-    }
-  };
-
-  const getAssetLabel = (type: Asset['type']) => {
-    switch (type) {
-      case 'room': return 'Room';
-      case 'style': return 'Style';
-      case 'product': return 'Product';
-    }
+  const handleCatalogItemClick = (item: CatalogFurnitureItem) => {
+    setSelectedCatalogItem(item);
+    setSelectedAsset(null);
+    onCatalogItemSelect?.(item);
   };
 
   if (!projectId) return null;
@@ -101,6 +112,12 @@ export function AssetsPanel({ projectId, onAssetSelect }: AssetsPanelProps) {
   const roomAssets = assets.filter(a => a.type === 'room');
   const styleAssets = assets.filter(a => a.type === 'style');
   const productAssets = assets.filter(a => a.type === 'product');
+
+  // Get unique categories from catalog
+  const categories = [...new Set(catalogItems.map(item => item.category))];
+  const filteredCatalogItems = selectedCategory 
+    ? catalogItems.filter(item => item.category === selectedCategory)
+    : catalogItems;
 
   return (
     <div className="border-t border-border bg-card/50">
@@ -111,10 +128,10 @@ export function AssetsPanel({ projectId, onAssetSelect }: AssetsPanelProps) {
       >
         <div className="flex items-center gap-2">
           <span className="text-xs font-medium text-foreground uppercase tracking-wider">
-            Project Assets
+            Assets & Catalog
           </span>
           <span className="text-xs text-muted-foreground bg-muted px-1.5 py-0.5 rounded">
-            {assets.length}
+            {assets.length + catalogItems.length}
           </span>
         </div>
         {isExpanded ? (
@@ -127,88 +144,155 @@ export function AssetsPanel({ projectId, onAssetSelect }: AssetsPanelProps) {
       {/* Content */}
       {isExpanded && (
         <div className="px-4 pb-3">
-          {loading ? (
-            <div className="grid grid-cols-4 gap-2">
-              {[...Array(4)].map((_, i) => (
-                <div key={i} className="aspect-square skeleton rounded-lg" />
-              ))}
-            </div>
-          ) : assets.length === 0 ? (
-            <div className="text-center py-6 text-muted-foreground">
-              <Image className="h-8 w-8 mx-auto mb-2 opacity-50" />
-              <p className="text-xs">No assets yet</p>
-            </div>
-          ) : (
-            <ScrollArea className="max-h-36">
-              <div className="space-y-3">
-                {/* Room uploads */}
-                {roomAssets.length > 0 && (
-                  <div>
-                    <div className="flex items-center gap-1.5 mb-1.5">
-                      <Image className="h-3 w-3 text-primary" />
-                      <span className="text-[10px] font-medium text-muted-foreground uppercase">
-                        Room Photos ({roomAssets.length})
-                      </span>
-                    </div>
-                    <div className="grid grid-cols-4 gap-1.5">
-                      {roomAssets.map((asset) => (
-                        <AssetThumbnail
-                          key={asset.id}
-                          asset={asset}
-                          isSelected={selectedAsset?.id === asset.id}
-                          onClick={() => handleAssetClick(asset)}
-                        />
-                      ))}
-                    </div>
-                  </div>
-                )}
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+            <TabsList className="w-full grid grid-cols-2 mb-3">
+              <TabsTrigger value="project" className="text-xs">
+                <Package className="h-3 w-3 mr-1" />
+                Project ({assets.length})
+              </TabsTrigger>
+              <TabsTrigger value="catalog" className="text-xs">
+                <ShoppingBag className="h-3 w-3 mr-1" />
+                Catalog ({catalogItems.length})
+              </TabsTrigger>
+            </TabsList>
 
-                {/* Style uploads */}
-                {styleAssets.length > 0 && (
-                  <div>
-                    <div className="flex items-center gap-1.5 mb-1.5">
-                      <Palette className="h-3 w-3 text-accent" />
-                      <span className="text-[10px] font-medium text-muted-foreground uppercase">
-                        Style References ({styleAssets.length})
-                      </span>
-                    </div>
-                    <div className="grid grid-cols-4 gap-1.5">
-                      {styleAssets.map((asset) => (
-                        <AssetThumbnail
-                          key={asset.id}
-                          asset={asset}
-                          isSelected={selectedAsset?.id === asset.id}
-                          onClick={() => handleAssetClick(asset)}
-                        />
-                      ))}
-                    </div>
-                  </div>
-                )}
+            <TabsContent value="project" className="mt-0">
+              {loading ? (
+                <div className="grid grid-cols-4 gap-2">
+                  {[...Array(4)].map((_, i) => (
+                    <div key={i} className="aspect-square skeleton rounded-lg" />
+                  ))}
+                </div>
+              ) : assets.length === 0 ? (
+                <div className="text-center py-6 text-muted-foreground">
+                  <Image className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                  <p className="text-xs">No assets yet</p>
+                </div>
+              ) : (
+                <ScrollArea className="max-h-36">
+                  <div className="space-y-3">
+                    {/* Room uploads */}
+                    {roomAssets.length > 0 && (
+                      <div>
+                        <div className="flex items-center gap-1.5 mb-1.5">
+                          <Image className="h-3 w-3 text-primary" />
+                          <span className="text-[10px] font-medium text-muted-foreground uppercase">
+                            Room Photos ({roomAssets.length})
+                          </span>
+                        </div>
+                        <div className="grid grid-cols-4 gap-1.5">
+                          {roomAssets.map((asset) => (
+                            <AssetThumbnail
+                              key={asset.id}
+                              asset={asset}
+                              isSelected={selectedAsset?.id === asset.id}
+                              onClick={() => handleAssetClick(asset)}
+                            />
+                          ))}
+                        </div>
+                      </div>
+                    )}
 
-                {/* Products */}
-                {productAssets.length > 0 && (
-                  <div>
-                    <div className="flex items-center gap-1.5 mb-1.5">
-                      <Package className="h-3 w-3 text-success" />
-                      <span className="text-[10px] font-medium text-muted-foreground uppercase">
-                        Products ({productAssets.length})
-                      </span>
-                    </div>
+                    {/* Style uploads */}
+                    {styleAssets.length > 0 && (
+                      <div>
+                        <div className="flex items-center gap-1.5 mb-1.5">
+                          <Palette className="h-3 w-3 text-accent" />
+                          <span className="text-[10px] font-medium text-muted-foreground uppercase">
+                            Style References ({styleAssets.length})
+                          </span>
+                        </div>
+                        <div className="grid grid-cols-4 gap-1.5">
+                          {styleAssets.map((asset) => (
+                            <AssetThumbnail
+                              key={asset.id}
+                              asset={asset}
+                              isSelected={selectedAsset?.id === asset.id}
+                              onClick={() => handleAssetClick(asset)}
+                            />
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Products */}
+                    {productAssets.length > 0 && (
+                      <div>
+                        <div className="flex items-center gap-1.5 mb-1.5">
+                          <Package className="h-3 w-3 text-success" />
+                          <span className="text-[10px] font-medium text-muted-foreground uppercase">
+                            Products ({productAssets.length})
+                          </span>
+                        </div>
+                        <div className="grid grid-cols-4 gap-1.5">
+                          {productAssets.map((asset) => (
+                            <AssetThumbnail
+                              key={asset.id}
+                              asset={asset}
+                              isSelected={selectedAsset?.id === asset.id}
+                              onClick={() => handleAssetClick(asset)}
+                            />
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </ScrollArea>
+              )}
+            </TabsContent>
+
+            <TabsContent value="catalog" className="mt-0">
+              {catalogLoading ? (
+                <div className="flex items-center justify-center py-8">
+                  <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {/* Category filter */}
+                  <div className="flex gap-1 flex-wrap">
+                    <button
+                      onClick={() => setSelectedCategory(null)}
+                      className={cn(
+                        "text-[10px] px-2 py-1 rounded-full transition-colors",
+                        selectedCategory === null
+                          ? "bg-primary text-primary-foreground"
+                          : "bg-muted text-muted-foreground hover:bg-muted/80"
+                      )}
+                    >
+                      All
+                    </button>
+                    {categories.map((cat) => (
+                      <button
+                        key={cat}
+                        onClick={() => setSelectedCategory(cat)}
+                        className={cn(
+                          "text-[10px] px-2 py-1 rounded-full transition-colors",
+                          selectedCategory === cat
+                            ? "bg-primary text-primary-foreground"
+                            : "bg-muted text-muted-foreground hover:bg-muted/80"
+                        )}
+                      >
+                        {cat}
+                      </button>
+                    ))}
+                  </div>
+
+                  <ScrollArea className="max-h-32">
                     <div className="grid grid-cols-4 gap-1.5">
-                      {productAssets.map((asset) => (
-                        <AssetThumbnail
-                          key={asset.id}
-                          asset={asset}
-                          isSelected={selectedAsset?.id === asset.id}
-                          onClick={() => handleAssetClick(asset)}
+                      {filteredCatalogItems.slice(0, 20).map((item) => (
+                        <CatalogThumbnail
+                          key={item.id}
+                          item={item}
+                          isSelected={selectedCatalogItem?.id === item.id}
+                          onClick={() => handleCatalogItemClick(item)}
                         />
                       ))}
                     </div>
-                  </div>
-                )}
-              </div>
-            </ScrollArea>
-          )}
+                  </ScrollArea>
+                </div>
+              )}
+            </TabsContent>
+          </Tabs>
         </div>
       )}
     </div>
@@ -243,6 +327,44 @@ function AssetThumbnail({ asset, isSelected, onClick }: AssetThumbnailProps) {
         {asset.type === 'room' && <Image className="h-2.5 w-2.5" />}
         {asset.type === 'style' && <Palette className="h-2.5 w-2.5" />}
         {asset.type === 'product' && <Package className="h-2.5 w-2.5" />}
+      </div>
+    </button>
+  );
+}
+
+interface CatalogThumbnailProps {
+  item: CatalogFurnitureItem;
+  isSelected: boolean;
+  onClick: () => void;
+}
+
+function CatalogThumbnail({ item, isSelected, onClick }: CatalogThumbnailProps) {
+  return (
+    <button
+      onClick={onClick}
+      className={cn(
+        'relative aspect-square rounded-lg overflow-hidden border-2 transition-all group',
+        'hover:scale-105 hover:shadow-lg',
+        isSelected 
+          ? 'border-primary ring-2 ring-primary/30' 
+          : 'border-border/50 hover:border-primary/50'
+      )}
+      title={`${item.name} - $${item.price}`}
+    >
+      <img
+        src={item.imageUrl}
+        alt={item.name}
+        className="w-full h-full object-cover"
+      />
+      {/* Category indicator */}
+      <div className="absolute bottom-0.5 right-0.5 p-0.5 rounded bg-black/60 text-white">
+        <ShoppingBag className="h-2.5 w-2.5" />
+      </div>
+      {/* Hover overlay with name */}
+      <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-end p-1">
+        <span className="text-[8px] text-white line-clamp-2 leading-tight">
+          {item.name}
+        </span>
       </div>
     </button>
   );
