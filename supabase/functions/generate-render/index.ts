@@ -47,7 +47,7 @@ serve(async (req) => {
     let layoutImageIndex: number | null = null;
     let roomPhotoIndex: number | null = null;
     const styleImageIndices: number[] = [];
-    const furnitureImageIndices: { name: string; index: number }[] = [];
+    const furnitureImageIndices: { name: string; category: string; index: number }[] = [];
 
     // Add layout image first (most important for room shape)
     if (layoutImageUrl) {
@@ -74,18 +74,22 @@ serve(async (req) => {
     for (const item of furnitureWithImages) {
       if (item.imageUrl) {
         content.push({ type: 'image_url', image_url: { url: item.imageUrl } });
-        furnitureImageIndices.push({ name: item.name, index: imageIndex++ });
+        furnitureImageIndices.push({ name: item.name, category: item.category, index: imageIndex++ });
       }
     }
 
-    // Build structured prompt with explicit image references
-    let structuredPrompt = `Generate a photorealistic interior design render following these STRICT requirements:\n\n`;
+    // Build structured prompt with NUMBERED IMAGE REFERENCES (Master Architect style)
+    let structuredPrompt = `Role: Expert Interior Architect and 3D Visualizer.
+Task: Generate a photorealistic interior design render.
+
+=== REFERENCE IMAGES ===
+
+`;
 
     // Layout instructions (highest priority)
     if (layoutImageIndex !== null) {
-      structuredPrompt += `IMAGE ${layoutImageIndex}: This is the 2D FLOOR PLAN LAYOUT.
-CRITICAL - The generated room MUST:
-- Match this layout's room shape, walls, and proportions EXACTLY
+      structuredPrompt += `IMAGE ${layoutImageIndex}: 2D FLOOR PLAN LAYOUT (HIGHEST PRIORITY)
+- The generated room MUST match this layout's room shape, walls, and proportions EXACTLY
 - Place furniture in the EXACT positions shown in this floor plan
 - Doors, windows, and openings must be in the EXACT locations shown
 - The room dimensions and proportions must be pixel-accurate to this layout
@@ -96,7 +100,7 @@ CRITICAL - The generated room MUST:
 
     // Room photo instructions
     if (roomPhotoIndex !== null) {
-      structuredPrompt += `IMAGE ${roomPhotoIndex}: This is an existing ROOM PHOTO reference.
+      structuredPrompt += `IMAGE ${roomPhotoIndex}: EXISTING ROOM PHOTO REFERENCE
 - Match the architectural features from this photo (ceiling height, window styles, door types)
 - Preserve similar structural elements and room character
 - Use this for realistic architectural context
@@ -108,88 +112,86 @@ CRITICAL - The generated room MUST:
     if (styleImageIndices.length > 0) {
       const styleRange = styleImageIndices.length === 1 
         ? `IMAGE ${styleImageIndices[0]}` 
-        : `IMAGES ${styleImageIndices[0]}-${styleImageIndices[styleImageIndices.length - 1]}`;
+        : `IMAGES ${styleImageIndices.join(', ')}`;
       
-      structuredPrompt += `${styleRange}: These are STYLE REFERENCES.
-CRITICAL - The final render's aesthetic MUST:
-- Match the color palette from these style references EXACTLY
-- Copy the materials, textures, and finishes shown
+      structuredPrompt += `${styleRange}: STYLE REFERENCES
+- The final render's aesthetic MUST match these style references
+- Copy the color palette, materials, textures, and finishes shown
 - Replicate the mood, lighting style, and atmosphere
-- Use similar furniture styles and design language
 - The overall aesthetic must be IDENTICAL to these references
 
 `;
     }
 
-    // Furniture instructions - ULTRA STRICT MATCHING
+    // Furniture instructions with NUMBERED CHANGE LIST format
     if (furnitureImageIndices.length > 0) {
-      structuredPrompt += `FURNITURE PRODUCTS - EXACT MATCHING REQUIRED:\n\n`;
-      for (const { name, index } of furnitureImageIndices) {
-        structuredPrompt += `IMAGE ${index}: "${name}"
+      structuredPrompt += `=== FURNITURE PRODUCTS TO INCLUDE ===
 
-⚠️ ABSOLUTE REQUIREMENTS FOR THIS PRODUCT:
-- COPY this product EXACTLY as shown - zero modifications allowed
-- The product shape, silhouette, and proportions must be IDENTICAL
-- Colors must match EXACTLY - do not adjust, enhance, or correct
-- Material textures must be preserved PERFECTLY
-- Any unique design features (curves, patterns, buttons, stitching, legs, handles) must appear IDENTICALLY
-- Do NOT "improve", "adapt", or "harmonize" this product
-- Do NOT generate a similar product - use THIS EXACT image
-
-🚫 FORBIDDEN MODIFICATIONS:
-- No color shifts or adjustments
-- No shape modifications
-- No material changes
-- No design "improvements"
-- No style adaptations
-
-VISUAL IDENTITY TO PRESERVE:
-- If this product has a unique shape (curved, angular, organic) → KEEP THAT EXACT SHAPE
-- If this product has specific colors → KEEP THOSE EXACT COLORS (no white-balancing)
-- If this product has visible textures → REPLICATE THOSE EXACT TEXTURES
-- If this product has design details (buttons, stitching, patterns) → INCLUDE ALL DETAILS
-
-The staged product should look like it was CUT from IMAGE ${index} and PASTED into the room.
+`;
+      for (let i = 0; i < furnitureImageIndices.length; i++) {
+        const { name, category, index } = furnitureImageIndices[i];
+        structuredPrompt += `${i + 1}. "${name}" (${category})
+   -> Visual Reference: IMAGE ${index}
+   -> COPY this product EXACTLY as shown - zero modifications allowed
+   -> Shape, silhouette, and proportions must be IDENTICAL to IMAGE ${index}
+   -> Colors must match EXACTLY - do not adjust, enhance, or correct
+   -> Material textures must be preserved PERFECTLY
+   -> Any unique design features must appear IDENTICALLY
+   ${layoutImageIndex !== null ? `-> Place according to floor plan in IMAGE ${layoutImageIndex}` : ''}
 
 `;
       }
     }
 
     // Add user's prompt
-    structuredPrompt += `USER DESIGN REQUEST: ${prompt}\n\n`;
+    structuredPrompt += `=== USER DESIGN REQUEST ===
+
+${prompt}
+
+`;
 
     // Add furniture descriptions for context
     if (furnitureItems && furnitureItems.length > 0) {
       const furnitureDescriptions = (furnitureItems as FurnitureItem[]).map(item => 
         `${item.name} (${item.category}): ${item.description}`
       ).join('; ');
-      structuredPrompt += `Furniture context: ${furnitureDescriptions}\n\n`;
+      structuredPrompt += `Furniture context: ${furnitureDescriptions}
+
+`;
     }
 
-    // Accuracy verification warning
-    structuredPrompt += `⚠️ ACCURACY CHECK WARNING:
-After generation, the rendered products will be compared side-by-side with their catalog images.
-The match must be PIXEL-PERFECT. Any visible differences in:
-- Product shape/silhouette
-- Product color
-- Product material/texture
-- Product design details
-...will be flagged as errors. Generate the products EXACTLY as shown in the reference images.
+    // Critical rules
+    structuredPrompt += `=== CRITICAL RULES ===
+
+1. Products MUST appear IDENTICALLY to their reference images - this is the #1 priority
+2. COPY products EXACTLY - do NOT "improve", "adapt", or "harmonize" them
+3. The staged products should look like they were CUT from their references and PASTED into the room
+4. If a product has a unique shape → KEEP THAT EXACT SHAPE
+5. If a product has specific colors → KEEP THOSE EXACT COLORS (no white-balancing)
+6. If a product has visible textures → REPLICATE THOSE EXACT TEXTURES
+7. If a product has design details (buttons, stitching, patterns) → INCLUDE ALL DETAILS
 
 `;
 
-    // Final requirements
-    structuredPrompt += `OUTPUT REQUIREMENTS:
+    // Output requirements
+    structuredPrompt += `=== OUTPUT REQUIREMENTS ===
+
 1. Photorealistic quality - professional architectural visualization
-2. 16:9 LANDSCAPE aspect ratio (wide cinematic format, 1920x1080 proportions)
+2. 16:9 LANDSCAPE aspect ratio (wide cinematic format)
 3. Dramatic, realistic lighting with natural shadows
 4. High-end interior design aesthetic
-5. Furniture products must be IDENTICAL to their reference images - this is the #1 priority
-6. All reference images must be respected in order of priority: Layout > Style > Room Photo > Furniture matching`;
+5. All reference images must be respected in order of priority: Layout > Style > Room Photo > Furniture
+
+⚠️ QUALITY CHECK: 
+After generation, rendered products will be compared side-by-side with their catalog images.
+ANY visible differences in shape, color, or details will be flagged as errors.
+The goal is 100% visual accuracy.
+
+Output: ONLY the final image.`;
 
     content.push({ type: 'text', text: structuredPrompt });
 
-    console.log('Structured prompt:', structuredPrompt.substring(0, 800) + '...');
+    console.log('Structured prompt length:', structuredPrompt.length);
     console.log('Total images in request:', content.filter(c => c.type === 'image_url').length);
 
     const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
@@ -200,16 +202,9 @@ The match must be PIXEL-PERFECT. Any visible differences in:
       },
       body: JSON.stringify({
         model: 'google/gemini-3-pro-image-preview',
-        messages: [
-          {
-            role: 'user',
-            content: content,
-          },
-        ],
+        messages: [{ role: 'user', content }],
         modalities: ['image', 'text'],
-        generationConfig: {
-          aspectRatio: "16:9"
-        }
+        generationConfig: { aspectRatio: "16:9" }
       }),
     });
 
