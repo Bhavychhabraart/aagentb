@@ -112,41 +112,84 @@ const Index = () => {
     }));
     setMessages(formattedMessages);
 
-    // Check if we should auto-trigger generation (coming from Landing page with prompt in URL)
+    // Check if we should auto-trigger generation (coming from Landing page)
     const shouldGenerate = searchParams.get('generate') === 'true';
     const promptFromUrl = searchParams.get('prompt');
+    const hasLayout = searchParams.get('hasLayout') === 'true';
+    const hasRoom = searchParams.get('hasRoom') === 'true';
+    const styleCount = parseInt(searchParams.get('styleCount') || '0', 10);
     
-    if (shouldGenerate && !hasTriggeredGeneration.current && promptFromUrl) {
+    if (shouldGenerate && !hasTriggeredGeneration.current) {
       hasTriggeredGeneration.current = true;
-      const decodedPrompt = decodeURIComponent(promptFromUrl);
       
-      // Remove the generate and prompt params from URL
+      // Remove all landing params from URL
       const newParams = new URLSearchParams(searchParams);
       newParams.delete('generate');
       newParams.delete('prompt');
+      newParams.delete('hasLayout');
+      newParams.delete('hasRoom');
+      newParams.delete('styleCount');
       setSearchParams(newParams, { replace: true });
       
-      // Add the prompt as a user message and show it immediately
-      const tempMessage: ChatMessage = {
-        id: `temp-${Date.now()}`,
-        role: 'user',
-        content: decodedPrompt,
-        metadata: { type: 'text' },
-        created_at: new Date().toISOString(),
-      };
-      setMessages(prev => [...prev, tempMessage]);
+      const newMessages: ChatMessage[] = [];
       
-      // Save to database (fire and forget, we already show it in UI)
-      supabase.from('chat_messages').insert({
-        project_id: currentProjectId,
-        user_id: user!.id,
-        role: 'user',
-        content: decodedPrompt,
-        metadata: { type: 'text' },
-      });
+      // Add upload info messages
+      if (hasLayout || hasRoom || styleCount > 0) {
+        const uploadParts: string[] = [];
+        if (hasLayout) uploadParts.push('2D layout');
+        if (hasRoom) uploadParts.push('room photo');
+        if (styleCount > 0) uploadParts.push(`${styleCount} style reference${styleCount > 1 ? 's' : ''}`);
+        
+        const uploadMessage: ChatMessage = {
+          id: `upload-${Date.now()}`,
+          role: 'user',
+          content: `Uploaded: ${uploadParts.join(', ')}`,
+          metadata: { type: 'upload' },
+          created_at: new Date().toISOString(),
+        };
+        newMessages.push(uploadMessage);
+        
+        // Save upload message
+        supabase.from('chat_messages').insert({
+          project_id: currentProjectId,
+          user_id: user!.id,
+          role: 'user',
+          content: uploadMessage.content,
+          metadata: { type: 'upload' },
+        });
+      }
       
-      // Trigger generation
-      triggerGeneration(decodedPrompt);
+      // Add prompt message if present
+      if (promptFromUrl) {
+        const decodedPrompt = decodeURIComponent(promptFromUrl);
+        const promptMessage: ChatMessage = {
+          id: `prompt-${Date.now()}`,
+          role: 'user',
+          content: decodedPrompt,
+          metadata: { type: 'text' },
+          created_at: new Date().toISOString(),
+        };
+        newMessages.push(promptMessage);
+        
+        // Save prompt message
+        supabase.from('chat_messages').insert({
+          project_id: currentProjectId,
+          user_id: user!.id,
+          role: 'user',
+          content: decodedPrompt,
+          metadata: { type: 'text' },
+        });
+      }
+      
+      if (newMessages.length > 0) {
+        setMessages(prev => [...prev, ...newMessages]);
+        
+        // Trigger generation with prompt or generic message
+        const generationPrompt = promptFromUrl 
+          ? decodeURIComponent(promptFromUrl)
+          : 'Generate a design based on the uploaded references';
+        triggerGeneration(generationPrompt);
+      }
     }
   };
 

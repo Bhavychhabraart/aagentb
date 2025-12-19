@@ -142,10 +142,22 @@ export default function Landing() {
 
       await Promise.all(uploadPromises);
 
-      // Navigate to workspace with prompt in URL (avoids race condition with DB save)
+      // Navigate to workspace with prompt and upload info in URL
       const params = new URLSearchParams({ project: project.id });
       if (session.prompt.trim()) {
         params.set("prompt", encodeURIComponent(session.prompt));
+      }
+      if (session.layout) {
+        params.set("hasLayout", "true");
+      }
+      if (session.roomPhoto) {
+        params.set("hasRoom", "true");
+      }
+      if (session.styleRefs.length > 0) {
+        params.set("styleCount", session.styleRefs.length.toString());
+      }
+      // Set generate flag if we have prompt or uploads
+      if (session.prompt.trim() || session.layout || session.roomPhoto) {
         params.set("generate", "true");
       }
       navigate(`/workspace?${params.toString()}`);
