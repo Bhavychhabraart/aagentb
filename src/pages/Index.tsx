@@ -42,6 +42,7 @@ const Index = () => {
   const [currentUpload, setCurrentUpload] = useState<RoomUpload | null>(null);
   const hasTriggeredGeneration = useRef(false);
   const [stagedItems, setStagedItems] = useState<CatalogFurnitureItem[]>([]);
+  const [layoutImageUrl, setLayoutImageUrl] = useState<string | null>(null);
 
   // Redirect to auth if not logged in
   useEffect(() => {
@@ -69,8 +70,24 @@ const Index = () => {
       loadLatestUpload();
       loadLatestRender();
       loadStagedFurniture();
+      loadLayoutImage();
     }
   }, [currentProjectId]);
+
+  // Load layout image for comparison view
+  const loadLayoutImage = async () => {
+    if (!currentProjectId) return;
+    
+    const { data } = await supabase
+      .from('room_uploads')
+      .select('file_url')
+      .eq('project_id', currentProjectId)
+      .eq('upload_type', 'layout')
+      .limit(1)
+      .maybeSingle();
+    
+    setLayoutImageUrl(data?.file_url || null);
+  };
 
   const loadOrCreateProject = async () => {
     const { data: projects, error } = await supabase
@@ -793,6 +810,7 @@ Ready to generate a render! Describe your vision.`;
           <RenderViewer
             imageUrl={currentRenderUrl}
             isGenerating={isGenerating}
+            layoutImageUrl={layoutImageUrl}
           />
           
           <div className="w-96 shrink-0 flex flex-col">
