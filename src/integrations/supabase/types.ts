@@ -52,6 +52,36 @@ export type Database = {
           },
         ]
       }
+      product_items: {
+        Row: {
+          created_at: string
+          id: string
+          image_url: string | null
+          name: string
+          product_url: string | null
+          project_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          image_url?: string | null
+          name: string
+          product_url?: string | null
+          project_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          image_url?: string | null
+          name?: string
+          product_url?: string | null
+          project_id?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           avatar_url: string | null
@@ -166,6 +196,7 @@ export type Database = {
           file_url: string
           id: string
           project_id: string
+          upload_type: string
           user_id: string
         }
         Insert: {
@@ -176,6 +207,7 @@ export type Database = {
           file_url: string
           id?: string
           project_id: string
+          upload_type?: string
           user_id: string
         }
         Update: {
@@ -186,6 +218,7 @@ export type Database = {
           file_url?: string
           id?: string
           project_id?: string
+          upload_type?: string
           user_id?: string
         }
         Relationships: [
@@ -197,6 +230,33 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      style_uploads: {
+        Row: {
+          created_at: string
+          file_name: string
+          file_url: string
+          id: string
+          project_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          file_name: string
+          file_url: string
+          id?: string
+          project_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          file_name?: string
+          file_url?: string
+          id?: string
+          project_id?: string
+          user_id?: string
+        }
+        Relationships: []
       }
     }
     Views: {
