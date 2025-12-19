@@ -65,30 +65,38 @@ serve(async (req) => {
       }
     }
 
-    // Build the editing instruction prompt
-    let editInstruction = `Edit this room render image. `;
+    // Build the editing instruction prompt with explicit image numbering
+    let editInstruction = `You are editing a room render (IMAGE 1 - the first image provided).
+
+I am providing product reference images that MUST be placed EXACTLY as shown - do NOT interpret, modify, or generate similar products.
+
+`;
     
     if (furnitureWithImages.length > 0) {
-      editInstruction += `Replace existing furniture with the EXACT product images provided:\n\n`;
-      
       furnitureWithImages.forEach((item, index) => {
         const categoryTarget = getCategoryReplacementInstruction(item.category);
-        editInstruction += `${index + 1}. Find and replace the ${categoryTarget} in the room with the "${item.name}" product shown in image ${index + 2}. `;
-        editInstruction += `Use the EXACT appearance, color, and design of the product image - do not interpret or change it.\n`;
+        const imageNumber = index + 2;
+        editInstruction += `IMAGE ${imageNumber}: "${item.name}" - This is the EXACT product to use.
+→ Find any ${categoryTarget} in the room (IMAGE 1) and REPLACE it with this EXACT product from IMAGE ${imageNumber}.
+→ Copy the precise shape, color, material, texture, and design PIXEL-FOR-PIXEL from IMAGE ${imageNumber}.
+→ Do NOT generate a similar-looking product - place THIS EXACT product into the scene.
+
+`;
       });
       
-      editInstruction += `\nCRITICAL REQUIREMENTS:
-- Replace furniture category-by-category (sofa with sofa, table with table, bed with bed)
-- Use the EXACT product images provided - match the precise colors, materials, textures, and design
-- Keep the room's walls, floor, windows, lighting, and overall architecture unchanged
-- Maintain the same camera angle and perspective
-- Preserve realistic lighting and shadows on the new furniture
-- The replaced furniture should look naturally placed in the room`;
+      editInstruction += `CRITICAL REQUIREMENTS:
+1. The products MUST appear IDENTICALLY to their reference images (IMAGE 2, 3, etc.)
+2. MAINTAIN the original 16:9 LANDSCAPE aspect ratio - output must be wide, not square
+3. Replace furniture category-by-category (sofa with sofa, table with table, bed with bed)
+4. Keep room architecture, walls, floors, windows, and lighting UNCHANGED
+5. Maintain the same camera angle and perspective as IMAGE 1
+6. Apply realistic lighting and shadows to the placed products
+7. The output image must have the SAME dimensions and aspect ratio as IMAGE 1`;
     }
 
     // Add user's additional instructions if provided
     if (userPrompt && userPrompt.trim()) {
-      editInstruction += `\n\nAdditional instructions: ${userPrompt}`;
+      editInstruction += `\n\nAdditional user instructions: ${userPrompt}`;
     }
 
     content.push({
@@ -105,7 +113,7 @@ serve(async (req) => {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'google/gemini-2.5-flash-image-preview',
+        model: 'google/gemini-3-pro-image-preview',
         messages: [
           {
             role: 'user',
@@ -113,6 +121,9 @@ serve(async (req) => {
           },
         ],
         modalities: ['image', 'text'],
+        generationConfig: {
+          aspectRatio: "16:9"
+        }
       }),
     });
 
