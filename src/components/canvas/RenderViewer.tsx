@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ZoomIn, ZoomOut, RotateCcw, Download, X, Maximize2, LayoutGrid, Image } from 'lucide-react';
+import { ZoomIn, ZoomOut, RotateCcw, Download, X, Maximize2, LayoutGrid, Image, Move } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from '@/components/ui/tooltip';
@@ -9,9 +9,10 @@ interface RenderViewerProps {
   isGenerating: boolean;
   layoutImageUrl?: string | null;
   onClose?: () => void;
+  onPositionFurniture?: () => void;
 }
 
-export function RenderViewer({ imageUrl, isGenerating, layoutImageUrl, onClose }: RenderViewerProps) {
+export function RenderViewer({ imageUrl, isGenerating, layoutImageUrl, onClose, onPositionFurniture }: RenderViewerProps) {
   const [zoom, setZoom] = useState(1);
   const [position, setPosition] = useState({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState(false);
@@ -92,6 +93,28 @@ export function RenderViewer({ imageUrl, isGenerating, layoutImageUrl, onClose }
                   </TooltipTrigger>
                   <TooltipContent>
                     <p>{showComparison ? 'Hide layout comparison' : 'Compare with layout'}</p>
+                  </TooltipContent>
+                </Tooltip>
+                <div className="w-px h-4 bg-border/50 mx-1" />
+              </>
+            )}
+
+            {/* Position furniture button */}
+            {onPositionFurniture && (
+              <>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={onPositionFurniture}
+                      className="h-8 w-8 hover:bg-primary/20 text-primary"
+                    >
+                      <Move className="h-4 w-4" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>Position furniture (100% accurate)</p>
                   </TooltipContent>
                 </Tooltip>
                 <div className="w-px h-4 bg-border/50 mx-1" />
