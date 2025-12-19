@@ -7,6 +7,7 @@ import { AppSidebar } from '@/components/layout/AppSidebar';
 import { ChatPanel, ChatMessage } from '@/components/canvas/ChatPanel';
 import { RenderViewer } from '@/components/canvas/RenderViewer';
 import { UploadDialog } from '@/components/canvas/UploadDialog';
+import { AssetsPanel } from '@/components/canvas/AssetsPanel';
 import { SidebarProvider } from '@/components/ui/sidebar';
 
 interface RoomUpload {
@@ -536,13 +537,16 @@ Ready to generate a render! Describe your vision.`;
             isGenerating={isGenerating}
           />
           
-          <div className="w-80 shrink-0">
-            <ChatPanel
-              messages={messages}
-              isLoading={isProcessing || isGenerating}
-              onSendMessage={handleSendMessage}
-              onUploadClick={() => setUploadDialogOpen(true)}
-            />
+          <div className="w-96 shrink-0 flex flex-col">
+            <div className="flex-1 overflow-hidden">
+              <ChatPanel
+                messages={messages}
+                isLoading={isProcessing || isGenerating}
+                onSendMessage={handleSendMessage}
+                onUploadClick={() => setUploadDialogOpen(true)}
+              />
+            </div>
+            <AssetsPanel projectId={currentProjectId} />
           </div>
         </div>
 
