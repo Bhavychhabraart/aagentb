@@ -121,13 +121,38 @@ CRITICAL - The final render's aesthetic MUST:
 `;
     }
 
-    // Furniture instructions
+    // Furniture instructions - ULTRA STRICT MATCHING
     if (furnitureImageIndices.length > 0) {
-      structuredPrompt += `FURNITURE PRODUCTS TO INCLUDE:\n`;
+      structuredPrompt += `FURNITURE PRODUCTS - EXACT MATCHING REQUIRED:\n\n`;
       for (const { name, index } of furnitureImageIndices) {
-        structuredPrompt += `- IMAGE ${index}: "${name}" - Place this EXACT product in the render, matching its appearance precisely\n`;
+        structuredPrompt += `IMAGE ${index}: "${name}"
+
+⚠️ ABSOLUTE REQUIREMENTS FOR THIS PRODUCT:
+- COPY this product EXACTLY as shown - zero modifications allowed
+- The product shape, silhouette, and proportions must be IDENTICAL
+- Colors must match EXACTLY - do not adjust, enhance, or correct
+- Material textures must be preserved PERFECTLY
+- Any unique design features (curves, patterns, buttons, stitching, legs, handles) must appear IDENTICALLY
+- Do NOT "improve", "adapt", or "harmonize" this product
+- Do NOT generate a similar product - use THIS EXACT image
+
+🚫 FORBIDDEN MODIFICATIONS:
+- No color shifts or adjustments
+- No shape modifications
+- No material changes
+- No design "improvements"
+- No style adaptations
+
+VISUAL IDENTITY TO PRESERVE:
+- If this product has a unique shape (curved, angular, organic) → KEEP THAT EXACT SHAPE
+- If this product has specific colors → KEEP THOSE EXACT COLORS (no white-balancing)
+- If this product has visible textures → REPLICATE THOSE EXACT TEXTURES
+- If this product has design details (buttons, stitching, patterns) → INCLUDE ALL DETAILS
+
+The staged product should look like it was CUT from IMAGE ${index} and PASTED into the room.
+
+`;
       }
-      structuredPrompt += `\n`;
     }
 
     // Add user's prompt
@@ -138,8 +163,20 @@ CRITICAL - The final render's aesthetic MUST:
       const furnitureDescriptions = (furnitureItems as FurnitureItem[]).map(item => 
         `${item.name} (${item.category}): ${item.description}`
       ).join('; ');
-      structuredPrompt += `Furniture to feature: ${furnitureDescriptions}\n\n`;
+      structuredPrompt += `Furniture context: ${furnitureDescriptions}\n\n`;
     }
+
+    // Accuracy verification warning
+    structuredPrompt += `⚠️ ACCURACY CHECK WARNING:
+After generation, the rendered products will be compared side-by-side with their catalog images.
+The match must be PIXEL-PERFECT. Any visible differences in:
+- Product shape/silhouette
+- Product color
+- Product material/texture
+- Product design details
+...will be flagged as errors. Generate the products EXACTLY as shown in the reference images.
+
+`;
 
     // Final requirements
     structuredPrompt += `OUTPUT REQUIREMENTS:
@@ -147,7 +184,8 @@ CRITICAL - The final render's aesthetic MUST:
 2. 16:9 LANDSCAPE aspect ratio (wide cinematic format, 1920x1080 proportions)
 3. Dramatic, realistic lighting with natural shadows
 4. High-end interior design aesthetic
-5. All reference images must be respected in order of priority: Layout > Style > Room Photo > Furniture`;
+5. Furniture products must be IDENTICAL to their reference images - this is the #1 priority
+6. All reference images must be respected in order of priority: Layout > Style > Room Photo > Furniture matching`;
 
     content.push({ type: 'text', text: structuredPrompt });
 
