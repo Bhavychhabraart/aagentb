@@ -12,6 +12,22 @@ interface FurnitureItem {
   imageUrl?: string;
   position?: { x: number; y: number }; // Percentage position (0-100) for composite mode
   scale?: number; // Scale factor for composite mode
+  originalLabel?: string; // Label of item being replaced
+}
+
+// Convert coordinates to natural language spatial description
+function getPositionDescription(x: number, y: number): string {
+  let positionDesc = "in the room";
+  
+  if (y < 33) positionDesc = "in the background/top area";
+  else if (y > 66) positionDesc = "in the foreground/bottom area";
+  else positionDesc = "in the middle ground";
+
+  if (x < 33) positionDesc += " on the left side";
+  else if (x > 66) positionDesc += " on the right side";
+  else positionDesc += " in the center";
+  
+  return positionDesc;
 }
 
 // Map furniture categories to replacement instructions
@@ -39,7 +55,7 @@ serve(async (req) => {
       userPrompt,
       layoutImageUrl,
       styleRefUrls,
-      compositeMode = false // New: use precise compositing
+      compositeMode = false // Use precise coordinate-based compositing
     } = await req.json();
     
     const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
@@ -58,19 +74,19 @@ serve(async (req) => {
     console.log('Style references:', styleRefUrls?.length || 0);
     console.log('Composite mode:', compositeMode);
 
-    // If composite mode is enabled and furniture has position data, use precise compositing
+    // Check if we have furniture items with position data for Master Staging
     const furnitureWithPositions = (furnitureItems as FurnitureItem[] || []).filter(
       item => item.imageUrl && item.position && item.scale !== undefined
     );
 
     if (compositeMode && furnitureWithPositions.length > 0) {
-      console.log('Using COMPOSITE MODE for precise furniture placement');
+      console.log('Using MASTER STAGING ARCHITECT mode for precise placement');
       
-      // Build content for precise compositing
+      // Build content array with numbered image references
       const content: Array<{ type: string; text?: string; image_url?: { url: string } }> = [];
       let imageIndex = 1;
 
-      // IMAGE 1: Base render
+      // IMAGE 1: Base render (the room to edit)
       content.push({ type: 'image_url', image_url: { url: currentRenderUrl } });
       const baseRenderIndex = imageIndex++;
 
@@ -90,92 +106,94 @@ serve(async (req) => {
         }
       }
 
-      // Furniture images with placement info
-      const furnitureIndices: { name: string; category: string; index: number; position: { x: number; y: number }; scale: number }[] = [];
-      for (const item of furnitureWithPositions) {
+      // Build NUMBERED CHANGE LIST (exactly like the working code)
+      let changeInstructions = "";
+      const furnitureIndices: number[] = [];
+
+      for (let i = 0; i < furnitureWithPositions.length; i++) {
+        const item = furnitureWithPositions[i];
+        const posDesc = getPositionDescription(item.position!.x, item.position!.y);
+        
+        // Add furniture image to content
         content.push({ type: 'image_url', image_url: { url: item.imageUrl! } });
-        furnitureIndices.push({
-          name: item.name,
-          category: item.category,
-          index: imageIndex++,
-          position: item.position!,
-          scale: item.scale!,
-        });
+        const itemIndex = imageIndex++;
+        furnitureIndices.push(itemIndex);
+
+        changeInstructions += `${i + 1}. At coordinates ${Math.round(item.position!.x)}% X, ${Math.round(item.position!.y)}% Y (${posDesc}):
+   Replace the existing ${item.originalLabel || item.category || 'object'} with "${item.name}".
+   -> Visual Reference: IMAGE ${itemIndex}
+   -> Scale: ${Math.round(item.scale! * 100)}% of natural size
+   
+`;
       }
 
-      // Build ultra-precise compositing prompt
-      let compositingPrompt = `You are performing PRECISE IMAGE COMPOSITING. This is NOT creative generation - you must EXACTLY composite furniture images into the room.
+      // Build the MASTER STAGING ARCHITECT prompt (from working code)
+      let masterPrompt = `Role: Master Staging Architect.
+Task: BATCH FURNITURE REPLACEMENT.
 
-=== CRITICAL COMPOSITING RULES ===
+Input: A room image (IMAGE ${baseRenderIndex}).
+
+Execute the following list of changes SIMULTANEOUSLY in a single pass.
+
+=== REFERENCE IMAGES ===
 
 IMAGE ${baseRenderIndex}: BASE ROOM RENDER
 - This is the EXACT room to composite furniture into
 - Keep the room COMPLETELY UNCHANGED: walls, floors, ceiling, windows, lighting, shadows
-- Do NOT modify any part of the room - only ADD furniture to it
+- Do NOT modify any part of the room - only ADD/REPLACE furniture
 - Maintain the EXACT same camera angle, perspective, and lighting
 
 `;
 
       if (layoutIndex !== null) {
-        compositingPrompt += `IMAGE ${layoutIndex}: FLOOR PLAN LAYOUT
-- Use this to verify furniture positions match the layout
+        masterPrompt += `IMAGE ${layoutIndex}: FLOOR PLAN LAYOUT
+- Use this to verify furniture positions match the intended layout
 - Furniture should be placed at positions that correspond to this floor plan
 
 `;
       }
 
       if (styleIndices.length > 0) {
-        compositingPrompt += `IMAGES ${styleIndices.join(', ')}: STYLE REFERENCES
+        masterPrompt += `IMAGES ${styleIndices.join(', ')}: STYLE REFERENCES
 - Match the overall aesthetic and lighting style from these references
 - Apply realistic shadows that match the room's lighting direction
 
 `;
       }
 
-      // Add precise furniture placement instructions
-      compositingPrompt += `=== FURNITURE COMPOSITING - PIXEL-PERFECT ACCURACY ===
+      masterPrompt += `=== CHANGE LIST ===
 
-For each furniture item below, you must:
-1. EXTRACT the exact product from its reference image
-2. SCALE it to the specified size relative to the room
-3. POSITION it at the exact specified coordinates
-4. BLEND shadows/lighting to match the room's illumination
-5. DO NOT MODIFY the product in any way - it must look identical to the reference
+${changeInstructions}
 
-`;
+=== CRITICAL RULES ===
 
-      for (const { name, category, index, position, scale } of furnitureIndices) {
-        compositingPrompt += `
-IMAGE ${index}: "${name}" (${category})
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-POSITION: ${position.x}% from left, ${position.y}% from top
-SCALE: ${Math.round(scale * 100)}% of natural size relative to room
+1. For each requested change, completely replace the object at the specified coordinates with the new item described.
+2. COPY the product EXACTLY from its reference image - zero modifications allowed.
+3. The product shape, silhouette, and proportions must be IDENTICAL to the reference.
+4. Colors must match EXACTLY - do not adjust, enhance, or correct.
+5. Material textures must be preserved PERFECTLY.
+6. Maintain perfect perspective, scale, and lighting consistency with the rest of the room.
+7. Do NOT modify any parts of the room NOT listed in the Change List.
+8. Ensure high-end photorealism with realistic shadows for each placed item.
 
-⚠️ ABSOLUTE REQUIREMENTS:
-• The product must be PIXEL-IDENTICAL to IMAGE ${index}
-• Copy the EXACT shape, color, texture, and all details
-• DO NOT regenerate or reinterpret - COPY EXACTLY
-• Apply realistic shadows matching room lighting direction
-• Perspective should match the room's camera angle
+VISUAL IDENTITY TO PRESERVE:
+- If a product has a unique shape (curved, angular, organic) → KEEP THAT EXACT SHAPE
+- If a product has specific colors → KEEP THOSE EXACT COLORS (no white-balancing)
+- If a product has visible textures → REPLICATE THOSE EXACT TEXTURES
+- If a product has design details (buttons, stitching, patterns) → INCLUDE ALL DETAILS
 
-🎯 POSITIONING:
-• Place furniture so its base/center is at ${position.x}% horizontal, ${position.y}% vertical
-• Scale: ${scale < 1 ? 'Make smaller than natural' : scale > 1 ? 'Make larger than natural' : 'Keep natural size'}
-• Ensure realistic proportions relative to room size
+The staged products should look like they were CUT from their reference images and PASTED into the room.
 
 `;
-      }
 
-      // Add user prompt if provided
       if (userPrompt && userPrompt.trim()) {
-        compositingPrompt += `\nAdditional instructions: ${userPrompt}\n`;
+        masterPrompt += `Additional instructions: ${userPrompt}\n\n`;
       }
 
-      compositingPrompt += `
-=== OUTPUT REQUIREMENTS ===
+      masterPrompt += `=== OUTPUT REQUIREMENTS ===
 
-1. The output must be the BASE RENDER (IMAGE ${baseRenderIndex}) with furniture composited in
-2. Room must be UNCHANGED - only add furniture
+1. The output must be the BASE RENDER (IMAGE ${baseRenderIndex}) with furniture replaced/added
+2. Room must be UNCHANGED - only modify furniture at specified coordinates
 3. Furniture must be PIXEL-PERFECT copies of reference images
 4. Maintain 16:9 LANDSCAPE aspect ratio
 5. Apply realistic shadows for each placed item
@@ -184,12 +202,14 @@ SCALE: ${Math.round(scale * 100)}% of natural size relative to room
 ⚠️ QUALITY CHECK: 
 After compositing, each furniture item will be compared side-by-side with its reference.
 ANY deviation in shape, color, or details is a failure.
-The goal is 100% visual accuracy - as if the catalog image was cut out and pasted into the room.`;
+The goal is 100% visual accuracy - as if the catalog image was cut out and pasted into the room.
 
-      content.push({ type: 'text', text: compositingPrompt });
+Output: ONLY the final image.`;
 
-      console.log('Composite prompt length:', compositingPrompt.length);
-      console.log('Total images in composite request:', content.filter(c => c.type === 'image_url').length);
+      content.push({ type: 'text', text: masterPrompt });
+
+      console.log('Master Staging prompt length:', masterPrompt.length);
+      console.log('Total images in request:', content.filter(c => c.type === 'image_url').length);
 
       const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
         method: 'POST',
@@ -228,23 +248,20 @@ The goal is 100% visual accuracy - as if the catalog image was cut out and paste
 
       if (!imageUrl) {
         console.error('No image in response:', JSON.stringify(data).substring(0, 500));
-        throw new Error('No image generated from composite request');
+        throw new Error('No image generated from Master Staging request');
       }
 
-      console.log('Furniture composited successfully (composite mode)');
+      console.log('Furniture staged successfully (Master Staging Architect mode)');
 
-      return new Response(JSON.stringify({ imageUrl, mode: 'composite' }), {
+      return new Response(JSON.stringify({ imageUrl, mode: 'master-staging' }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
-    // Standard edit mode (original behavior)
-
-    // Build content array with reference images
+    // Standard edit mode (category-based replacement)
     const content: Array<{ type: string; text?: string; image_url?: { url: string } }> = [];
     let imageIndex = 1;
 
-    // Track image positions for prompt
     let currentRenderIndex: number;
     let layoutIndex: number | null = null;
     const styleIndices: number[] = [];
@@ -254,7 +271,7 @@ The goal is 100% visual accuracy - as if the catalog image was cut out and paste
     content.push({ type: 'image_url', image_url: { url: currentRenderUrl } });
     currentRenderIndex = imageIndex++;
 
-    // Add layout reference if provided (for positional accuracy)
+    // Add layout reference if provided
     if (layoutImageUrl) {
       content.push({ type: 'image_url', image_url: { url: layoutImageUrl } });
       layoutIndex = imageIndex++;
@@ -281,17 +298,21 @@ The goal is 100% visual accuracy - as if the catalog image was cut out and paste
       }
     }
 
-    // Build the editing instruction prompt with explicit image numbering
-    let editInstruction = `You are editing a room render. Follow these instructions EXACTLY:\n\n`;
+    // Build the editing instruction prompt with numbered change list
+    let editInstruction = `Role: Master Staging Architect.
+Task: FURNITURE REPLACEMENT.
 
-    editInstruction += `IMAGE ${currentRenderIndex}: This is the CURRENT ROOM RENDER to edit.
+Input: A room image (IMAGE ${currentRenderIndex}).
+
+=== REFERENCE IMAGES ===
+
+IMAGE ${currentRenderIndex}: This is the CURRENT ROOM RENDER to edit.
 - This is your base image - modify it according to the instructions below
 - Keep the room architecture, walls, floors, windows, and lighting UNCHANGED
 - Maintain the same camera angle and perspective
 
 `;
 
-    // Add layout reference instructions
     if (layoutIndex !== null) {
       editInstruction += `IMAGE ${layoutIndex}: This is the 2D FLOOR PLAN LAYOUT reference.
 - When placing furniture, positions MUST match this layout
@@ -301,7 +322,6 @@ The goal is 100% visual accuracy - as if the catalog image was cut out and paste
 `;
     }
 
-    // Add style reference instructions
     if (styleIndices.length > 0) {
       const styleRange = styleIndices.length === 1 
         ? `IMAGE ${styleIndices[0]}` 
@@ -314,65 +334,54 @@ The goal is 100% visual accuracy - as if the catalog image was cut out and paste
 `;
     }
 
-    // Add furniture replacement instructions - ULTRA STRICT MATCHING
+    // Build numbered change list for furniture
     if (furnitureImageIndices.length > 0) {
-      editInstruction += `FURNITURE PRODUCTS TO PLACE - EXACT MATCHING REQUIRED:\n\n`;
+      editInstruction += `=== CHANGE LIST ===
+
+`;
       
-      for (const { name, category, index } of furnitureImageIndices) {
+      for (let i = 0; i < furnitureImageIndices.length; i++) {
+        const { name, category, index } = furnitureImageIndices[i];
         const categoryTarget = getCategoryReplacementInstruction(category);
-        editInstruction += `IMAGE ${index}: "${name}"
-
-⚠️ ABSOLUTE REQUIREMENTS FOR THIS PRODUCT:
-- Find any ${categoryTarget} in the room (IMAGE ${currentRenderIndex}) and REPLACE it with this EXACT product
-- COPY this product EXACTLY as shown - zero modifications allowed
-- The product shape, silhouette, and proportions must be IDENTICAL to IMAGE ${index}
-- Colors must match EXACTLY - do not adjust, enhance, or correct
-- Material textures must be preserved PERFECTLY
-- Any unique design features (curves, patterns, buttons, stitching, legs, handles) must appear IDENTICALLY
-- Do NOT "improve", "adapt", or "harmonize" this product
-- Do NOT generate a similar product - use THIS EXACT image
-
-🚫 FORBIDDEN MODIFICATIONS:
-- No color shifts or adjustments
-- No shape modifications  
-- No material changes
-- No design "improvements"
-- No style adaptations
-
-VISUAL IDENTITY TO PRESERVE:
-- If this product has a unique shape (curved, angular, organic) → KEEP THAT EXACT SHAPE
-- If this product has specific colors → KEEP THOSE EXACT COLORS (no white-balancing)
-- If this product has visible textures → REPLICATE THOSE EXACT TEXTURES
-- If this product has design details (buttons, stitching, patterns) → INCLUDE ALL DETAILS
-
-The staged product should look like it was CUT from IMAGE ${index} and PASTED into the room.
-${layoutIndex !== null ? `Place according to the floor plan in IMAGE ${layoutIndex}.` : ''}
+        editInstruction += `${i + 1}. Find any ${categoryTarget} in the room (IMAGE ${currentRenderIndex}) and REPLACE it with "${name}".
+   -> Visual Reference: IMAGE ${index}
+   -> COPY this product EXACTLY as shown - zero modifications allowed
+   -> The product shape, colors, and textures must be IDENTICAL to IMAGE ${index}
+   ${layoutIndex !== null ? `-> Place according to floor plan in IMAGE ${layoutIndex}` : ''}
 
 `;
       }
       
-      editInstruction += `⚠️ ACCURACY CHECK WARNING:
-After editing, the rendered products will be compared side-by-side with their catalog images.
-The match must be PIXEL-PERFECT. Any visible differences will be flagged as errors.
+      editInstruction += `=== CRITICAL RULES ===
 
-CRITICAL REQUIREMENTS:
-1. Products MUST appear IDENTICALLY to their reference images - this is the #1 priority
-2. MAINTAIN the original 16:9 LANDSCAPE aspect ratio - output must be wide, not square
-3. Replace furniture category-by-category (sofa with sofa, table with table)
-4. Keep room architecture completely unchanged
-5. Apply realistic lighting and shadows to placed products
-6. Output dimensions must match IMAGE ${currentRenderIndex}`;
+1. For each item in the Change List, completely replace the matching furniture with the new product.
+2. COPY products EXACTLY from reference images - zero modifications allowed.
+3. Shape, silhouette, proportions, colors, and textures must be IDENTICAL.
+4. Do NOT "improve", "adapt", or "harmonize" products.
+5. Maintain perfect perspective, scale, and lighting consistency.
+6. The staged products should look like they were CUT from their references and PASTED into the room.
+
+`;
     }
 
-    // Add user's additional instructions if provided
     if (userPrompt && userPrompt.trim()) {
-      editInstruction += `\n\nAdditional user instructions: ${userPrompt}`;
+      editInstruction += `Additional instructions: ${userPrompt}\n\n`;
     }
+
+    editInstruction += `=== OUTPUT REQUIREMENTS ===
+
+1. Photorealistic quality - professional furniture staging
+2. Maintain 16:9 LANDSCAPE aspect ratio
+3. Products MUST appear IDENTICALLY to their reference images
+4. Apply realistic lighting and shadows to placed products
+5. Room architecture must remain completely unchanged
+
+Output: ONLY the final image.`;
 
     content.push({ type: 'text', text: editInstruction });
 
-    console.log('Edit instruction:', editInstruction.substring(0, 600) + '...');
-    console.log('Total images in edit request:', content.filter(c => c.type === 'image_url').length);
+    console.log('Edit instruction length:', editInstruction.length);
+    console.log('Total images in request:', content.filter(c => c.type === 'image_url').length);
 
     const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
       method: 'POST',
@@ -382,16 +391,9 @@ CRITICAL REQUIREMENTS:
       },
       body: JSON.stringify({
         model: 'google/gemini-3-pro-image-preview',
-        messages: [
-          {
-            role: 'user',
-            content: content,
-          },
-        ],
+        messages: [{ role: 'user', content }],
         modalities: ['image', 'text'],
-        generationConfig: {
-          aspectRatio: "16:9"
-        }
+        generationConfig: { aspectRatio: "16:9" }
       }),
     });
 

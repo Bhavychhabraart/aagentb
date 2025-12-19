@@ -1,15 +1,25 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
-import { Move, ZoomIn, ZoomOut, Check, X, GripVertical, RotateCcw } from 'lucide-react';
+import { Move, ZoomIn, ZoomOut, Check, X, GripVertical, RotateCcw, Scan, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
 import { cn } from '@/lib/utils';
 import { CatalogFurnitureItem } from '@/services/catalogService';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
 
 export interface FurniturePlacement {
   id: string;
   item: CatalogFurnitureItem;
   position: { x: number; y: number }; // Percentage 0-100
   scale: number; // 0.3 to 2
+  originalLabel?: string; // Label of detected item being replaced
+}
+
+interface DetectedFurniture {
+  id: string;
+  label: string;
+  x: number;
+  y: number;
 }
 
 interface FurniturePositionerProps {
@@ -41,8 +51,51 @@ export function FurniturePositioner({
   );
   const [selectedId, setSelectedId] = useState<string | null>(placements[0]?.id || null);
   const [isDragging, setIsDragging] = useState(false);
+  const [detectedFurniture, setDetectedFurniture] = useState<DetectedFurniture[]>([]);
+  const [isDetecting, setIsDetecting] = useState(false);
+  const [showDetected, setShowDetected] = useState(true);
 
   const selectedPlacement = placements.find(p => p.id === selectedId);
+
+  // Detect furniture in the room image
+  const detectFurniture = async () => {
+    setIsDetecting(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('detect-furniture', {
+        body: { roomImageUrl: renderUrl }
+      });
+
+      if (error) {
+        console.error('Detection error:', error);
+        toast.error('Failed to detect furniture');
+        return;
+      }
+
+      if (data?.items && Array.isArray(data.items)) {
+        setDetectedFurniture(data.items);
+        toast.success(`Detected ${data.items.length} furniture items`);
+      }
+    } catch (err) {
+      console.error('Detection failed:', err);
+      toast.error('Failed to detect furniture');
+    } finally {
+      setIsDetecting(false);
+    }
+  };
+
+  // Snap placement to detected furniture location
+  const snapToDetected = (placementId: string, detected: DetectedFurniture) => {
+    setPlacements(prev => prev.map(p => 
+      p.id === placementId 
+        ? { 
+            ...p, 
+            position: { x: detected.x, y: detected.y },
+            originalLabel: detected.label
+          }
+        : p
+    ));
+    toast.success(`Snapped to ${detected.label} position`);
+  };
 
   const handleDragStart = useCallback((e: React.MouseEvent | React.TouchEvent, id: string) => {
     e.preventDefault();
@@ -99,7 +152,8 @@ export function FurniturePositioner({
         ? { 
             ...p, 
             position: { x: 30 + (index * 20) % 40, y: 60 + (index * 10) % 20 },
-            scale: 0.8 
+            scale: 0.8,
+            originalLabel: undefined
           }
         : p
     ));
@@ -114,20 +168,31 @@ export function FurniturePositioner({
           <div>
             <h2 className="text-sm font-semibold text-foreground">Position Furniture</h2>
             <p className="text-xs text-muted-foreground">
-              Drag items to position, adjust scale for 100% accurate staging
+              Drag items or snap to detected furniture for 100% accurate staging
             </p>
           </div>
         </div>
         <div className="flex items-center gap-2">
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={detectFurniture} 
+            disabled={isDetecting || isProcessing}
+          >
+            {isDetecting ? (
+              <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+            ) : (
+              <Scan className="h-4 w-4 mr-1" />
+            )}
+            Detect Furniture
+          </Button>
           <Button variant="outline" size="sm" onClick={onCancel} disabled={isProcessing}>
             <X className="h-4 w-4 mr-1" />
             Cancel
           </Button>
           <Button size="sm" onClick={() => onConfirm(placements)} disabled={isProcessing}>
             {isProcessing ? (
-              <>
-                <span className="animate-pulse">Processing...</span>
-              </>
+              <span className="animate-pulse">Processing...</span>
             ) : (
               <>
                 <Check className="h-4 w-4 mr-1" />
@@ -154,6 +219,30 @@ export function FurniturePositioner({
               className="w-full h-full object-contain"
               draggable={false}
             />
+
+            {/* Detected furniture markers */}
+            {showDetected && detectedFurniture.map((detected) => (
+              <div
+                key={detected.id}
+                className="absolute w-6 h-6 -translate-x-1/2 -translate-y-1/2 cursor-pointer group"
+                style={{
+                  left: `${detected.x}%`,
+                  top: `${detected.y}%`,
+                }}
+                onClick={() => {
+                  if (selectedId) {
+                    snapToDetected(selectedId, detected);
+                  }
+                }}
+              >
+                <div className="w-full h-full rounded-full bg-amber-500/80 border-2 border-amber-300 flex items-center justify-center animate-pulse">
+                  <div className="w-2 h-2 rounded-full bg-white" />
+                </div>
+                <div className="absolute left-1/2 -translate-x-1/2 top-full mt-1 px-2 py-0.5 bg-black/80 rounded text-[10px] text-white whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity z-20">
+                  {detected.label}
+                </div>
+              </div>
+            ))}
 
             {/* Furniture overlays */}
             {placements.map((placement) => (
@@ -185,6 +274,12 @@ export function FurniturePositioner({
                 <div className="absolute -top-2 -right-2 p-1 rounded-full bg-primary text-primary-foreground opacity-80">
                   <GripVertical className="h-3 w-3" />
                 </div>
+                {/* Original label badge */}
+                {placement.originalLabel && (
+                  <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 px-1.5 py-0.5 bg-amber-500/90 rounded text-[9px] text-white font-medium whitespace-nowrap">
+                    → {placement.originalLabel}
+                  </div>
+                )}
               </div>
             ))}
 
@@ -192,6 +287,7 @@ export function FurniturePositioner({
             {selectedPlacement && (
               <div className="absolute bottom-2 left-2 px-2 py-1 bg-black/70 rounded text-xs text-white font-mono">
                 X: {selectedPlacement.position.x.toFixed(0)}% | Y: {selectedPlacement.position.y.toFixed(0)}% | Scale: {(selectedPlacement.scale * 100).toFixed(0)}%
+                {selectedPlacement.originalLabel && ` | Replacing: ${selectedPlacement.originalLabel}`}
               </div>
             )}
           </div>
@@ -199,9 +295,47 @@ export function FurniturePositioner({
 
         {/* Side panel - Item controls */}
         <div className="w-72 border-l border-border bg-card p-4 overflow-y-auto">
-          <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">
-            Staged Items ({placements.length})
-          </h3>
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+              Staged Items ({placements.length})
+            </h3>
+            {detectedFurniture.length > 0 && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-6 text-xs"
+                onClick={() => setShowDetected(!showDetected)}
+              >
+                {showDetected ? 'Hide' : 'Show'} markers
+              </Button>
+            )}
+          </div>
+
+          {/* Detected furniture list */}
+          {detectedFurniture.length > 0 && (
+            <div className="mb-4 p-2 rounded-lg bg-amber-500/10 border border-amber-500/30">
+              <p className="text-xs font-medium text-amber-600 mb-2">
+                Detected: {detectedFurniture.length} items
+              </p>
+              <div className="flex flex-wrap gap-1">
+                {detectedFurniture.map((d) => (
+                  <button
+                    key={d.id}
+                    className="px-2 py-0.5 text-[10px] bg-amber-500/20 hover:bg-amber-500/30 rounded text-amber-700 transition-colors"
+                    onClick={() => {
+                      if (selectedId) {
+                        snapToDetected(selectedId, d);
+                      } else {
+                        toast.info('Select an item first');
+                      }
+                    }}
+                  >
+                    {d.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
 
           <div className="space-y-3">
             {placements.map((placement) => (
@@ -228,6 +362,11 @@ export function FurniturePositioner({
                     <p className="text-xs text-muted-foreground">
                       {placement.item.category}
                     </p>
+                    {placement.originalLabel && (
+                      <p className="text-[10px] text-amber-600 mt-0.5">
+                        Replacing: {placement.originalLabel}
+                      </p>
+                    )}
                   </div>
                 </div>
 
@@ -292,12 +431,13 @@ export function FurniturePositioner({
 
           {/* Instructions */}
           <div className="mt-6 p-3 rounded-lg bg-muted/50 border border-border">
-            <h4 className="text-xs font-semibold text-foreground mb-2">Tips for Accuracy</h4>
+            <h4 className="text-xs font-semibold text-foreground mb-2">Tips for 100% Accuracy</h4>
             <ul className="text-xs text-muted-foreground space-y-1">
-              <li>• Drag items to their exact position</li>
+              <li>• Click <strong>Detect Furniture</strong> to find existing items</li>
+              <li>• Click amber markers to snap item to that position</li>
+              <li>• Drag items to fine-tune placement</li>
               <li>• Adjust scale to match room perspective</li>
               <li>• Items near bottom = closer to camera</li>
-              <li>• The AI will preserve exact product appearance</li>
             </ul>
           </div>
         </div>
