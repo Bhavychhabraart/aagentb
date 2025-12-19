@@ -142,20 +142,10 @@ export default function Landing() {
 
       await Promise.all(uploadPromises);
 
-      // Save the prompt as a chat message so it appears in the workspace
-      if (session.prompt.trim()) {
-        await supabase.from("chat_messages").insert({
-          project_id: project.id,
-          user_id: user.id,
-          role: "user",
-          content: session.prompt,
-          metadata: { type: "text" },
-        });
-      }
-
-      // Navigate to workspace with the project and trigger generation
+      // Navigate to workspace with prompt in URL (avoids race condition with DB save)
       const params = new URLSearchParams({ project: project.id });
       if (session.prompt.trim()) {
+        params.set("prompt", encodeURIComponent(session.prompt));
         params.set("generate", "true");
       }
       navigate(`/workspace?${params.toString()}`);
