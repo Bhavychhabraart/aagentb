@@ -5,6 +5,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { cn } from '@/lib/utils';
 import { fetchFurnitureCatalog, CatalogFurnitureItem } from '@/services/catalogService';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { ProductDetailModal } from './ProductDetailModal';
 
 interface Asset {
   id: string;
@@ -32,6 +33,7 @@ export function AssetsPanel({ projectId, onAssetSelect, onCatalogItemSelect, sta
   const [selectedCatalogItem, setSelectedCatalogItem] = useState<CatalogFurnitureItem | null>(null);
   const [activeTab, setActiveTab] = useState('project');
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const [previewItem, setPreviewItem] = useState<CatalogFurnitureItem | null>(null);
 
   useEffect(() => {
     if (projectId) {
@@ -105,6 +107,10 @@ export function AssetsPanel({ projectId, onAssetSelect, onCatalogItemSelect, sta
   };
 
   const handleCatalogItemClick = (item: CatalogFurnitureItem) => {
+    setPreviewItem(item);
+  };
+
+  const handleToggleStage = (item: CatalogFurnitureItem) => {
     setSelectedCatalogItem(item);
     setSelectedAsset(null);
     onCatalogItemSelect?.(item);
@@ -298,6 +304,15 @@ export function AssetsPanel({ projectId, onAssetSelect, onCatalogItemSelect, sta
           </Tabs>
         </div>
       )}
+
+      {/* Product Detail Modal */}
+      <ProductDetailModal
+        item={previewItem}
+        isOpen={!!previewItem}
+        onClose={() => setPreviewItem(null)}
+        isStaged={previewItem ? stagedItemIds.includes(previewItem.id) : false}
+        onToggleStage={handleToggleStage}
+      />
     </div>
   );
 }
