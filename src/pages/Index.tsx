@@ -10,6 +10,7 @@ import { UploadDialog } from '@/components/canvas/UploadDialog';
 import { AssetsPanel } from '@/components/canvas/AssetsPanel';
 import { SidebarProvider } from '@/components/ui/sidebar';
 import { CatalogFurnitureItem } from '@/services/catalogService';
+import { FurniturePositioner, FurniturePlacement } from '@/components/canvas/FurniturePositioner';
 
 interface RoomUpload {
   id: string;
@@ -43,6 +44,7 @@ const Index = () => {
   const hasTriggeredGeneration = useRef(false);
   const [stagedItems, setStagedItems] = useState<CatalogFurnitureItem[]>([]);
   const [layoutImageUrl, setLayoutImageUrl] = useState<string | null>(null);
+  const [showPositioner, setShowPositioner] = useState(false);
 
   // Redirect to auth if not logged in
   useEffect(() => {
@@ -797,6 +799,93 @@ Ready to generate a render! Describe your vision.`;
     return null;
   }
 
+  // Handle composite mode with positioned furniture
+  const handleCompositeConfirm = useCallback(async (placements: FurniturePlacement[]) => {
+    if (!user || !currentProjectId || !currentRenderUrl) return;
+
+    setIsGenerating(true);
+    setShowPositioner(false);
+
+    try {
+      const references = await fetchProjectReferences(currentProjectId);
+
+      const { data: renderRecord, error: renderError } = await supabase
+        .from('renders')
+        .insert({
+          project_id: currentProjectId,
+          user_id: user.id,
+          prompt: 'Composite furniture staging',
+          room_upload_id: currentUpload?.id || null,
+          parent_render_id: currentRenderId,
+          status: 'generating',
+        })
+        .select()
+        .single();
+
+      if (renderError) throw renderError;
+
+      await addMessage('assistant', `Compositing ${placements.length} furniture items with precise positioning...`, 
+        { type: 'text', status: 'pending' }
+      );
+
+      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/edit-render`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+        },
+        body: JSON.stringify({
+          currentRenderUrl,
+          compositeMode: true,
+          furnitureItems: placements.map(p => ({
+            name: p.item.name,
+            category: p.item.category,
+            description: p.item.description,
+            imageUrl: p.item.imageUrl,
+            position: p.position,
+            scale: p.scale,
+          })),
+          layoutImageUrl: references.layoutUrl,
+          styleRefUrls: references.styleRefUrls,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || 'Composite failed');
+      }
+
+      const { imageUrl } = await response.json();
+
+      await supabase
+        .from('renders')
+        .update({ render_url: imageUrl, status: 'completed' })
+        .eq('id', renderRecord.id);
+
+      setCurrentRenderUrl(imageUrl);
+      setCurrentRenderId(renderRecord.id);
+
+      await addMessage('assistant', 'Furniture composited with pixel-perfect accuracy!', {
+        type: 'render',
+        imageUrl,
+        status: 'ready',
+      });
+
+      // Clear staged items
+      await supabase.from('staged_furniture').delete().eq('project_id', currentProjectId);
+      setStagedItems([]);
+
+      toast({ title: 'Composite complete', description: 'Furniture staged with precise positioning.' });
+    } catch (error) {
+      console.error('Composite failed:', error);
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      await addMessage('assistant', `Composite failed: ${message}`, { type: 'text', status: 'failed' });
+      toast({ variant: 'destructive', title: 'Composite failed', description: message });
+    } finally {
+      setIsGenerating(false);
+    }
+  }, [user, currentProjectId, currentRenderUrl, currentRenderId, currentUpload, addMessage, toast]);
+
   return (
     <SidebarProvider>
       <div className="flex h-screen w-full bg-background">
@@ -811,6 +900,7 @@ Ready to generate a render! Describe your vision.`;
             imageUrl={currentRenderUrl}
             isGenerating={isGenerating}
             layoutImageUrl={layoutImageUrl}
+            onPositionFurniture={stagedItems.length > 0 && currentRenderUrl ? () => setShowPositioner(true) : undefined}
           />
           
           <div className="w-96 shrink-0 flex flex-col">
@@ -839,6 +929,16 @@ Ready to generate a render! Describe your vision.`;
           onUpload={handleUpload}
           isUploading={isUploading}
         />
+
+        {showPositioner && currentRenderUrl && (
+          <FurniturePositioner
+            renderUrl={currentRenderUrl}
+            stagedItems={stagedItems}
+            onConfirm={handleCompositeConfirm}
+            onCancel={() => setShowPositioner(false)}
+            isProcessing={isGenerating}
+          />
+        )}
       </div>
     </SidebarProvider>
   );

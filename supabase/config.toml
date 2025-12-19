@@ -8,3 +8,6 @@ verify_jwt = false
 
 [functions.edit-render]
 verify_jwt = false
+
+[functions.composite-furniture]
+verify_jwt = false
