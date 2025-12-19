@@ -1,9 +1,10 @@
 import { useState, useRef, useEffect } from 'react';
-import { Send, Upload, Loader2, Image as ImageIcon } from 'lucide-react';
+import { Send, Upload, Loader2, Image as ImageIcon, Sparkles, FileImage, Clock } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
+import { format } from 'date-fns';
 
 export interface ChatMessage {
   id: string;
@@ -22,6 +23,21 @@ interface ChatPanelProps {
   isLoading: boolean;
   onSendMessage: (content: string) => void;
   onUploadClick: () => void;
+}
+
+function getMessageIcon(metadata?: ChatMessage['metadata']) {
+  if (metadata?.type === 'upload') return <FileImage className="h-3.5 w-3.5" />;
+  if (metadata?.type === 'render') return <Sparkles className="h-3.5 w-3.5" />;
+  return null;
+}
+
+function formatTimestamp(dateString: string) {
+  try {
+    const date = new Date(dateString);
+    return format(date, 'HH:mm');
+  } catch {
+    return '';
+  }
 }
 
 export function ChatPanel({ messages, isLoading, onSendMessage, onUploadClick }: ChatPanelProps) {
@@ -53,8 +69,13 @@ export function ChatPanel({ messages, isLoading, onSendMessage, onUploadClick }:
   return (
     <div className="flex flex-col h-full bg-card border-l border-border">
       {/* Header */}
-      <div className="px-4 py-3 border-b border-border">
-        <h2 className="text-sm font-medium text-foreground">Command</h2>
+      <div className="px-4 py-3 border-b border-border flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <h2 className="text-sm font-medium text-foreground">Command History</h2>
+          <span className="text-xs text-muted-foreground bg-muted px-1.5 py-0.5 rounded">
+            {messages.length}
+          </span>
+        </div>
       </div>
 
       {/* Messages */}
@@ -69,43 +90,76 @@ export function ChatPanel({ messages, isLoading, onSendMessage, onUploadClick }:
             </p>
           </div>
         ) : (
-          <div className="space-y-4">
+          <div className="space-y-3">
             {messages.map((message) => (
               <div
                 key={message.id}
                 className={cn(
-                  'px-3 py-2 rounded-lg text-sm animate-slide-up',
+                  'relative rounded-lg text-sm animate-slide-up',
                   message.role === 'user'
                     ? 'chat-message-user ml-4'
                     : 'chat-message-assistant mr-4'
                 )}
               >
-                {message.metadata?.imageUrl && (
-                  <img
-                    src={message.metadata.imageUrl}
-                    alt="Uploaded"
-                    className="rounded-md mb-2 max-w-full"
-                  />
-                )}
-                <p className="whitespace-pre-wrap">{message.content}</p>
-                {message.metadata?.status && (
-                  <p className={cn(
-                    'text-xs mt-1 font-mono',
-                    message.metadata.status === 'pending' && 'status-pending',
-                    message.metadata.status === 'analyzing' && 'status-analyzing',
-                    message.metadata.status === 'ready' && 'status-ready',
-                    message.metadata.status === 'failed' && 'status-failed'
-                  )}>
-                    {message.metadata.status}
-                  </p>
-                )}
+                {/* Message header with icon and timestamp */}
+                <div className="flex items-center justify-between gap-2 px-3 pt-2 pb-1">
+                  <div className="flex items-center gap-1.5">
+                    {message.role === 'user' ? (
+                      <>
+                        {getMessageIcon(message.metadata)}
+                        <span className="text-xs font-medium text-primary/80">You</span>
+                      </>
+                    ) : (
+                      <>
+                        <Sparkles className="h-3.5 w-3.5 text-primary" />
+                        <span className="text-xs font-medium text-primary/80">Agent B</span>
+                      </>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-1 text-muted-foreground">
+                    <Clock className="h-3 w-3" />
+                    <span className="text-[10px] font-mono">{formatTimestamp(message.created_at)}</span>
+                  </div>
+                </div>
+                
+                {/* Message content */}
+                <div className="px-3 pb-2">
+                  {message.metadata?.imageUrl && (
+                    <img
+                      src={message.metadata.imageUrl}
+                      alt="Uploaded"
+                      className="rounded-md mb-2 max-w-full border border-border/50"
+                    />
+                  )}
+                  <p className="whitespace-pre-wrap text-foreground/90">{message.content}</p>
+                  {message.metadata?.status && (
+                    <div className={cn(
+                      'inline-flex items-center gap-1 text-xs mt-2 px-2 py-0.5 rounded-full font-mono',
+                      message.metadata.status === 'pending' && 'bg-muted text-muted-foreground',
+                      message.metadata.status === 'analyzing' && 'bg-warning/10 text-warning',
+                      message.metadata.status === 'ready' && 'bg-success/10 text-success',
+                      message.metadata.status === 'failed' && 'bg-destructive/10 text-destructive'
+                    )}>
+                      <span className={cn(
+                        'h-1.5 w-1.5 rounded-full',
+                        message.metadata.status === 'pending' && 'bg-muted-foreground',
+                        message.metadata.status === 'analyzing' && 'bg-warning animate-pulse',
+                        message.metadata.status === 'ready' && 'bg-success',
+                        message.metadata.status === 'failed' && 'bg-destructive'
+                      )} />
+                      {message.metadata.status}
+                    </div>
+                  )}
+                </div>
               </div>
             ))}
             {isLoading && (
-              <div className="chat-message-assistant mr-4 px-3 py-2 rounded-lg">
-                <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  Processing...
+              <div className="chat-message-assistant mr-4 rounded-lg">
+                <div className="px-3 py-2.5">
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <Loader2 className="h-4 w-4 animate-spin text-primary" />
+                    Processing...
+                  </div>
                 </div>
               </div>
             )}
