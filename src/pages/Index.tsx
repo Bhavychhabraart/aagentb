@@ -60,6 +60,7 @@ const Index = () => {
       loadMessages();
       loadLatestUpload();
       loadLatestRender();
+      loadStagedFurniture();
     }
   }, [currentProjectId]);
 
@@ -534,23 +535,85 @@ Ready to generate a render! Describe your vision.`;
     // Trigger generation with staged items
     triggerGeneration(content, stagedItems);
     
-    // Clear staged items after sending
+    // Clear staged items from DB and state after sending
+    if (stagedItems.length > 0) {
+      await supabase
+        .from('staged_furniture')
+        .delete()
+        .eq('project_id', currentProjectId);
+    }
     setStagedItems([]);
   }, [user, currentProjectId, addMessage, triggerGeneration, stagedItems]);
 
-  const handleCatalogItemSelect = useCallback((item: CatalogFurnitureItem) => {
-    setStagedItems(prev => {
-      const exists = prev.find(i => i.id === item.id);
-      if (exists) {
-        return prev.filter(i => i.id !== item.id);
-      }
-      return [...prev, item];
-    });
-  }, []);
+  const handleCatalogItemSelect = useCallback(async (item: CatalogFurnitureItem) => {
+    if (!user || !currentProjectId) return;
 
-  const handleClearStagedItems = useCallback(() => {
+    const exists = stagedItems.find(i => i.id === item.id);
+    
+    if (exists) {
+      // Remove from DB
+      await supabase
+        .from('staged_furniture')
+        .delete()
+        .eq('project_id', currentProjectId)
+        .eq('catalog_item_id', item.id);
+      
+      setStagedItems(prev => prev.filter(i => i.id !== item.id));
+    } else {
+      // Add to DB
+      await supabase
+        .from('staged_furniture')
+        .insert({
+          project_id: currentProjectId,
+          user_id: user.id,
+          catalog_item_id: item.id,
+          item_name: item.name,
+          item_category: item.category,
+          item_description: item.description,
+          item_image_url: item.imageUrl,
+          item_price: item.price,
+        });
+      
+      setStagedItems(prev => [...prev, item]);
+    }
+  }, [user, currentProjectId, stagedItems]);
+
+  const handleClearStagedItems = useCallback(async () => {
+    if (!currentProjectId) return;
+    
+    await supabase
+      .from('staged_furniture')
+      .delete()
+      .eq('project_id', currentProjectId);
+    
     setStagedItems([]);
-  }, []);
+  }, [currentProjectId]);
+
+  const loadStagedFurniture = async () => {
+    if (!currentProjectId) return;
+
+    const { data, error } = await supabase
+      .from('staged_furniture')
+      .select('*')
+      .eq('project_id', currentProjectId)
+      .order('created_at', { ascending: true });
+
+    if (error) {
+      console.error('Failed to load staged furniture:', error);
+      return;
+    }
+
+    const items: CatalogFurnitureItem[] = (data || []).map(row => ({
+      id: row.catalog_item_id,
+      name: row.item_name,
+      category: row.item_category,
+      description: row.item_description || '',
+      imageUrl: row.item_image_url || undefined,
+      price: row.item_price || 0,
+    }));
+
+    setStagedItems(items);
+  };
 
   // Loading state
   if (authLoading) {
