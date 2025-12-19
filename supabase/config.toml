@@ -5,3 +5,6 @@ verify_jwt = false
 
 [functions.analyze-room]
 verify_jwt = false
+
+[functions.edit-render]
+verify_jwt = false

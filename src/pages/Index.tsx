@@ -27,6 +27,7 @@ const Index = () => {
   const [currentProjectId, setCurrentProjectId] = useState<string | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [currentRenderUrl, setCurrentRenderUrl] = useState<string | null>(null);
+  const [currentRenderId, setCurrentRenderId] = useState<string | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
@@ -219,7 +220,7 @@ const Index = () => {
   const loadLatestRender = async () => {
     const { data, error } = await supabase
       .from('renders')
-      .select('render_url')
+      .select('id, render_url')
       .eq('project_id', currentProjectId)
       .eq('status', 'completed')
       .order('created_at', { ascending: false })
@@ -228,6 +229,7 @@ const Index = () => {
 
     if (!error && data?.render_url) {
       setCurrentRenderUrl(data.render_url);
+      setCurrentRenderId(data.id);
     }
   };
 
@@ -246,6 +248,7 @@ const Index = () => {
       setCurrentProjectId(data.id);
       setMessages([]);
       setCurrentRenderUrl(null);
+      setCurrentRenderId(null);
       setCurrentUpload(null);
       toast({ title: 'Project created', description: 'New project ready.' });
     }
@@ -255,6 +258,7 @@ const Index = () => {
     setCurrentProjectId(projectId);
     setMessages([]);
     setCurrentRenderUrl(null);
+    setCurrentRenderId(null);
     setCurrentUpload(null);
   };
 
@@ -428,6 +432,87 @@ Ready to generate a render! Describe your vision.`;
     }
   };
 
+  // Edit existing render with staged furniture
+  const editRender = useCallback(async (content: string, furnitureItems: CatalogFurnitureItem[]) => {
+    if (!user || !currentProjectId || !currentRenderUrl) return;
+
+    setIsGenerating(true);
+
+    try {
+      // Create render record with parent reference
+      const { data: renderRecord, error: renderError } = await supabase
+        .from('renders')
+        .insert({
+          project_id: currentProjectId,
+          user_id: user.id,
+          prompt: content,
+          room_upload_id: currentUpload?.id || null,
+          parent_render_id: currentRenderId,
+          status: 'generating',
+        })
+        .select()
+        .single();
+
+      if (renderError) throw renderError;
+
+      const furnitureNames = furnitureItems.map(i => i.name).join(', ');
+      await addMessage('assistant', `Editing render: replacing furniture with ${furnitureNames}...`, 
+        { type: 'text', status: 'pending' }
+      );
+
+      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/edit-render`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+        },
+        body: JSON.stringify({
+          currentRenderUrl,
+          userPrompt: content,
+          furnitureItems: furnitureItems.map(item => ({
+            name: item.name,
+            category: item.category,
+            description: item.description,
+            imageUrl: item.imageUrl,
+          })),
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || 'Edit failed');
+      }
+
+      const { imageUrl } = await response.json();
+
+      // Update render record
+      await supabase
+        .from('renders')
+        .update({ render_url: imageUrl, status: 'completed' })
+        .eq('id', renderRecord.id);
+
+      setCurrentRenderUrl(imageUrl);
+      setCurrentRenderId(renderRecord.id);
+
+      await addMessage('assistant', 'Render updated with your furniture! The staged items have been placed in the room.', {
+        type: 'render',
+        imageUrl,
+        status: 'ready',
+      });
+
+      toast({ title: 'Render updated', description: 'Furniture replaced successfully.' });
+
+    } catch (error) {
+      console.error('Render edit failed:', error);
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      await addMessage('assistant', `Sorry, editing failed: ${message}`, { type: 'text', status: 'failed' });
+      toast({ variant: 'destructive', title: 'Edit failed', description: message });
+    } finally {
+      setIsGenerating(false);
+    }
+  }, [user, currentProjectId, currentRenderUrl, currentRenderId, currentUpload, addMessage, toast]);
+
+  // Generate new render (no existing render)
   const triggerGeneration = useCallback(async (content: string, furnitureItems: CatalogFurnitureItem[] = []) => {
     if (!user || !currentProjectId) return;
 
@@ -499,6 +584,7 @@ Ready to generate a render! Describe your vision.`;
         .eq('id', renderRecord.id);
 
       setCurrentRenderUrl(imageUrl);
+      setCurrentRenderId(renderRecord.id);
 
       await addMessage('assistant', 'Your render is ready! You can download it using the controls above.', {
         type: 'render',
@@ -521,6 +607,9 @@ Ready to generate a render! Describe your vision.`;
   const handleSendMessage = useCallback(async (content: string) => {
     if (!user || !currentProjectId) return;
 
+    // Determine if we should edit or generate
+    const shouldEdit = currentRenderUrl && stagedItems.length > 0;
+
     // Build message content with staged items info
     const messageContent = stagedItems.length > 0
       ? `${content}\n\n📦 Staged furniture: ${stagedItems.map(i => i.name).join(', ')}`
@@ -532,8 +621,14 @@ Ready to generate a render! Describe your vision.`;
       stagedFurniture: stagedItems.length > 0 ? stagedItems.map(i => ({ id: i.id, name: i.name })) : undefined,
     } as ChatMessage['metadata']);
 
-    // Trigger generation with staged items
-    triggerGeneration(content, stagedItems);
+    // Choose edit or generate based on context
+    if (shouldEdit) {
+      // Edit existing render with staged furniture
+      editRender(content, stagedItems);
+    } else {
+      // Generate new render
+      triggerGeneration(content, stagedItems);
+    }
     
     // Clear staged items from DB and state after sending
     if (stagedItems.length > 0) {
@@ -543,7 +638,7 @@ Ready to generate a render! Describe your vision.`;
         .eq('project_id', currentProjectId);
     }
     setStagedItems([]);
-  }, [user, currentProjectId, addMessage, triggerGeneration, stagedItems]);
+  }, [user, currentProjectId, addMessage, triggerGeneration, editRender, stagedItems, currentRenderUrl]);
 
   const handleCatalogItemSelect = useCallback(async (item: CatalogFurnitureItem) => {
     if (!user || !currentProjectId) return;
@@ -615,6 +710,9 @@ Ready to generate a render! Describe your vision.`;
     setStagedItems(items);
   };
 
+  // Determine if in edit mode
+  const isEditMode = currentRenderUrl !== null && stagedItems.length > 0;
+
   // Loading state
   if (authLoading) {
     return (
@@ -655,6 +753,7 @@ Ready to generate a render! Describe your vision.`;
                 onUploadClick={() => setUploadDialogOpen(true)}
                 stagedItems={stagedItems}
                 onClearStagedItems={handleClearStagedItems}
+                isEditMode={isEditMode}
               />
             </div>
             <AssetsPanel 
