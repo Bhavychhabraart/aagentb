@@ -31,7 +31,7 @@ serve(async (req) => {
         messages: [
           {
             role: 'user',
-            content: `Generate a photorealistic interior design render: ${prompt}. The image should be professional architectural visualization quality, with realistic lighting, materials, and proportions. Modern high-end interior design aesthetic.`,
+            content: `Generate a photorealistic interior design render in 16:9 widescreen cinematic aspect ratio (1920x1080 proportions): ${prompt}. The image must be composed in wide horizontal format like a movie frame. Professional architectural visualization quality with dramatic cinematic lighting, realistic materials, and proportions. Modern high-end interior design aesthetic with cinematic framing.`,
           },
         ],
         modalities: ['image', 'text'],
