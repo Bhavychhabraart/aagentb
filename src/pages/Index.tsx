@@ -9,6 +9,7 @@ import { RenderViewer } from '@/components/canvas/RenderViewer';
 import { UploadDialog } from '@/components/canvas/UploadDialog';
 import { AssetsPanel } from '@/components/canvas/AssetsPanel';
 import { SidebarProvider } from '@/components/ui/sidebar';
+import { CatalogFurnitureItem } from '@/services/catalogService';
 
 interface RoomUpload {
   id: string;
@@ -32,6 +33,7 @@ const Index = () => {
   const [isUploading, setIsUploading] = useState(false);
   const [currentUpload, setCurrentUpload] = useState<RoomUpload | null>(null);
   const hasTriggeredGeneration = useRef(false);
+  const [stagedItems, setStagedItems] = useState<CatalogFurnitureItem[]>([]);
 
   // Redirect to auth if not logged in
   useEffect(() => {
@@ -425,7 +427,7 @@ Ready to generate a render! Describe your vision.`;
     }
   };
 
-  const triggerGeneration = useCallback(async (content: string, skipUserMessage = false) => {
+  const triggerGeneration = useCallback(async (content: string, furnitureItems: CatalogFurnitureItem[] = []) => {
     if (!user || !currentProjectId) return;
 
     // Check if we have a room upload to reference
@@ -434,13 +436,22 @@ Ready to generate a render! Describe your vision.`;
     setIsGenerating(true);
 
     try {
+      // Build enhanced prompt with furniture context
+      let enhancedPrompt = content;
+      if (furnitureItems.length > 0) {
+        const furnitureContext = furnitureItems.map(item => 
+          `- ${item.name} (${item.category}): ${item.description}`
+        ).join('\n');
+        enhancedPrompt = `${content}\n\n[Include these specific furniture pieces in the design:\n${furnitureContext}]`;
+      }
+
       // Create render record
       const { data: renderRecord, error: renderError } = await supabase
         .from('renders')
         .insert({
           project_id: currentProjectId,
           user_id: user.id,
-          prompt: content,
+          prompt: enhancedPrompt,
           room_upload_id: currentUpload?.id || null,
           status: 'generating',
         })
@@ -449,7 +460,11 @@ Ready to generate a render! Describe your vision.`;
 
       if (renderError) throw renderError;
 
-      await addMessage('assistant', 'Generating your render...', { type: 'text', status: 'pending' });
+      await addMessage('assistant', furnitureItems.length > 0 
+        ? `Generating your render with ${furnitureItems.length} furniture piece${furnitureItems.length > 1 ? 's' : ''}...`
+        : 'Generating your render...', 
+        { type: 'text', status: 'pending' }
+      );
 
       const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-render`, {
         method: 'POST',
@@ -458,8 +473,14 @@ Ready to generate a render! Describe your vision.`;
           'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
         },
         body: JSON.stringify({
-          prompt: content,
+          prompt: enhancedPrompt,
           roomImageUrl,
+          furnitureItems: furnitureItems.map(item => ({
+            name: item.name,
+            category: item.category,
+            description: item.description,
+            imageUrl: item.imageUrl,
+          })),
         }),
       });
 
@@ -499,12 +520,37 @@ Ready to generate a render! Describe your vision.`;
   const handleSendMessage = useCallback(async (content: string) => {
     if (!user || !currentProjectId) return;
 
-    // Add user message
-    await addMessage('user', content, { type: 'text' });
+    // Build message content with staged items info
+    const messageContent = stagedItems.length > 0
+      ? `${content}\n\n📦 Staged furniture: ${stagedItems.map(i => i.name).join(', ')}`
+      : content;
 
-    // Trigger generation
-    triggerGeneration(content);
-  }, [user, currentProjectId, addMessage, triggerGeneration]);
+    // Add user message
+    await addMessage('user', messageContent, { 
+      type: 'text',
+      stagedFurniture: stagedItems.length > 0 ? stagedItems.map(i => ({ id: i.id, name: i.name })) : undefined,
+    } as ChatMessage['metadata']);
+
+    // Trigger generation with staged items
+    triggerGeneration(content, stagedItems);
+    
+    // Clear staged items after sending
+    setStagedItems([]);
+  }, [user, currentProjectId, addMessage, triggerGeneration, stagedItems]);
+
+  const handleCatalogItemSelect = useCallback((item: CatalogFurnitureItem) => {
+    setStagedItems(prev => {
+      const exists = prev.find(i => i.id === item.id);
+      if (exists) {
+        return prev.filter(i => i.id !== item.id);
+      }
+      return [...prev, item];
+    });
+  }, []);
+
+  const handleClearStagedItems = useCallback(() => {
+    setStagedItems([]);
+  }, []);
 
   // Loading state
   if (authLoading) {
@@ -544,9 +590,15 @@ Ready to generate a render! Describe your vision.`;
                 isLoading={isProcessing || isGenerating}
                 onSendMessage={handleSendMessage}
                 onUploadClick={() => setUploadDialogOpen(true)}
+                stagedItems={stagedItems}
+                onClearStagedItems={handleClearStagedItems}
               />
             </div>
-            <AssetsPanel projectId={currentProjectId} />
+            <AssetsPanel 
+              projectId={currentProjectId} 
+              onCatalogItemSelect={handleCatalogItemSelect}
+              stagedItemIds={stagedItems.map(i => i.id)}
+            />
           </div>
         </div>
 

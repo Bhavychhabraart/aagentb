@@ -5,13 +5,20 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+interface FurnitureItem {
+  name: string;
+  category: string;
+  description: string;
+  imageUrl?: string;
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    const { prompt, projectId } = await req.json();
+    const { prompt, projectId, furnitureItems } = await req.json();
     const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
     
     if (!LOVABLE_API_KEY) {
@@ -19,6 +26,20 @@ serve(async (req) => {
     }
 
     console.log('Generating render for prompt:', prompt);
+    console.log('Furniture items:', furnitureItems?.length || 0);
+
+    // Build enhanced prompt with furniture context
+    let enhancedPrompt = `Generate a photorealistic interior design render in wide 16:9 landscape format: ${prompt}. Compose the image horizontally like a cinematic movie frame at 1920x1080 proportions. Professional architectural visualization with dramatic lighting, realistic materials, and modern high-end interior design aesthetic.`;
+
+    if (furnitureItems && furnitureItems.length > 0) {
+      const furnitureDescriptions = (furnitureItems as FurnitureItem[]).map(item => 
+        `${item.name} (${item.category}): ${item.description}`
+      ).join('; ');
+      
+      enhancedPrompt += ` IMPORTANT: The design MUST prominently feature these specific furniture pieces: ${furnitureDescriptions}. Integrate these items naturally into the room composition as key focal points.`;
+      
+      console.log('Enhanced prompt with furniture:', enhancedPrompt.substring(0, 500) + '...');
+    }
 
     const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
       method: 'POST',
@@ -26,19 +47,19 @@ serve(async (req) => {
         Authorization: `Bearer ${LOVABLE_API_KEY}`,
         'Content-Type': 'application/json',
       },
-        body: JSON.stringify({
-          model: 'google/gemini-3-pro-image-preview',
-          messages: [
-            {
-              role: 'user',
-              content: `Generate a photorealistic interior design render in wide 16:9 landscape format: ${prompt}. Compose the image horizontally like a cinematic movie frame at 1920x1080 proportions. Professional architectural visualization with dramatic lighting, realistic materials, and modern high-end interior design aesthetic.`,
-            },
-          ],
-          modalities: ['image', 'text'],
-          generationConfig: {
-            aspectRatio: "16:9"
-          }
-        }),
+      body: JSON.stringify({
+        model: 'google/gemini-3-pro-image-preview',
+        messages: [
+          {
+            role: 'user',
+            content: enhancedPrompt,
+          },
+        ],
+        modalities: ['image', 'text'],
+        generationConfig: {
+          aspectRatio: "16:9"
+        }
+      }),
     });
 
     if (!response.ok) {
