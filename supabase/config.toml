@@ -29,3 +29,6 @@ verify_jwt = false
 
 [functions.generate-product-photo]
 verify_jwt = false
+
+[functions.upscale-image]
+verify_jwt = false

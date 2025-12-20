@@ -25,7 +25,8 @@ import {
   Clock,
   Eye,
   Download,
-  X
+  X,
+  Maximize
 } from 'lucide-react';
 import {
   Dialog,
@@ -86,6 +87,7 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [showCustomFurniture, setShowCustomFurniture] = useState(false);
   const [viewingRender, setViewingRender] = useState<Render | null>(null);
+  const [upscalingId, setUpscalingId] = useState<string | null>(null);
 
   const handleDownloadRender = async (render: Render, e: React.MouseEvent) => {
     e.stopPropagation();
@@ -111,6 +113,49 @@ export default function Dashboard() {
   const handleViewRender = (render: Render, e: React.MouseEvent) => {
     e.stopPropagation();
     setViewingRender(render);
+  };
+
+  const handleUpscaleRender = async (render: Render, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!render.render_url || upscalingId) return;
+    
+    setUpscalingId(render.id);
+    toast({ title: 'Upscaling...', description: 'Enhancing image quality. This may take a moment.' });
+    
+    try {
+      const response = await supabase.functions.invoke('upscale-image', {
+        body: { imageUrl: render.render_url, renderId: render.id }
+      });
+      
+      if (response.error) {
+        throw new Error(response.error.message);
+      }
+      
+      if (response.data?.upscaledUrl) {
+        // Download the upscaled image
+        const downloadResponse = await fetch(response.data.upscaledUrl);
+        const blob = await downloadResponse.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `upscaled-${render.id.slice(0, 8)}.png`;
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(a);
+        
+        toast({ title: 'Upscaled!', description: 'High-resolution image downloaded.' });
+      }
+    } catch (error) {
+      console.error('Upscale error:', error);
+      toast({ 
+        variant: 'destructive', 
+        title: 'Upscale failed', 
+        description: error instanceof Error ? error.message : 'Failed to upscale image.'
+      });
+    } finally {
+      setUpscalingId(null);
+    }
   };
 
   useEffect(() => {
@@ -417,6 +462,20 @@ export default function Dashboard() {
                           size="icon"
                           variant="secondary"
                           className="h-8 w-8 bg-white/90 hover:bg-white text-foreground"
+                          onClick={(e) => handleUpscaleRender(render, e)}
+                          disabled={upscalingId === render.id}
+                          title="Upscale to HD"
+                        >
+                          {upscalingId === render.id ? (
+                            <div className="h-4 w-4 border-2 border-foreground/30 border-t-foreground rounded-full animate-spin" />
+                          ) : (
+                            <Maximize className="h-4 w-4" />
+                          )}
+                        </Button>
+                        <Button
+                          size="icon"
+                          variant="secondary"
+                          className="h-8 w-8 bg-white/90 hover:bg-white text-foreground"
                           onClick={(e) => handleDownloadRender(render, e)}
                           title="Download"
                         >
@@ -631,6 +690,20 @@ export default function Dashboard() {
             <DialogTitle className="text-white flex items-center justify-between">
               <span>{viewingRender?.project_name || 'Render'}</span>
               <div className="flex gap-2">
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  className="gap-2"
+                  onClick={(e) => viewingRender && handleUpscaleRender(viewingRender, e)}
+                  disabled={upscalingId === viewingRender?.id}
+                >
+                  {upscalingId === viewingRender?.id ? (
+                    <div className="h-4 w-4 border-2 border-foreground/30 border-t-foreground rounded-full animate-spin" />
+                  ) : (
+                    <Maximize className="h-4 w-4" />
+                  )}
+                  Upscale HD
+                </Button>
                 <Button
                   size="sm"
                   variant="secondary"
