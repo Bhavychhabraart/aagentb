@@ -15,6 +15,7 @@ import { CatalogFurnitureItem } from '@/services/catalogService';
 import { FurniturePositioner, FurniturePlacement } from '@/components/canvas/FurniturePositioner';
 import { ProjectData } from '@/services/documentService';
 import { SelectionRegion } from '@/components/canvas/SelectionOverlay';
+import { RenderHistoryItem } from '@/components/canvas/RenderHistoryCarousel';
 
 interface RoomUpload {
   id: string;
@@ -56,6 +57,7 @@ const Index = () => {
   const [projectName, setProjectName] = useState('Untitled Project');
   const [styleRefUrls, setStyleRefUrls] = useState<string[]>([]);
   const [allRenderUrls, setAllRenderUrls] = useState<string[]>([]);
+  const [allRenders, setAllRenders] = useState<RenderHistoryItem[]>([]);
   const [isSelectiveEditing, setIsSelectiveEditing] = useState(false);
   const [isProjectSwitching, setIsProjectSwitching] = useState(false);
 
@@ -209,12 +211,23 @@ const Index = () => {
     
     const { data: renders } = await supabase
       .from('renders')
-      .select('render_url')
+      .select('id, render_url, prompt, parent_render_id, created_at')
       .eq('project_id', currentProjectId)
       .eq('status', 'completed')
       .order('created_at', { ascending: false });
     
-    setAllRenderUrls(renders?.map(r => r.render_url).filter(Boolean) as string[] || []);
+    const historyItems: RenderHistoryItem[] = (renders || [])
+      .filter(r => r.render_url)
+      .map(r => ({
+        id: r.id,
+        render_url: r.render_url!,
+        prompt: r.prompt,
+        parent_render_id: r.parent_render_id,
+        created_at: r.created_at,
+      }));
+    
+    setAllRenders(historyItems);
+    setAllRenderUrls(historyItems.map(r => r.render_url));
   };
 
   const loadOrCreateProject = async () => {
@@ -442,6 +455,7 @@ const Index = () => {
     setRoomPhotoUrl(null);
     setStyleRefUrls([]);
     setAllRenderUrls([]);
+    setAllRenders([]);
     setProjectName('Untitled Project');
     setIsStagingMode(false);
     setShowPositioner(false);
@@ -1116,6 +1130,43 @@ Ready to generate a render! Describe your vision.`;
     }
   }, [user, currentProjectId, currentRenderUrl, currentRenderId, currentUpload, addMessage, toast]);
 
+  // Handle render selection from history carousel
+  const handleRenderHistorySelect = useCallback((render: RenderHistoryItem) => {
+    setCurrentRenderUrl(render.render_url);
+    setCurrentRenderId(render.id);
+    toast({ title: 'Render selected', description: 'Viewing selected render version.' });
+  }, [toast]);
+
+  // Handle undo - go back to parent render
+  const handleUndo = useCallback(async () => {
+    if (!currentRenderId || !allRenders.length) return;
+
+    // Find current render in history
+    const currentRender = allRenders.find(r => r.id === currentRenderId);
+    if (!currentRender?.parent_render_id) {
+      toast({ variant: 'destructive', title: 'Cannot undo', description: 'No previous version available.' });
+      return;
+    }
+
+    // Find parent render
+    const parentRender = allRenders.find(r => r.id === currentRender.parent_render_id);
+    if (!parentRender) {
+      toast({ variant: 'destructive', title: 'Cannot undo', description: 'Parent render not found.' });
+      return;
+    }
+
+    setCurrentRenderUrl(parentRender.render_url);
+    setCurrentRenderId(parentRender.id);
+    toast({ title: 'Undo successful', description: 'Reverted to previous render version.' });
+  }, [currentRenderId, allRenders, toast]);
+
+  // Check if undo is possible
+  const canUndo = (() => {
+    if (!currentRenderId || !allRenders.length) return false;
+    const currentRender = allRenders.find(r => r.id === currentRenderId);
+    return !!currentRender?.parent_render_id;
+  })();
+
   // Loading state - early returns AFTER all hooks
   if (authLoading) {
     return (
@@ -1162,6 +1213,11 @@ Ready to generate a render! Describe your vision.`;
           onStartOrder={stagedItems.length > 0 ? () => setShowOrderModal(true) : undefined}
           onSelectiveEdit={handleSelectiveEdit}
           isSelectiveEditing={isSelectiveEditing}
+          allRenders={allRenders}
+          currentRenderId={currentRenderId}
+          onRenderHistorySelect={handleRenderHistorySelect}
+          onUndo={handleUndo}
+          canUndo={canUndo}
         />
         
         <div className="w-96 shrink-0 flex flex-col">
