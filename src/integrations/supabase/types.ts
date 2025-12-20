@@ -493,6 +493,44 @@ export type Database = {
         }
         Relationships: []
       }
+      vendor_product_photos: {
+        Row: {
+          created_at: string | null
+          id: string
+          image_url: string
+          photo_type: string
+          product_id: string | null
+          template_name: string
+          vendor_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          image_url: string
+          photo_type: string
+          product_id?: string | null
+          template_name: string
+          vendor_id: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          image_url?: string
+          photo_type?: string
+          product_id?: string | null
+          template_name?: string
+          vendor_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "vendor_product_photos_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "vendor_products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       vendor_products: {
         Row: {
           category: string
