@@ -1,12 +1,14 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { Image, Palette, Package, ChevronDown, ChevronUp, ShoppingBag, Loader2, Search, X } from 'lucide-react';
+import { Image, Palette, Package, ChevronDown, ChevronUp, ShoppingBag, Loader2, Search, X, Maximize2 } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { supabase } from '@/integrations/supabase/client';
 import { cn } from '@/lib/utils';
 import { fetchFurnitureCatalog, CatalogFurnitureItem } from '@/services/catalogService';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ProductDetailModal } from './ProductDetailModal';
+import { FullScreenCatalogModal } from './FullScreenCatalogModal';
 import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
 
 interface Asset {
   id: string;
@@ -39,6 +41,7 @@ export function AssetsPanel({ projectId, onAssetSelect, onCatalogItemSelect, sta
   const [previewItem, setPreviewItem] = useState<CatalogFurnitureItem | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [displayCount, setDisplayCount] = useState(ITEMS_PER_PAGE);
+  const [isFullScreenOpen, setIsFullScreenOpen] = useState(false);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -289,24 +292,35 @@ export function AssetsPanel({ projectId, onAssetSelect, onCatalogItemSelect, sta
                 </div>
               ) : (
                 <div className="space-y-2">
-                  {/* Search bar */}
-                  <div className="relative">
-                    <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3 w-3 text-muted-foreground" />
-                    <Input
-                      type="text"
-                      placeholder="Search furniture..."
-                      value={searchQuery}
-                      onChange={(e) => setSearchQuery(e.target.value)}
-                      className="h-7 pl-7 pr-7 text-xs bg-muted/50 border-border/50"
-                    />
-                    {searchQuery && (
-                      <button
-                        onClick={() => setSearchQuery('')}
-                        className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                      >
-                        <X className="h-3 w-3" />
-                      </button>
-                    )}
+                  {/* Search bar with expand button */}
+                  <div className="flex gap-2">
+                    <div className="relative flex-1">
+                      <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3 w-3 text-muted-foreground" />
+                      <Input
+                        type="text"
+                        placeholder="Search furniture..."
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        className="h-7 pl-7 pr-7 text-xs bg-muted/50 border-border/50"
+                      />
+                      {searchQuery && (
+                        <button
+                          onClick={() => setSearchQuery('')}
+                          className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                        >
+                          <X className="h-3 w-3" />
+                        </button>
+                      )}
+                    </div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-7 px-2"
+                      onClick={() => setIsFullScreenOpen(true)}
+                      title="Expand catalog"
+                    >
+                      <Maximize2 className="h-3.5 w-3.5" />
+                    </Button>
                   </div>
 
                   {/* Category filter */}
@@ -386,6 +400,18 @@ export function AssetsPanel({ projectId, onAssetSelect, onCatalogItemSelect, sta
         onClose={() => setPreviewItem(null)}
         isStaged={previewItem ? stagedItemIds.includes(previewItem.id) : false}
         onToggleStage={handleToggleStage}
+      />
+
+      {/* Full Screen Catalog Modal */}
+      <FullScreenCatalogModal
+        isOpen={isFullScreenOpen}
+        onClose={() => setIsFullScreenOpen(false)}
+        catalogItems={catalogItems}
+        stagedItemIds={stagedItemIds}
+        onToggleStage={handleToggleStage}
+        onPreviewItem={(item) => {
+          setPreviewItem(item);
+        }}
       />
     </div>
   );
