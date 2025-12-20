@@ -62,6 +62,8 @@ export type Database = {
           item_name: string
           item_price: number
           order_id: string
+          vendor_id: string | null
+          vendor_product_id: string | null
         }
         Insert: {
           catalog_item_id?: string | null
@@ -72,6 +74,8 @@ export type Database = {
           item_name: string
           item_price?: number
           order_id: string
+          vendor_id?: string | null
+          vendor_product_id?: string | null
         }
         Update: {
           catalog_item_id?: string | null
@@ -82,6 +86,8 @@ export type Database = {
           item_name?: string
           item_price?: number
           order_id?: string
+          vendor_id?: string | null
+          vendor_product_id?: string | null
         }
         Relationships: [
           {
@@ -89,6 +95,13 @@ export type Database = {
             columns: ["order_id"]
             isOneToOne: false
             referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "order_items_vendor_product_id_fkey"
+            columns: ["vendor_product_id"]
+            isOneToOne: false
+            referencedRelation: "vendor_products"
             referencedColumns: ["id"]
           },
         ]
@@ -415,15 +428,84 @@ export type Database = {
         }
         Relationships: []
       }
+      user_roles: {
+        Row: {
+          created_at: string
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
+        }
+        Relationships: []
+      }
+      vendor_products: {
+        Row: {
+          category: string
+          created_at: string
+          description: string | null
+          id: string
+          image_url: string | null
+          is_active: boolean
+          name: string
+          price: number
+          sku: string | null
+          updated_at: string
+          vendor_id: string
+        }
+        Insert: {
+          category: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          image_url?: string | null
+          is_active?: boolean
+          name: string
+          price?: number
+          sku?: string | null
+          updated_at?: string
+          vendor_id: string
+        }
+        Update: {
+          category?: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          image_url?: string | null
+          is_active?: boolean
+          name?: string
+          price?: number
+          sku?: string | null
+          updated_at?: string
+          vendor_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      has_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
     }
     Enums: {
-      [_ in never]: never
+      app_role: "user" | "vendor"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -550,6 +632,8 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      app_role: ["user", "vendor"],
+    },
   },
 } as const
