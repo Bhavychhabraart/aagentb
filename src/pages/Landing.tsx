@@ -304,9 +304,9 @@ export default function Landing() {
         {/* Hero text */}
         <div className="text-center mb-12 max-w-2xl">
           <h2 className="text-4xl md:text-5xl font-semibold text-foreground mb-4 leading-tight">
-            The AI canvas for
+            Stage and Sell
             <br />
-            architectural design.
+            Beautiful Spaces
           </h2>
           <p className="text-lg text-muted-foreground">
             Design, visualize, collaborate and present, all in one platform.
