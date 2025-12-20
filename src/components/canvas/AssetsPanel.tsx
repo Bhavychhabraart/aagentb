@@ -1,11 +1,12 @@
-import { useState, useEffect } from 'react';
-import { Image, Palette, Package, ChevronDown, ChevronUp, ShoppingBag, Loader2 } from 'lucide-react';
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { Image, Palette, Package, ChevronDown, ChevronUp, ShoppingBag, Loader2, Search, X } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { supabase } from '@/integrations/supabase/client';
 import { cn } from '@/lib/utils';
 import { fetchFurnitureCatalog, CatalogFurnitureItem } from '@/services/catalogService';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ProductDetailModal } from './ProductDetailModal';
+import { Input } from '@/components/ui/input';
 
 interface Asset {
   id: string;
@@ -23,6 +24,8 @@ interface AssetsPanelProps {
 
 export type { CatalogFurnitureItem };
 
+const ITEMS_PER_PAGE = 20;
+
 export function AssetsPanel({ projectId, onAssetSelect, onCatalogItemSelect, stagedItemIds = [] }: AssetsPanelProps) {
   const [assets, setAssets] = useState<Asset[]>([]);
   const [catalogItems, setCatalogItems] = useState<CatalogFurnitureItem[]>([]);
@@ -34,6 +37,9 @@ export function AssetsPanel({ projectId, onAssetSelect, onCatalogItemSelect, sta
   const [activeTab, setActiveTab] = useState('project');
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [previewItem, setPreviewItem] = useState<CatalogFurnitureItem | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [displayCount, setDisplayCount] = useState(ITEMS_PER_PAGE);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (projectId) {
@@ -116,6 +122,20 @@ export function AssetsPanel({ projectId, onAssetSelect, onCatalogItemSelect, sta
     onCatalogItemSelect?.(item);
   };
 
+  // Reset display count when search or category changes
+  useEffect(() => {
+    setDisplayCount(ITEMS_PER_PAGE);
+  }, [searchQuery, selectedCategory]);
+
+  // Handle scroll for infinite loading
+  const handleScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
+    const target = e.target as HTMLDivElement;
+    const bottom = target.scrollHeight - target.scrollTop <= target.clientHeight + 50;
+    if (bottom && displayCount < filteredCatalogItems.length) {
+      setDisplayCount(prev => Math.min(prev + ITEMS_PER_PAGE, filteredCatalogItems.length));
+    }
+  }, [displayCount]);
+
   if (!projectId) return null;
 
   const roomAssets = assets.filter(a => a.type === 'room');
@@ -124,9 +144,19 @@ export function AssetsPanel({ projectId, onAssetSelect, onCatalogItemSelect, sta
 
   // Get unique categories from catalog
   const categories = [...new Set(catalogItems.map(item => item.category))];
-  const filteredCatalogItems = selectedCategory 
-    ? catalogItems.filter(item => item.category === selectedCategory)
-    : catalogItems;
+  
+  // Filter by category and search query
+  const filteredCatalogItems = catalogItems.filter(item => {
+    const matchesCategory = !selectedCategory || item.category === selectedCategory;
+    const matchesSearch = !searchQuery || 
+      item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      item.category.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      item.brand?.toLowerCase().includes(searchQuery.toLowerCase());
+    return matchesCategory && matchesSearch;
+  });
+
+  const displayedItems = filteredCatalogItems.slice(0, displayCount);
+  const hasMore = displayCount < filteredCatalogItems.length;
 
   return (
     <div className="border-t border-border bg-card/50">
@@ -259,6 +289,26 @@ export function AssetsPanel({ projectId, onAssetSelect, onCatalogItemSelect, sta
                 </div>
               ) : (
                 <div className="space-y-2">
+                  {/* Search bar */}
+                  <div className="relative">
+                    <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3 w-3 text-muted-foreground" />
+                    <Input
+                      type="text"
+                      placeholder="Search furniture..."
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      className="h-7 pl-7 pr-7 text-xs bg-muted/50 border-border/50"
+                    />
+                    {searchQuery && (
+                      <button
+                        onClick={() => setSearchQuery('')}
+                        className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    )}
+                  </div>
+
                   {/* Category filter */}
                   <div className="flex gap-1 flex-wrap">
                     <button
@@ -288,19 +338,39 @@ export function AssetsPanel({ projectId, onAssetSelect, onCatalogItemSelect, sta
                     ))}
                   </div>
 
-                  <div className="h-32 overflow-hidden">
-                  <ScrollArea className="h-full">
-                    <div className="grid grid-cols-4 gap-1.5">
-                      {filteredCatalogItems.slice(0, 20).map((item) => (
-                        <CatalogThumbnail
-                          key={item.id}
-                          item={item}
-                          isSelected={stagedItemIds.includes(item.id)}
-                          onClick={() => handleCatalogItemClick(item)}
-                        />
-                      ))}
-                    </div>
-                  </ScrollArea>
+                  {/* Results count */}
+                  <div className="text-[10px] text-muted-foreground">
+                    Showing {displayedItems.length} of {filteredCatalogItems.length} items
+                  </div>
+
+                  {/* Scrollable grid with infinite scroll */}
+                  <div 
+                    className="h-40 overflow-y-auto" 
+                    onScroll={handleScroll}
+                    ref={scrollContainerRef}
+                  >
+                    {filteredCatalogItems.length === 0 ? (
+                      <div className="text-center py-6 text-muted-foreground">
+                        <Search className="h-6 w-6 mx-auto mb-2 opacity-50" />
+                        <p className="text-xs">No items found</p>
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-4 gap-1.5">
+                        {displayedItems.map((item) => (
+                          <CatalogThumbnail
+                            key={item.id}
+                            item={item}
+                            isSelected={stagedItemIds.includes(item.id)}
+                            onClick={() => handleCatalogItemClick(item)}
+                          />
+                        ))}
+                      </div>
+                    )}
+                    {hasMore && (
+                      <div className="flex justify-center py-2">
+                        <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                      </div>
+                    )}
                   </div>
                 </div>
               )}
