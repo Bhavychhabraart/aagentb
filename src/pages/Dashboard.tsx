@@ -22,8 +22,17 @@ import {
   LayoutGrid,
   TrendingUp,
   Package,
-  Clock
+  Clock,
+  Eye,
+  Download,
+  X
 } from 'lucide-react';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { cn } from '@/lib/utils';
 import { CustomFurnitureModal } from '@/components/creation/CustomFurnitureModal';
 
@@ -76,6 +85,33 @@ export default function Dashboard() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [showCustomFurniture, setShowCustomFurniture] = useState(false);
+  const [viewingRender, setViewingRender] = useState<Render | null>(null);
+
+  const handleDownloadRender = async (render: Render, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!render.render_url) return;
+    
+    try {
+      const response = await fetch(render.render_url);
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `render-${render.id.slice(0, 8)}.png`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+      toast({ title: 'Downloaded', description: 'Render saved to your device.' });
+    } catch (error) {
+      toast({ variant: 'destructive', title: 'Error', description: 'Failed to download render.' });
+    }
+  };
+
+  const handleViewRender = (render: Render, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setViewingRender(render);
+  };
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -356,8 +392,7 @@ export default function Dashboard() {
                 renders.map((render) => (
                   <div 
                     key={render.id} 
-                    className="group relative aspect-video rounded-lg overflow-hidden bg-muted cursor-pointer"
-                    onClick={() => navigate(`/workspace?project=${render.project_id}`)}
+                    className="group relative aspect-video rounded-lg overflow-hidden bg-muted"
                   >
                     {render.render_url && (
                       <img 
@@ -366,8 +401,33 @@ export default function Dashboard() {
                         className="w-full h-full object-cover group-hover:scale-105 transition-transform"
                       />
                     )}
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent opacity-0 group-hover:opacity-100 transition-opacity">
-                      <div className="absolute bottom-2 left-2 right-2">
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-black/30 opacity-0 group-hover:opacity-100 transition-opacity">
+                      {/* Action buttons at top */}
+                      <div className="absolute top-2 right-2 flex gap-1.5">
+                        <Button
+                          size="icon"
+                          variant="secondary"
+                          className="h-8 w-8 bg-white/90 hover:bg-white text-foreground"
+                          onClick={(e) => handleViewRender(render, e)}
+                          title="View full size"
+                        >
+                          <Eye className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          size="icon"
+                          variant="secondary"
+                          className="h-8 w-8 bg-white/90 hover:bg-white text-foreground"
+                          onClick={(e) => handleDownloadRender(render, e)}
+                          title="Download"
+                        >
+                          <Download className="h-4 w-4" />
+                        </Button>
+                      </div>
+                      {/* Info at bottom */}
+                      <div 
+                        className="absolute bottom-2 left-2 right-2 cursor-pointer"
+                        onClick={() => navigate(`/workspace?project=${render.project_id}`)}
+                      >
                         <p className="text-xs text-white truncate">{render.project_name}</p>
                         <p className="text-xs text-white/70">
                           {new Date(render.created_at).toLocaleDateString()}
@@ -563,6 +623,35 @@ export default function Dashboard() {
           setShowCustomFurniture(false);
         }}
       />
+
+      {/* Render View Modal */}
+      <Dialog open={!!viewingRender} onOpenChange={(open) => !open && setViewingRender(null)}>
+        <DialogContent className="max-w-4xl p-0 overflow-hidden">
+          <DialogHeader className="absolute top-0 left-0 right-0 z-10 p-4 bg-gradient-to-b from-black/50 to-transparent">
+            <DialogTitle className="text-white flex items-center justify-between">
+              <span>{viewingRender?.project_name || 'Render'}</span>
+              <div className="flex gap-2">
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  className="gap-2"
+                  onClick={(e) => viewingRender && handleDownloadRender(viewingRender, e)}
+                >
+                  <Download className="h-4 w-4" />
+                  Download
+                </Button>
+              </div>
+            </DialogTitle>
+          </DialogHeader>
+          {viewingRender?.render_url && (
+            <img
+              src={viewingRender.render_url}
+              alt="Render full view"
+              className="w-full h-auto max-h-[80vh] object-contain"
+            />
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
