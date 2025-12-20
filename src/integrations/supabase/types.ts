@@ -52,6 +52,106 @@ export type Database = {
           },
         ]
       }
+      order_items: {
+        Row: {
+          catalog_item_id: string | null
+          created_at: string
+          id: string
+          item_category: string | null
+          item_image_url: string | null
+          item_name: string
+          item_price: number
+          order_id: string
+        }
+        Insert: {
+          catalog_item_id?: string | null
+          created_at?: string
+          id?: string
+          item_category?: string | null
+          item_image_url?: string | null
+          item_name: string
+          item_price?: number
+          order_id: string
+        }
+        Update: {
+          catalog_item_id?: string | null
+          created_at?: string
+          id?: string
+          item_category?: string | null
+          item_image_url?: string | null
+          item_name?: string
+          item_price?: number
+          order_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "order_items_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      orders: {
+        Row: {
+          client_email: string | null
+          client_name: string
+          client_phone: string | null
+          commission: number
+          created_at: string
+          grand_total: number
+          id: string
+          invoice_number: string | null
+          notes: string | null
+          project_id: string
+          status: string
+          subtotal: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          client_email?: string | null
+          client_name: string
+          client_phone?: string | null
+          commission?: number
+          created_at?: string
+          grand_total?: number
+          id?: string
+          invoice_number?: string | null
+          notes?: string | null
+          project_id: string
+          status?: string
+          subtotal?: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          client_email?: string | null
+          client_name?: string
+          client_phone?: string | null
+          commission?: number
+          created_at?: string
+          grand_total?: number
+          id?: string
+          invoice_number?: string | null
+          notes?: string | null
+          project_id?: string
+          status?: string
+          subtotal?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "orders_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       product_items: {
         Row: {
           created_at: string
