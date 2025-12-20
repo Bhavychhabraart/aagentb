@@ -57,6 +57,7 @@ const Index = () => {
   const [styleRefUrls, setStyleRefUrls] = useState<string[]>([]);
   const [allRenderUrls, setAllRenderUrls] = useState<string[]>([]);
   const [isSelectiveEditing, setIsSelectiveEditing] = useState(false);
+  const [isProjectSwitching, setIsProjectSwitching] = useState(false);
 
   // Redirect to auth if not logged in
   useEffect(() => {
@@ -80,14 +81,24 @@ const Index = () => {
   // Load messages when project changes
   useEffect(() => {
     if (currentProjectId) {
-      loadMessages();
-      loadLatestUpload();
-      loadLatestRender();
-      loadStagedFurniture();
-      loadLayoutImage();
-      loadRoomPhoto();
-      loadProjectDetails();
-      loadAllRenders();
+      const loadProjectData = async () => {
+        try {
+          await Promise.all([
+            loadMessages(),
+            loadLatestUpload(),
+            loadLatestRender(),
+            loadStagedFurniture(),
+            loadLayoutImage(),
+            loadRoomPhoto(),
+            loadProjectDetails(),
+            loadAllRenders(),
+          ]);
+        } finally {
+          setIsProjectSwitching(false);
+        }
+      };
+      
+      loadProjectData();
       
       // Check for staging mode from URL params
       const mode = searchParams.get('mode');
@@ -418,6 +429,9 @@ const Index = () => {
   };
 
   const handleProjectSelect = (projectId: string) => {
+    // Show loading indicator
+    setIsProjectSwitching(true);
+    
     // Reset all state immediately before switching
     setMessages([]);
     setCurrentRenderUrl(null);
@@ -1127,7 +1141,17 @@ Ready to generate a render! Describe your vision.`;
           onNewProject={handleNewProject}
         />
         
-        <div className="flex flex-1 overflow-hidden">
+        <div className="flex flex-1 overflow-hidden relative">
+          {/* Project switching overlay */}
+          {isProjectSwitching && (
+            <div className="absolute inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center">
+              <div className="text-center">
+                <div className="h-10 w-10 rounded-full border-2 border-primary border-t-transparent animate-spin mx-auto mb-3" />
+                <p className="text-sm text-muted-foreground">Loading project...</p>
+              </div>
+            </div>
+          )}
+          
         <RenderViewer
           imageUrl={currentRenderUrl}
           isGenerating={isGenerating}
