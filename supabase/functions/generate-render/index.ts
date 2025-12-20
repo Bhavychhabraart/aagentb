@@ -12,6 +12,170 @@ interface FurnitureItem {
   imageUrl?: string;
 }
 
+interface LayoutAnalysis {
+  roomShape: string;
+  dimensions: { width: number; depth: number; height: number; unit: string };
+  aspectRatio: string;
+  walls: { position: string; length: number; features: { type: string; positionPercent: number; widthPercent: number }[] }[];
+  windows: { wall: string; positionPercent: number; widthPercent: number; heightPercent: number; type: string }[];
+  doors: { wall: string; positionPercent: number; widthPercent: number; type: string; swingDirection: string }[];
+  furnitureZones: { name: string; label: string; xStart: number; xEnd: number; yStart: number; yEnd: number; suggestedItems: string[] }[];
+  cameraRecommendation: { position: string; angle: number; height: string; fov: string };
+  gridOverlay: string;
+}
+
+// Build architectural specification from layout analysis
+function buildArchitecturalSpec(analysis: LayoutAnalysis): string {
+  const { dimensions, walls, windows, doors, furnitureZones, cameraRecommendation, gridOverlay } = analysis;
+  
+  let spec = `MANDATORY ARCHITECTURAL CONSTRAINTS:
+
+═══════════════════════════════════════════════════════════════
+                    ROOM GEOMETRY SPECIFICATION
+═══════════════════════════════════════════════════════════════
+
+ROOM SHAPE: ${analysis.roomShape.toUpperCase()}
+DIMENSIONS: ${dimensions.width}${dimensions.unit === 'feet' ? 'ft' : 'm'} wide × ${dimensions.depth}${dimensions.unit === 'feet' ? 'ft' : 'm'} deep × ${dimensions.height}${dimensions.unit === 'feet' ? 'ft' : 'm'} ceiling
+ASPECT RATIO: ${analysis.aspectRatio}
+
+`;
+
+  // Wall specifications
+  spec += `═══════════════════════════════════════════════════════════════
+                    WALL SPECIFICATIONS (Top = North)
+═══════════════════════════════════════════════════════════════
+
+`;
+
+  // ASCII representation of room
+  spec += `┌─────────────────NORTH (${dimensions.width}ft)─────────────────┐
+│`;
+  
+  // Add window markers for north wall
+  const northWin = windows.filter(w => w.wall === 'north');
+  if (northWin.length > 0) {
+    northWin.forEach(w => {
+      spec += ` ▢ Window @${Math.round(w.positionPercent)}%`;
+    });
+  } else {
+    spec += '                    SOLID                     ';
+  }
+  spec += `│
+│                                                           │
+│WEST                                                   EAST│
+│(${dimensions.depth}ft)                                                (${dimensions.depth}ft)│
+│                                                           │
+│`;
+
+  // Add window markers for south wall
+  const southWin = windows.filter(w => w.wall === 'south');
+  if (southWin.length > 0) {
+    southWin.forEach(w => {
+      spec += ` ▢ Window @${Math.round(w.positionPercent)}%`;
+    });
+  } else {
+    const southDoor = doors.filter(d => d.wall === 'south');
+    if (southDoor.length > 0) {
+      southDoor.forEach(d => {
+        spec += ` ◯ Door @${Math.round(d.positionPercent)}%`;
+      });
+    } else {
+      spec += '                    SOLID                     ';
+    }
+  }
+  spec += `│
+└─────────────────SOUTH (${dimensions.width}ft)─────────────────┘
+
+`;
+
+  // Detailed wall features
+  for (const wall of walls) {
+    const wallWindows = windows.filter(w => w.wall === wall.position);
+    const wallDoors = doors.filter(d => d.wall === wall.position);
+    
+    spec += `${wall.position.toUpperCase()} WALL (${wall.length}ft):\n`;
+    
+    if (wallWindows.length > 0) {
+      wallWindows.forEach((w, i) => {
+        spec += `  → Window ${i + 1}: Position ${Math.round(w.positionPercent)}% from left, Width ${Math.round(w.widthPercent)}%, Type: ${w.type}\n`;
+      });
+    }
+    if (wallDoors.length > 0) {
+      wallDoors.forEach((d, i) => {
+        spec += `  → Door ${i + 1}: Position ${Math.round(d.positionPercent)}% from left, Type: ${d.type}, Swing: ${d.swingDirection}\n`;
+      });
+    }
+    if (wallWindows.length === 0 && wallDoors.length === 0) {
+      spec += `  → SOLID WALL (no openings)\n`;
+    }
+    spec += '\n';
+  }
+
+  // Camera specification
+  spec += `═══════════════════════════════════════════════════════════════
+                    CAMERA POSITION & ANGLE
+═══════════════════════════════════════════════════════════════
+
+VIEWING FROM: ${cameraRecommendation.position.toUpperCase()} corner
+CAMERA HEIGHT: ${cameraRecommendation.height === 'eye-level' ? '5ft (eye level)' : cameraRecommendation.height === 'elevated' ? '8ft (elevated)' : '3ft (low angle)'}
+LOOKING TOWARD: ${getOppositeCorner(cameraRecommendation.position)}
+FIELD OF VIEW: ${cameraRecommendation.fov.toUpperCase()}
+ANGLE FROM NORTH: ${cameraRecommendation.angle}°
+
+`;
+
+  // Furniture zones
+  if (furnitureZones.length > 0) {
+    spec += `═══════════════════════════════════════════════════════════════
+                    FURNITURE PLACEMENT ZONES
+═══════════════════════════════════════════════════════════════
+
+`;
+    furnitureZones.forEach((zone, i) => {
+      spec += `ZONE ${i + 1}: ${zone.label.toUpperCase()}
+  • X Range: ${zone.xStart}% - ${zone.xEnd}% (left to right)
+  • Y Range: ${zone.yStart}% - ${zone.yEnd}% (front to back)
+  • Suggested: ${zone.suggestedItems.join(', ')}
+  
+`;
+    });
+  }
+
+  // Verification checklist
+  spec += `═══════════════════════════════════════════════════════════════
+                    VERIFICATION CHECKLIST
+═══════════════════════════════════════════════════════════════
+
+The generated render MUST show:
+□ Room proportions matching ${dimensions.width}:${dimensions.depth} ratio
+□ Total windows visible: ${windows.length} (check each wall)
+□ Door(s) visible: ${doors.length} total
+□ Camera angle from ${cameraRecommendation.position} corner
+□ Furniture placed within designated zones
+
+FAILURE CONDITIONS (will require regeneration):
+✗ Wrong number of windows on any wall
+✗ Door on wrong wall or missing
+✗ Camera angle from incorrect corner
+✗ Room proportions don't match specification
+✗ Furniture placed outside designated zones
+
+`;
+
+  return spec;
+}
+
+function getOppositeCorner(corner: string): string {
+  const opposites: Record<string, string> = {
+    'southeast': 'northwest',
+    'southwest': 'northeast',
+    'northeast': 'southwest',
+    'northwest': 'southeast',
+    'center': 'center'
+  };
+  return opposites[corner] || 'opposite corner';
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -24,7 +188,8 @@ serve(async (req) => {
       furnitureItems,
       layoutImageUrl,
       roomPhotoUrl,
-      styleRefUrls 
+      styleRefUrls,
+      layoutAnalysis // NEW: Pre-parsed layout data
     } = await req.json();
     
     const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
@@ -36,6 +201,7 @@ serve(async (req) => {
     console.log('Generating render for prompt:', prompt);
     console.log('Furniture items:', furnitureItems?.length || 0);
     console.log('Layout image:', layoutImageUrl ? 'provided' : 'none');
+    console.log('Layout analysis:', layoutAnalysis ? 'provided (111% accuracy mode)' : 'none');
     console.log('Room photo:', roomPhotoUrl ? 'provided' : 'none');
     console.log('Style references:', styleRefUrls?.length || 0);
 
@@ -78,11 +244,19 @@ serve(async (req) => {
       }
     }
 
-    // Build structured prompt with NUMBERED IMAGE REFERENCES (Master Architect style)
-    let structuredPrompt = `Role: Expert Interior Architect and 3D Visualizer.
-Task: Generate a photorealistic interior design render.
+    // Build structured prompt with ARCHITECTURAL CONSTRAINTS if layout analysis provided
+    let structuredPrompt = `Role: Expert Interior Architect and 3D Visualizer with PIXEL-PERFECT architectural accuracy.
+Task: Generate a photorealistic interior design render that EXACTLY matches the floor plan specifications.
 
-=== REFERENCE IMAGES ===
+`;
+
+    // Add ARCHITECTURAL CONSTRAINTS if layout analysis is provided
+    if (layoutAnalysis) {
+      structuredPrompt += buildArchitecturalSpec(layoutAnalysis as LayoutAnalysis);
+      structuredPrompt += '\n';
+    }
+
+    structuredPrompt += `=== REFERENCE IMAGES ===
 
 `;
 
@@ -94,7 +268,7 @@ Task: Generate a photorealistic interior design render.
 - Doors, windows, and openings must be in the EXACT locations shown
 - The room dimensions and proportions must be pixel-accurate to this layout
 - This is the MASTER reference for spatial arrangement
-
+${layoutAnalysis ? '\n⚠️ ARCHITECTURAL CONSTRAINTS ABOVE WERE EXTRACTED FROM THIS LAYOUT - FOLLOW THEM PRECISELY\n' : ''}
 `;
     }
 
@@ -130,13 +304,29 @@ Task: Generate a photorealistic interior design render.
 `;
       for (let i = 0; i < furnitureImageIndices.length; i++) {
         const { name, category, index } = furnitureImageIndices[i];
+        
+        // Find matching zone from layout analysis if available
+        let zoneInstruction = '';
+        if (layoutAnalysis) {
+          const analysis = layoutAnalysis as LayoutAnalysis;
+          const matchingZone = analysis.furnitureZones.find(z => 
+            z.suggestedItems.some(item => 
+              item.toLowerCase().includes(category.toLowerCase()) ||
+              category.toLowerCase().includes(item.toLowerCase())
+            )
+          );
+          if (matchingZone) {
+            zoneInstruction = `\n   -> PLACEMENT ZONE: ${matchingZone.label} (X: ${matchingZone.xStart}-${matchingZone.xEnd}%, Y: ${matchingZone.yStart}-${matchingZone.yEnd}%)`;
+          }
+        }
+        
         structuredPrompt += `${i + 1}. "${name}" (${category})
    -> Visual Reference: IMAGE ${index}
    -> COPY this product EXACTLY as shown - zero modifications allowed
    -> Shape, silhouette, and proportions must be IDENTICAL to IMAGE ${index}
    -> Colors must match EXACTLY - do not adjust, enhance, or correct
    -> Material textures must be preserved PERFECTLY
-   -> Any unique design features must appear IDENTICALLY
+   -> Any unique design features must appear IDENTICALLY${zoneInstruction}
    ${layoutImageIndex !== null ? `-> Place according to floor plan in IMAGE ${layoutImageIndex}` : ''}
 
 `;
@@ -163,13 +353,14 @@ ${prompt}
     // Critical rules
     structuredPrompt += `=== CRITICAL RULES ===
 
-1. Products MUST appear IDENTICALLY to their reference images - this is the #1 priority
-2. COPY products EXACTLY - do NOT "improve", "adapt", or "harmonize" them
-3. The staged products should look like they were CUT from their references and PASTED into the room
-4. If a product has a unique shape → KEEP THAT EXACT SHAPE
-5. If a product has specific colors → KEEP THOSE EXACT COLORS (no white-balancing)
-6. If a product has visible textures → REPLICATE THOSE EXACT TEXTURES
-7. If a product has design details (buttons, stitching, patterns) → INCLUDE ALL DETAILS
+1. ${layoutAnalysis ? 'ARCHITECTURAL CONSTRAINTS ABOVE ARE MANDATORY - any deviation is a failure' : 'Layout proportions must match the floor plan exactly'}
+2. Products MUST appear IDENTICALLY to their reference images - this is the #1 priority
+3. COPY products EXACTLY - do NOT "improve", "adapt", or "harmonize" them
+4. The staged products should look like they were CUT from their references and PASTED into the room
+5. If a product has a unique shape → KEEP THAT EXACT SHAPE
+6. If a product has specific colors → KEEP THOSE EXACT COLORS (no white-balancing)
+7. If a product has visible textures → REPLICATE THOSE EXACT TEXTURES
+8. If a product has design details (buttons, stitching, patterns) → INCLUDE ALL DETAILS
 
 `;
 
@@ -181,11 +372,16 @@ ${prompt}
 3. Dramatic, realistic lighting with natural shadows
 4. High-end interior design aesthetic
 5. All reference images must be respected in order of priority: Layout > Style > Room Photo > Furniture
+${layoutAnalysis ? '6. VERIFY all architectural constraints are met before finalizing' : ''}
 
 ⚠️ QUALITY CHECK: 
-After generation, rendered products will be compared side-by-side with their catalog images.
-ANY visible differences in shape, color, or details will be flagged as errors.
-The goal is 100% visual accuracy.
+After generation, the render will be compared against the floor plan specifications.
+- Window count and positions will be verified
+- Door locations will be checked
+- Room proportions will be measured
+- Furniture zones will be validated
+ANY discrepancies will require regeneration.
+The goal is 111% architectural accuracy.
 
 Output: ONLY the final image.`;
 
@@ -193,6 +389,7 @@ Output: ONLY the final image.`;
 
     console.log('Structured prompt length:', structuredPrompt.length);
     console.log('Total images in request:', content.filter(c => c.type === 'image_url').length);
+    console.log('111% accuracy mode:', layoutAnalysis ? 'ENABLED' : 'disabled');
 
     const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
       method: 'POST',

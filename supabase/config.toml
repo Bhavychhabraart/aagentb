@@ -17,3 +17,9 @@ verify_jwt = false
 
 [functions.generate-custom-furniture]
 verify_jwt = false
+
+[functions.analyze-layout]
+verify_jwt = false
+
+[functions.validate-render]
+verify_jwt = false
