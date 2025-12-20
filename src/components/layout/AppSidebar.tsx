@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Plus, FolderOpen, LogOut, User, MoreHorizontal, Pencil, Trash2, Check, X, LayoutDashboard, Store } from 'lucide-react';
+import { Plus, FolderOpen, LogOut, User, MoreHorizontal, Pencil, Trash2, Check, X, LayoutDashboard, Store, Palette } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -180,6 +180,14 @@ export function AppSidebar({ currentProjectId, onProjectSelect, onNewProject }: 
           >
             {userRole === 'vendor' ? <Store className="h-4 w-4" /> : <LayoutDashboard className="h-4 w-4" />}
             {userRole === 'vendor' ? 'Vendor Dashboard' : 'Dashboard'}
+          </Button>
+          <Button 
+            onClick={() => navigate('/custom-furniture')}
+            className="w-full justify-start gap-2"
+            variant="ghost"
+          >
+            <Palette className="h-4 w-4" />
+            Custom Library
           </Button>
           <Button 
             onClick={onNewProject}
