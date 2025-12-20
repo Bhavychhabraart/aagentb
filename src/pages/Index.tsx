@@ -986,7 +986,7 @@ Ready to generate a render! Describe your vision.`;
   }, [user, currentProjectId, currentRenderUrl, currentRenderId, currentUpload, addMessage, toast]);
 
   // Handle selective area edit
-  const handleSelectiveEdit = useCallback(async (region: SelectionRegion, prompt: string) => {
+  const handleSelectiveEdit = useCallback(async (region: SelectionRegion, prompt: string, catalogItem?: CatalogFurnitureItem) => {
     if (!user || !currentProjectId || !currentRenderUrl) return;
 
     setIsSelectiveEditing(true);
@@ -994,12 +994,16 @@ Ready to generate a render! Describe your vision.`;
     try {
       const references = await fetchProjectReferences(currentProjectId);
 
+      const promptText = catalogItem 
+        ? `[Catalog item: ${catalogItem.name}] ${prompt}`
+        : prompt;
+
       const { data: renderRecord, error: renderError } = await supabase
         .from('renders')
         .insert({
           project_id: currentProjectId,
           user_id: user.id,
-          prompt: `[Selective edit at ${Math.round(region.x)}%,${Math.round(region.y)}%] ${prompt}`,
+          prompt: `[Selective edit at ${Math.round(region.x)}%,${Math.round(region.y)}%] ${promptText}`,
           room_upload_id: currentUpload?.id || null,
           parent_render_id: currentRenderId,
           status: 'generating',
@@ -1009,11 +1013,17 @@ Ready to generate a render! Describe your vision.`;
 
       if (renderError) throw renderError;
 
-      await addMessage('user', `[Selected area: ${Math.round(region.x)}%, ${Math.round(region.y)}% → ${Math.round(region.width)}% × ${Math.round(region.height)}%]\n${prompt}`, {
+      const messageText = catalogItem
+        ? `[Selected area: ${Math.round(region.x)}%, ${Math.round(region.y)}% → ${Math.round(region.width)}% × ${Math.round(region.height)}%]\nReplacing with: ${catalogItem.name}\n${prompt}`
+        : `[Selected area: ${Math.round(region.x)}%, ${Math.round(region.y)}% → ${Math.round(region.width)}% × ${Math.round(region.height)}%]\n${prompt}`;
+
+      await addMessage('user', messageText, {
         type: 'text',
       });
 
-      await addMessage('assistant', 'Applying selective edit to the selected region...', {
+      await addMessage('assistant', catalogItem 
+        ? `Placing ${catalogItem.name} in the selected region...`
+        : 'Applying selective edit to the selected region...', {
         type: 'text',
         status: 'pending',
       });
@@ -1028,6 +1038,12 @@ Ready to generate a render! Describe your vision.`;
           currentRenderUrl,
           userPrompt: prompt,
           maskRegion: region,
+          catalogItem: catalogItem ? {
+            name: catalogItem.name,
+            category: catalogItem.category,
+            description: catalogItem.description,
+            imageUrl: catalogItem.imageUrl,
+          } : undefined,
           layoutImageUrl: references.layoutUrl,
           styleRefUrls: references.styleRefUrls,
         }),
@@ -1048,7 +1064,9 @@ Ready to generate a render! Describe your vision.`;
       setCurrentRenderUrl(imageUrl);
       setCurrentRenderId(renderRecord.id);
 
-      await addMessage('assistant', 'Selective edit applied successfully!', {
+      await addMessage('assistant', catalogItem 
+        ? `${catalogItem.name} placed successfully!`
+        : 'Selective edit applied successfully!', {
         type: 'render',
         imageUrl,
         status: 'ready',
@@ -1057,7 +1075,7 @@ Ready to generate a render! Describe your vision.`;
       // Reload all renders to include the new one
       loadAllRenders();
 
-      toast({ title: 'Edit complete', description: 'Selected area has been updated.' });
+      toast({ title: 'Edit complete', description: catalogItem ? `${catalogItem.name} placed in selected area.` : 'Selected area has been updated.' });
     } catch (error) {
       console.error('Selective edit failed:', error);
       const message = error instanceof Error ? error.message : 'Unknown error';

@@ -95,7 +95,8 @@ serve(async (req) => {
       styleRefUrls,
       layoutAnalysis,
       compositeMode = false,
-      maskRegion // NEW: For selective area editing { x, y, width, height } as percentages
+      maskRegion, // For selective area editing { x, y, width, height } as percentages
+      catalogItem // NEW: For catalog-based selective edit { name, category, description, imageUrl }
     } = await req.json();
     
     const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
@@ -115,16 +116,55 @@ serve(async (req) => {
     console.log('Style references:', styleRefUrls?.length || 0);
     console.log('Composite mode:', compositeMode);
     console.log('Mask region:', maskRegion ? `${maskRegion.x}%,${maskRegion.y}% (${maskRegion.width}%×${maskRegion.height}%)` : 'none');
+    console.log('Catalog item:', catalogItem ? catalogItem.name : 'none');
 
     // Handle SELECTIVE AREA EDIT mode
-    if (maskRegion && userPrompt) {
-      console.log('Using SELECTIVE AREA EDIT mode');
+    if (maskRegion && (userPrompt || catalogItem)) {
+      console.log('Using SELECTIVE AREA EDIT mode' + (catalogItem ? ' with catalog item' : ''));
       
       const content: Array<{ type: string; text?: string; image_url?: { url: string } }> = [];
       
+      // IMAGE 1: Current render
       content.push({ type: 'image_url', image_url: { url: currentRenderUrl } });
       
-      const selectivePrompt = `You are a precise image editor. Edit ONLY the specified region of this room image.
+      // IMAGE 2: Catalog item reference (if provided)
+      if (catalogItem?.imageUrl) {
+        content.push({ type: 'image_url', image_url: { url: catalogItem.imageUrl } });
+      }
+      
+      let selectivePrompt: string;
+      
+      if (catalogItem) {
+        // Catalog-based selective edit with product reference
+        selectivePrompt = `You are a precision furniture staging specialist. Replace content in the specified region with the EXACT product shown in the reference image.
+
+REGION TO EDIT:
+- Position: ${Math.round(maskRegion.x)}% from left, ${Math.round(maskRegion.y)}% from top
+- Size: ${Math.round(maskRegion.width)}% width × ${Math.round(maskRegion.height)}% height
+
+PRODUCT TO PLACE:
+- Name: ${catalogItem.name}
+- Category: ${catalogItem.category}
+- Description: ${catalogItem.description || 'Premium furniture piece'}
+- Visual Reference: IMAGE 2 (COPY THIS EXACTLY)
+
+CRITICAL REQUIREMENTS:
+1. REPLACE the content in the specified region with the EXACT product from IMAGE 2
+2. The placed furniture must be a PIXEL-PERFECT copy of the reference image
+3. Copy the EXACT shape, color, material texture, and proportions from IMAGE 2
+4. Keep EVERYTHING outside this region EXACTLY unchanged - pixel perfect
+5. Maintain consistent lighting and shadows with the surrounding room
+6. Adjust scale to fit naturally within the region while preserving aspect ratio
+7. Apply realistic shadows that match the room's lighting direction
+
+${userPrompt ? `ADDITIONAL INSTRUCTIONS: ${userPrompt}` : ''}
+
+QUALITY CHECK: The placed furniture will be compared side-by-side with IMAGE 2. ANY deviation in shape, color, or details is a failure.
+
+Output: The room image with ONLY the specified region modified, containing the exact product from IMAGE 2.`;
+      } else {
+        // Text-based selective edit (original behavior)
+        selectivePrompt = `You are a precise image editor. Edit ONLY the specified region of this room image.
 
 REGION TO EDIT:
 - Position: ${Math.round(maskRegion.x)}% from left, ${Math.round(maskRegion.y)}% from top
@@ -140,6 +180,7 @@ CRITICAL RULES:
 5. Preserve the same camera angle and image quality
 
 Output: The edited image with ONLY the specified region modified.`;
+      }
 
       content.push({ type: 'text', text: selectivePrompt });
 
@@ -179,8 +220,8 @@ Output: The edited image with ONLY the specified region modified.`;
         throw new Error('No image generated from selective edit request');
       }
 
-      console.log('Selective area edit completed successfully');
-      return new Response(JSON.stringify({ imageUrl, mode: 'selective-edit' }), {
+      console.log('Selective area edit completed successfully' + (catalogItem ? ` with ${catalogItem.name}` : ''));
+      return new Response(JSON.stringify({ imageUrl, mode: catalogItem ? 'selective-catalog' : 'selective-edit' }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }

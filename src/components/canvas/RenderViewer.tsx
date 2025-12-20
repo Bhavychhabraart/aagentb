@@ -5,6 +5,7 @@ import { cn } from '@/lib/utils';
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from '@/components/ui/tooltip';
 import { SelectionOverlay, SelectionRegion } from './SelectionOverlay';
 import { SelectiveEditPanel } from './SelectiveEditPanel';
+import { CatalogFurnitureItem } from '@/services/catalogService';
 
 interface RenderViewerProps {
   imageUrl: string | null;
@@ -15,7 +16,7 @@ interface RenderViewerProps {
   onPositionFurniture?: () => void;
   onExport?: () => void;
   onStartOrder?: () => void;
-  onSelectiveEdit?: (region: SelectionRegion, prompt: string) => void;
+  onSelectiveEdit?: (region: SelectionRegion, prompt: string, catalogItem?: CatalogFurnitureItem) => void;
   isSelectiveEditing?: boolean;
 }
 
@@ -96,9 +97,9 @@ export function RenderViewer({
     setCurrentSelection(region);
   };
 
-  const handleSelectiveEditSubmit = (prompt: string) => {
+  const handleSelectiveEditSubmit = (prompt: string, catalogItem?: CatalogFurnitureItem) => {
     if (currentSelection && onSelectiveEdit) {
-      onSelectiveEdit(currentSelection, prompt);
+      onSelectiveEdit(currentSelection, prompt, catalogItem);
       // Don't exit selection mode yet - let the parent handle that after processing
     }
   };
