@@ -52,6 +52,50 @@ export type Database = {
           },
         ]
       }
+      layouts: {
+        Row: {
+          canvas_data: Json | null
+          created_at: string | null
+          id: string
+          name: string | null
+          project_id: string | null
+          room_dimensions: Json | null
+          thumbnail_url: string | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          canvas_data?: Json | null
+          created_at?: string | null
+          id?: string
+          name?: string | null
+          project_id?: string | null
+          room_dimensions?: Json | null
+          thumbnail_url?: string | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          canvas_data?: Json | null
+          created_at?: string | null
+          id?: string
+          name?: string | null
+          project_id?: string | null
+          room_dimensions?: Json | null
+          thumbnail_url?: string | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "layouts_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       order_items: {
         Row: {
           catalog_item_id: string | null
