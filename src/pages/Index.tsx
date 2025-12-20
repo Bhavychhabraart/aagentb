@@ -14,6 +14,8 @@ import { SidebarProvider } from '@/components/ui/sidebar';
 import { CatalogFurnitureItem } from '@/services/catalogService';
 import { FurniturePositioner, FurniturePlacement } from '@/components/canvas/FurniturePositioner';
 import { ProjectData } from '@/services/documentService';
+import { SelectionRegion } from '@/components/canvas/SelectionOverlay';
+
 interface RoomUpload {
   id: string;
   file_url: string;
@@ -52,6 +54,7 @@ const Index = () => {
   const [projectName, setProjectName] = useState('Untitled Project');
   const [styleRefUrls, setStyleRefUrls] = useState<string[]>([]);
   const [allRenderUrls, setAllRenderUrls] = useState<string[]>([]);
+  const [isSelectiveEditing, setIsSelectiveEditing] = useState(false);
 
   // Redirect to auth if not logged in
   useEffect(() => {
@@ -917,6 +920,89 @@ Ready to generate a render! Describe your vision.`;
     }
   }, [user, currentProjectId, currentRenderUrl, currentRenderId, currentUpload, addMessage, toast]);
 
+  // Handle selective area edit
+  const handleSelectiveEdit = useCallback(async (region: SelectionRegion, prompt: string) => {
+    if (!user || !currentProjectId || !currentRenderUrl) return;
+
+    setIsSelectiveEditing(true);
+
+    try {
+      const references = await fetchProjectReferences(currentProjectId);
+
+      const { data: renderRecord, error: renderError } = await supabase
+        .from('renders')
+        .insert({
+          project_id: currentProjectId,
+          user_id: user.id,
+          prompt: `[Selective edit at ${Math.round(region.x)}%,${Math.round(region.y)}%] ${prompt}`,
+          room_upload_id: currentUpload?.id || null,
+          parent_render_id: currentRenderId,
+          status: 'generating',
+        })
+        .select()
+        .single();
+
+      if (renderError) throw renderError;
+
+      await addMessage('user', `[Selected area: ${Math.round(region.x)}%, ${Math.round(region.y)}% → ${Math.round(region.width)}% × ${Math.round(region.height)}%]\n${prompt}`, {
+        type: 'text',
+      });
+
+      await addMessage('assistant', 'Applying selective edit to the selected region...', {
+        type: 'text',
+        status: 'pending',
+      });
+
+      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/edit-render`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+        },
+        body: JSON.stringify({
+          currentRenderUrl,
+          userPrompt: prompt,
+          maskRegion: region,
+          layoutImageUrl: references.layoutUrl,
+          styleRefUrls: references.styleRefUrls,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || 'Selective edit failed');
+      }
+
+      const { imageUrl } = await response.json();
+
+      await supabase
+        .from('renders')
+        .update({ render_url: imageUrl, status: 'completed' })
+        .eq('id', renderRecord.id);
+
+      setCurrentRenderUrl(imageUrl);
+      setCurrentRenderId(renderRecord.id);
+
+      await addMessage('assistant', 'Selective edit applied successfully!', {
+        type: 'render',
+        imageUrl,
+        status: 'ready',
+      });
+
+      // Reload all renders to include the new one
+      loadAllRenders();
+
+      toast({ title: 'Edit complete', description: 'Selected area has been updated.' });
+    } catch (error) {
+      console.error('Selective edit failed:', error);
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      await addMessage('assistant', `Selective edit failed: ${message}`, { type: 'text', status: 'failed' });
+      toast({ variant: 'destructive', title: 'Edit failed', description: message });
+    } finally {
+      setIsSelectiveEditing(false);
+    }
+  }, [user, currentProjectId, currentRenderUrl, currentRenderId, currentUpload, addMessage, toast]);
+
   // Loading state - early returns AFTER all hooks
   if (authLoading) {
     return (
@@ -950,18 +1036,22 @@ Ready to generate a render! Describe your vision.`;
           onPositionFurniture={stagedItems.length > 0 && currentRenderUrl ? () => setShowPositioner(true) : undefined}
           onExport={() => setShowExportModal(true)}
           onStartOrder={stagedItems.length > 0 ? () => setShowOrderModal(true) : undefined}
+          onSelectiveEdit={handleSelectiveEdit}
+          isSelectiveEditing={isSelectiveEditing}
         />
         
         <div className="w-96 shrink-0 flex flex-col">
           <div className="flex-1 overflow-hidden">
             <ChatPanel
               messages={messages}
-              isLoading={isProcessing || isGenerating}
+              isLoading={isProcessing || isGenerating || isSelectiveEditing}
               onSendMessage={handleSendMessage}
               onUploadClick={() => setUploadDialogOpen(true)}
               stagedItems={stagedItems}
               onClearStagedItems={handleClearStagedItems}
               isEditMode={isEditMode}
+              currentRenderUrl={currentRenderUrl}
+              onRenderSelect={(url) => setCurrentRenderUrl(url)}
             />
           </div>
           <AssetsPanel 
