@@ -1,6 +1,7 @@
 import pptxgen from 'pptxgenjs';
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import { formatINR } from '@/utils/formatCurrency';
 
 export interface FurnitureItem {
   id: string;
@@ -33,14 +34,8 @@ export interface InvoiceDetails {
   notes?: string;
 }
 
-// Format currency in INR with Indian number formatting
-export const formatINR = (amount: number): string => {
-  return new Intl.NumberFormat('en-IN', {
-    style: 'currency',
-    currency: 'INR',
-    maximumFractionDigits: 0,
-  }).format(amount);
-};
+// Re-export formatINR from the utility file
+export { formatINR } from '@/utils/formatCurrency';
 
 // Calculate totals with 20% commission
 export const calculateTotals = (items: FurnitureItem[]) => {

@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
-import { formatINR } from '@/services/documentService';
+import { formatINR } from '@/utils/formatCurrency';
 
 export interface InvoiceItem {
   id: string;
