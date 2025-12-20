@@ -5,11 +5,12 @@ import { supabase } from '@/integrations/supabase/client';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Package, ShoppingCart, BarChart3, Plus, ArrowLeft, IndianRupee } from 'lucide-react';
+import { Package, ShoppingCart, BarChart3, Plus, ArrowLeft, IndianRupee, Camera } from 'lucide-react';
 import { AddProductModal } from '@/components/vendor/AddProductModal';
 import { ProductCard } from '@/components/vendor/ProductCard';
 import { VendorOrdersTable } from '@/components/vendor/VendorOrdersTable';
 import { VendorAnalytics } from '@/components/vendor/VendorAnalytics';
+import { PhotoStudio } from '@/components/vendor/PhotoStudio';
 
 interface VendorProduct {
   id: string;
@@ -219,6 +220,10 @@ export default function VendorDashboard() {
               <Package className="h-4 w-4" />
               Products
             </TabsTrigger>
+            <TabsTrigger value="studio" className="gap-2">
+              <Camera className="h-4 w-4" />
+              Photo Studio
+            </TabsTrigger>
             <TabsTrigger value="orders" className="gap-2">
               <ShoppingCart className="h-4 w-4" />
               Orders
@@ -257,6 +262,10 @@ export default function VendorDashboard() {
                 ))}
               </div>
             )}
+          </TabsContent>
+
+          <TabsContent value="studio">
+            <PhotoStudio products={products} vendorId={user?.id || ''} />
           </TabsContent>
 
           <TabsContent value="orders">
