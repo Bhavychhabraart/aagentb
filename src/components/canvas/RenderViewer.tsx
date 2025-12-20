@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ZoomIn, ZoomOut, RotateCcw, Download, X, Maximize2, LayoutGrid, Image, Move, FileDown } from 'lucide-react';
+import { ZoomIn, ZoomOut, RotateCcw, Download, X, Maximize2, LayoutGrid, Image, Move, FileDown, ShoppingCart } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from '@/components/ui/tooltip';
@@ -11,9 +11,10 @@ interface RenderViewerProps {
   onClose?: () => void;
   onPositionFurniture?: () => void;
   onExport?: () => void;
+  onStartOrder?: () => void;
 }
 
-export function RenderViewer({ imageUrl, isGenerating, layoutImageUrl, onClose, onPositionFurniture, onExport }: RenderViewerProps) {
+export function RenderViewer({ imageUrl, isGenerating, layoutImageUrl, onClose, onPositionFurniture, onExport, onStartOrder }: RenderViewerProps) {
   const [zoom, setZoom] = useState(1);
   const [position, setPosition] = useState({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState(false);
@@ -162,6 +163,26 @@ export function RenderViewer({ imageUrl, isGenerating, layoutImageUrl, onClose, 
             >
               <Download className="h-4 w-4" />
             </Button>
+            {onStartOrder && (
+              <>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={onStartOrder}
+                      className="h-8 w-8 hover:bg-primary/20 text-success"
+                    >
+                      <ShoppingCart className="h-4 w-4" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>Start Order</p>
+                  </TooltipContent>
+                </Tooltip>
+                <div className="w-px h-4 bg-border/50 mx-1" />
+              </>
+            )}
             {onExport && (
               <Tooltip>
                 <TooltipTrigger asChild>

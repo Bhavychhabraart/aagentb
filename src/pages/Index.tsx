@@ -9,6 +9,7 @@ import { RenderViewer } from '@/components/canvas/RenderViewer';
 import { UploadDialog } from '@/components/canvas/UploadDialog';
 import { AssetsPanel } from '@/components/canvas/AssetsPanel';
 import { ExportModal } from '@/components/canvas/ExportModal';
+import { OrderFlowModal } from '@/components/canvas/OrderFlowModal';
 import { SidebarProvider } from '@/components/ui/sidebar';
 import { CatalogFurnitureItem } from '@/services/catalogService';
 import { FurniturePositioner, FurniturePlacement } from '@/components/canvas/FurniturePositioner';
@@ -47,6 +48,7 @@ const Index = () => {
   const [layoutImageUrl, setLayoutImageUrl] = useState<string | null>(null);
   const [showPositioner, setShowPositioner] = useState(false);
   const [showExportModal, setShowExportModal] = useState(false);
+  const [showOrderModal, setShowOrderModal] = useState(false);
   const [projectName, setProjectName] = useState('Untitled Project');
   const [styleRefUrls, setStyleRefUrls] = useState<string[]>([]);
   const [allRenderUrls, setAllRenderUrls] = useState<string[]>([]);
@@ -947,6 +949,7 @@ Ready to generate a render! Describe your vision.`;
           layoutImageUrl={layoutImageUrl}
           onPositionFurniture={stagedItems.length > 0 && currentRenderUrl ? () => setShowPositioner(true) : undefined}
           onExport={() => setShowExportModal(true)}
+          onStartOrder={stagedItems.length > 0 ? () => setShowOrderModal(true) : undefined}
         />
         
         <div className="w-96 shrink-0 flex flex-col">
@@ -995,6 +998,41 @@ Ready to generate a render! Describe your vision.`;
             imageUrl: item.imageUrl,
             price: item.price || 0,
           })),
+        }}
+      />
+
+      <OrderFlowModal
+        open={showOrderModal}
+        onOpenChange={setShowOrderModal}
+        projectId={currentProjectId || ''}
+        projectName={projectName}
+        stagedItems={stagedItems.map(item => ({
+          id: item.id,
+          name: item.name,
+          category: item.category,
+          price: item.price || 0,
+          imageUrl: item.imageUrl,
+        }))}
+        projectData={{
+          projectName,
+          projectId: currentProjectId || '',
+          layoutImageUrl,
+          roomPhotoUrl: currentUpload?.file_url || null,
+          styleRefUrls,
+          renderUrls: allRenderUrls,
+          currentRenderUrl,
+          furnitureItems: stagedItems.map(item => ({
+            id: item.id,
+            name: item.name,
+            category: item.category,
+            description: item.description,
+            imageUrl: item.imageUrl,
+            price: item.price || 0,
+          })),
+        }}
+        onOrderComplete={() => {
+          toast({ title: 'Order created successfully!' });
+          loadStagedFurniture();
         }}
       />
 

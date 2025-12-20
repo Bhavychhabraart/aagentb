@@ -188,7 +188,16 @@ export function OrderFlowModal({
       })),
     };
     
-    await generateProformaInvoice(invoiceData, clientName, invoiceNumber);
+    const invoiceDetails = {
+      clientName,
+      clientEmail: clientEmail || undefined,
+      clientPhone: clientPhone || undefined,
+      invoiceNumber,
+      invoiceDate: new Date().toLocaleDateString('en-IN'),
+      notes: notes || undefined,
+    };
+    
+    await generateProformaInvoice(invoiceData, invoiceDetails);
     toast({ title: 'Invoice downloaded!' });
   };
 
