@@ -27,7 +27,9 @@ import {
   X,
   Maximize,
   Menu,
-  LogOut
+  LogOut,
+  Layers,
+  Library
 } from 'lucide-react';
 import {
   Dialog,
@@ -279,6 +281,13 @@ export default function Dashboard() {
     { id: 'tools' as const, label: 'Quick Tools', icon: Zap, count: null },
   ];
 
+  const quickLinks = [
+    { label: 'Workspace', icon: Layers, onClick: () => projects.length > 0 && navigate(`/workspace?project=${projects[0].id}`) },
+    { label: 'Custom Library', icon: Library, onClick: () => navigate('/custom-furniture') },
+    { label: 'Custom Furniture', icon: Palette, onClick: () => setShowCustomFurniture(true) },
+    { label: 'Layout Creator', icon: LayoutGrid, onClick: () => navigate('/layout-creator') },
+  ];
+
   return (
     <div className="min-h-screen bg-background flex">
       {/* Sidebar */}
@@ -318,7 +327,7 @@ export default function Dashboard() {
         </div>
 
         {/* Navigation */}
-        <nav className="flex-1 p-3 space-y-1">
+        <nav className="flex-1 p-3 space-y-1 overflow-y-auto">
           {navItems.map((item) => (
             <button
               key={item.id}
@@ -344,6 +353,24 @@ export default function Dashboard() {
                   )}
                 </>
               )}
+            </button>
+          ))}
+
+          {/* Divider */}
+          <div className="my-3 border-t border-border" />
+
+          {/* Quick Links */}
+          {sidebarOpen && (
+            <p className="px-3 text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2">Quick Links</p>
+          )}
+          {quickLinks.map((link) => (
+            <button
+              key={link.label}
+              onClick={link.onClick}
+              className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+            >
+              <link.icon className="h-5 w-5 shrink-0" />
+              {sidebarOpen && <span className="flex-1 text-left">{link.label}</span>}
             </button>
           ))}
         </nav>
