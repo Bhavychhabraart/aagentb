@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Plus, FolderOpen, LogOut, User, MoreHorizontal, Pencil, Trash2, Check, X, LayoutDashboard } from 'lucide-react';
+import { Plus, FolderOpen, LogOut, User, MoreHorizontal, Pencil, Trash2, Check, X, LayoutDashboard, Store } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -40,7 +40,7 @@ interface AppSidebarProps {
 }
 
 export function AppSidebar({ currentProjectId, onProjectSelect, onNewProject }: AppSidebarProps) {
-  const { user, signOut } = useAuth();
+  const { user, userRole, signOut } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
   const [projects, setProjects] = useState<Project[]>([]);
@@ -174,13 +174,22 @@ export function AppSidebar({ currentProjectId, onProjectSelect, onNewProject }: 
         {/* Dashboard Link */}
         <div className="p-3 space-y-2">
           <Button 
-            onClick={() => navigate('/dashboard')}
+            onClick={() => navigate(userRole === 'vendor' ? '/vendor' : '/dashboard')}
             className="w-full justify-start gap-2"
             variant="ghost"
           >
-            <LayoutDashboard className="h-4 w-4" />
-            Dashboard
+            {userRole === 'vendor' ? <Store className="h-4 w-4" /> : <LayoutDashboard className="h-4 w-4" />}
+            {userRole === 'vendor' ? 'Vendor Dashboard' : 'Dashboard'}
           </Button>
+          <Button 
+            onClick={onNewProject}
+            className="w-full justify-start gap-2"
+            variant="secondary"
+          >
+            <Plus className="h-4 w-4" />
+            New Project
+          </Button>
+        </div>
           <Button 
             onClick={onNewProject}
             className="w-full justify-start gap-2"

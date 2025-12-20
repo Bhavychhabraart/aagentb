@@ -2,6 +2,8 @@
  * BentChair Furniture Catalog API Service
  */
 
+import { supabase } from '@/integrations/supabase/client';
+
 export interface CatalogFurnitureItem {
   id: string;
   name: string;
@@ -10,6 +12,8 @@ export interface CatalogFurnitureItem {
   price: number;
   imageUrl?: string;
   brand?: string;
+  vendorId?: string;
+  isVendorProduct?: boolean;
 }
 
 interface BentchairProduct {
@@ -96,33 +100,70 @@ async function fetchCategory(href: string): Promise<BentchairProduct[]> {
   }
 }
 
+// Fetch vendor products from Supabase
+export async function fetchVendorProducts(): Promise<CatalogFurnitureItem[]> {
+  try {
+    const { data, error } = await supabase
+      .from('vendor_products')
+      .select('*')
+      .eq('is_active', true);
+
+    if (error || !data) return [];
+
+    return data.map(p => ({
+      id: `vendor-${p.id}`,
+      name: p.name,
+      category: p.category,
+      description: p.description || `Vendor product: ${p.name}`,
+      price: p.price,
+      imageUrl: p.image_url || undefined,
+      brand: 'Vendor',
+      vendorId: p.vendor_id,
+      isVendorProduct: true,
+    }));
+  } catch (error) {
+    console.error('Failed to fetch vendor products:', error);
+    return [];
+  }
+}
+
 export async function fetchFurnitureCatalog(): Promise<CatalogFurnitureItem[]> {
   try {
-    const [furnitureResult, artResult, rugsResult] = await Promise.allSettled([
-      fetchCategory('furniture'),
-      fetchCategory('art'),
-      fetchCategory('rugs')
+    // Fetch from both BentChair API and vendor products in parallel
+    const [bentchairResult, vendorProducts] = await Promise.all([
+      (async () => {
+        const [furnitureResult, artResult, rugsResult] = await Promise.allSettled([
+          fetchCategory('furniture'),
+          fetchCategory('art'),
+          fetchCategory('rugs')
+        ]);
+
+        const furnitureData = furnitureResult.status === 'fulfilled' ? furnitureResult.value : [];
+        const artData = artResult.status === 'fulfilled' ? artResult.value : [];
+        const rugsData = rugsResult.status === 'fulfilled' ? rugsResult.value : [];
+
+        const furniture = furnitureData.map(p => ({ ...p, _inferred_category: 'Furniture' }));
+        const art = artData.map(p => ({ ...p, _inferred_category: 'Art' }));
+        const rugs = rugsData.map(p => ({ ...p, _inferred_category: 'Rug' }));
+
+        return [...furniture, ...art, ...rugs];
+      })(),
+      fetchVendorProducts()
     ]);
 
-    const furnitureData = furnitureResult.status === 'fulfilled' ? furnitureResult.value : [];
-    const artData = artResult.status === 'fulfilled' ? artResult.value : [];
-    const rugsData = rugsResult.status === 'fulfilled' ? rugsResult.value : [];
+    const allBentchairProducts = bentchairResult;
 
-    const furniture = furnitureData.map(p => ({ ...p, _inferred_category: 'Furniture' }));
-    const art = artData.map(p => ({ ...p, _inferred_category: 'Art' }));
-    const rugs = rugsData.map(p => ({ ...p, _inferred_category: 'Rug' }));
-
-    const allProducts = [...furniture, ...art, ...rugs];
-
-    if (allProducts.length === 0) return FALLBACK_CATALOG;
-
-    // Shuffle
-    for (let i = allProducts.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [allProducts[i], allProducts[j]] = [allProducts[j], allProducts[i]];
+    if (allBentchairProducts.length === 0 && vendorProducts.length === 0) {
+      return FALLBACK_CATALOG;
     }
 
-    const adapted: CatalogFurnitureItem[] = allProducts.map(p => {
+    // Shuffle BentChair products
+    for (let i = allBentchairProducts.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [allBentchairProducts[i], allBentchairProducts[j]] = [allBentchairProducts[j], allBentchairProducts[i]];
+    }
+
+    const bentchairAdapted: CatalogFurnitureItem[] = allBentchairProducts.map(p => {
       const title = p.product_name || p.title || p.name || 'Unknown Item';
       const category = p.cat_name || p._inferred_category || 'Decor';
       const inferredCat = inferCategory(category, title);
@@ -139,7 +180,10 @@ export async function fetchFurnitureCatalog(): Promise<CatalogFurnitureItem[]> {
       };
     }).filter(item => item.imageUrl);
 
-    return adapted.length > 0 ? adapted : FALLBACK_CATALOG;
+    // Merge vendor products with BentChair products (vendor products first for visibility)
+    const allProducts = [...vendorProducts, ...bentchairAdapted];
+
+    return allProducts.length > 0 ? allProducts : FALLBACK_CATALOG;
   } catch (error) {
     console.error("Catalog fetch failed, using fallback:", error);
     return FALLBACK_CATALOG;

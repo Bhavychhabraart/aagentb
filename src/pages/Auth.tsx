@@ -6,8 +6,9 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2 } from 'lucide-react';
+import { Loader2, User, Store } from 'lucide-react';
 import { z } from 'zod';
 
 const emailSchema = z.string().email('Please enter a valid email address');
@@ -15,20 +16,26 @@ const passwordSchema = z.string().min(6, 'Password must be at least 6 characters
 
 export default function Auth() {
   const navigate = useNavigate();
-  const { user, signIn, signUp } = useAuth();
+  const { user, userRole, signIn, signUp } = useAuth();
   const { toast } = useToast();
   
   const [isLoading, setIsLoading] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [fullName, setFullName] = useState('');
+  const [selectedRole, setSelectedRole] = useState<'user' | 'vendor'>('user');
   const [errors, setErrors] = useState<{ email?: string; password?: string }>({});
 
   useEffect(() => {
     if (user) {
-      navigate('/');
+      // Redirect based on role
+      if (userRole === 'vendor') {
+        navigate('/vendor');
+      } else {
+        navigate('/');
+      }
     }
-  }, [user, navigate]);
+  }, [user, userRole, navigate]);
 
   const validateForm = () => {
     const newErrors: { email?: string; password?: string } = {};
@@ -71,7 +78,7 @@ export default function Auth() {
     if (!validateForm()) return;
     
     setIsLoading(true);
-    const { error } = await signUp(email, password, fullName);
+    const { error } = await signUp(email, password, fullName, selectedRole);
     setIsLoading(false);
     
     if (error) {
@@ -88,7 +95,9 @@ export default function Auth() {
     } else {
       toast({
         title: 'Account created',
-        description: 'Welcome to Agent B.',
+        description: selectedRole === 'vendor' 
+          ? 'Welcome to Agent B Vendor Portal.' 
+          : 'Welcome to Agent B.',
       });
     }
   };
@@ -198,6 +207,52 @@ export default function Auth() {
                     <p className="text-sm text-destructive">{errors.password}</p>
                   )}
                 </div>
+
+                {/* Role Selection */}
+                <div className="space-y-3">
+                  <Label>I want to</Label>
+                  <RadioGroup 
+                    value={selectedRole} 
+                    onValueChange={(v) => setSelectedRole(v as 'user' | 'vendor')}
+                    className="grid grid-cols-2 gap-3"
+                  >
+                    <label 
+                      htmlFor="role-user"
+                      className={`flex items-center gap-3 p-3 rounded-lg border-2 cursor-pointer transition-colors ${
+                        selectedRole === 'user' 
+                          ? 'border-primary bg-primary/5' 
+                          : 'border-border hover:border-primary/50'
+                      }`}
+                    >
+                      <RadioGroupItem value="user" id="role-user" />
+                      <div className="flex items-center gap-2">
+                        <User className="h-4 w-4 text-primary" />
+                        <div>
+                          <p className="text-sm font-medium">Designer</p>
+                          <p className="text-[10px] text-muted-foreground">Create designs</p>
+                        </div>
+                      </div>
+                    </label>
+                    <label 
+                      htmlFor="role-vendor"
+                      className={`flex items-center gap-3 p-3 rounded-lg border-2 cursor-pointer transition-colors ${
+                        selectedRole === 'vendor' 
+                          ? 'border-primary bg-primary/5' 
+                          : 'border-border hover:border-primary/50'
+                      }`}
+                    >
+                      <RadioGroupItem value="vendor" id="role-vendor" />
+                      <div className="flex items-center gap-2">
+                        <Store className="h-4 w-4 text-primary" />
+                        <div>
+                          <p className="text-sm font-medium">Vendor</p>
+                          <p className="text-[10px] text-muted-foreground">Sell products</p>
+                        </div>
+                      </div>
+                    </label>
+                  </RadioGroup>
+                </div>
+
                 <Button type="submit" className="w-full" disabled={isLoading}>
                   {isLoading ? (
                     <>
