@@ -190,15 +190,6 @@ export function AppSidebar({ currentProjectId, onProjectSelect, onNewProject }: 
             New Project
           </Button>
         </div>
-          <Button 
-            onClick={onNewProject}
-            className="w-full justify-start gap-2"
-            variant="secondary"
-          >
-            <Plus className="h-4 w-4" />
-            New Project
-          </Button>
-        </div>
 
         <Separator className="bg-sidebar-border" />
 
