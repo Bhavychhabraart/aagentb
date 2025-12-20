@@ -3,7 +3,6 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -26,7 +25,9 @@ import {
   Eye,
   Download,
   X,
-  Maximize
+  Maximize,
+  Menu,
+  LogOut
 } from 'lucide-react';
 import {
   Dialog,
@@ -88,6 +89,13 @@ export default function Dashboard() {
   const [showCustomFurniture, setShowCustomFurniture] = useState(false);
   const [viewingRender, setViewingRender] = useState<Render | null>(null);
   const [upscalingId, setUpscalingId] = useState<string | null>(null);
+  const [activeSection, setActiveSection] = useState<'projects' | 'renders' | 'earnings' | 'tools'>('projects');
+  const [sidebarOpen, setSidebarOpen] = useState(true);
+
+  const handleSignOut = async () => {
+    await supabase.auth.signOut();
+    navigate('/auth');
+  };
 
   const handleDownloadRender = async (render: Render, e: React.MouseEvent) => {
     e.stopPropagation();
@@ -264,105 +272,130 @@ export default function Dashboard() {
     );
   }
 
+  const navItems = [
+    { id: 'projects' as const, label: 'Projects', icon: FolderOpen, count: totalProjects },
+    { id: 'renders' as const, label: 'Renders', icon: Image, count: totalRenders },
+    { id: 'earnings' as const, label: 'Earnings', icon: IndianRupee, count: null, badge: formatINR(totalEarnings) },
+    { id: 'tools' as const, label: 'Quick Tools', icon: Zap, count: null },
+  ];
+
   return (
-    <div className="min-h-screen bg-background">
-      {/* Header */}
-      <header className="border-b border-border bg-card/50 backdrop-blur-sm sticky top-0 z-40">
-        <div className="container mx-auto px-6 py-4 flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-semibold text-foreground">Dashboard</h1>
-            <p className="text-sm text-muted-foreground">Welcome back, {user.email?.split('@')[0]}</p>
-          </div>
-          <Button onClick={handleNewProject} className="gap-2">
-            <Plus className="h-4 w-4" />
-            New Project
+    <div className="min-h-screen bg-background flex">
+      {/* Sidebar */}
+      <aside 
+        className={cn(
+          "fixed inset-y-0 left-0 z-50 flex flex-col bg-card border-r border-border transition-all duration-300",
+          sidebarOpen ? "w-64" : "w-16"
+        )}
+      >
+        {/* Sidebar Header */}
+        <div className="p-4 border-b border-border flex items-center justify-between">
+          {sidebarOpen && (
+            <div className="flex-1 min-w-0">
+              <h1 className="text-lg font-semibold text-foreground truncate">Dashboard</h1>
+              <p className="text-xs text-muted-foreground truncate">{user.email?.split('@')[0]}</p>
+            </div>
+          )}
+          <Button 
+            variant="ghost" 
+            size="icon" 
+            onClick={() => setSidebarOpen(!sidebarOpen)}
+            className="shrink-0"
+          >
+            <Menu className="h-5 w-5" />
           </Button>
         </div>
-      </header>
 
-      <main className="container mx-auto px-6 py-8">
-        {/* Stats Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-          <Card className="bg-card border-border">
-            <CardContent className="pt-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-muted-foreground">Total Projects</p>
-                  <p className="text-3xl font-bold text-foreground">{totalProjects}</p>
-                </div>
-                <div className="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center">
-                  <FolderOpen className="h-6 w-6 text-primary" />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-card border-border">
-            <CardContent className="pt-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-muted-foreground">Total Renders</p>
-                  <p className="text-3xl font-bold text-foreground">{totalRenders}</p>
-                </div>
-                <div className="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center">
-                  <Image className="h-6 w-6 text-primary" />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-card border-border">
-            <CardContent className="pt-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-muted-foreground">Total Earnings</p>
-                  <p className="text-3xl font-bold text-foreground">{formatINR(totalEarnings)}</p>
-                </div>
-                <div className="h-12 w-12 rounded-full bg-success/10 flex items-center justify-center">
-                  <TrendingUp className="h-6 w-6 text-success" />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-card border-border">
-            <CardContent className="pt-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-muted-foreground">Pending Orders</p>
-                  <p className="text-3xl font-bold text-foreground">{pendingOrders}</p>
-                </div>
-                <div className="h-12 w-12 rounded-full bg-warning/10 flex items-center justify-center">
-                  <Clock className="h-6 w-6 text-warning" />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+        {/* New Project Button */}
+        <div className="p-3">
+          <Button 
+            onClick={handleNewProject} 
+            className={cn("w-full gap-2", !sidebarOpen && "px-0")}
+          >
+            <Plus className="h-4 w-4" />
+            {sidebarOpen && "New Project"}
+          </Button>
         </div>
 
-        {/* Tabs */}
-        <Tabs defaultValue="projects" className="space-y-6">
-          <TabsList className="bg-secondary border border-border">
-            <TabsTrigger value="projects" className="gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
-              <FolderOpen className="h-4 w-4" />
-              Projects
-            </TabsTrigger>
-            <TabsTrigger value="renders" className="gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
-              <Image className="h-4 w-4" />
-              Renders
-            </TabsTrigger>
-            <TabsTrigger value="earnings" className="gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
-              <IndianRupee className="h-4 w-4" />
-              Earnings
-            </TabsTrigger>
-            <TabsTrigger value="tools" className="gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
-              <Zap className="h-4 w-4" />
-              Quick Tools
-            </TabsTrigger>
-          </TabsList>
+        {/* Navigation */}
+        <nav className="flex-1 p-3 space-y-1">
+          {navItems.map((item) => (
+            <button
+              key={item.id}
+              onClick={() => setActiveSection(item.id)}
+              className={cn(
+                "w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors",
+                activeSection === item.id 
+                  ? "bg-primary text-primary-foreground" 
+                  : "text-muted-foreground hover:text-foreground hover:bg-muted"
+              )}
+            >
+              <item.icon className="h-5 w-5 shrink-0" />
+              {sidebarOpen && (
+                <>
+                  <span className="flex-1 text-left">{item.label}</span>
+                  {item.count !== null && (
+                    <Badge variant="secondary" className="ml-auto">
+                      {item.count}
+                    </Badge>
+                  )}
+                  {item.badge && (
+                    <span className="text-xs opacity-70">{item.badge}</span>
+                  )}
+                </>
+              )}
+            </button>
+          ))}
+        </nav>
 
-          {/* Projects Tab */}
-          <TabsContent value="projects">
+        {/* Stats Summary (collapsed view) */}
+        {sidebarOpen && (
+          <div className="p-4 border-t border-border space-y-3">
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-muted-foreground">Pending Orders</span>
+              <Badge variant={pendingOrders > 0 ? "default" : "secondary"} className={cn(pendingOrders > 0 && "bg-warning text-warning-foreground")}>
+                {pendingOrders}
+              </Badge>
+            </div>
+          </div>
+        )}
+
+        {/* Sign Out */}
+        <div className="p-3 border-t border-border">
+          <Button 
+            variant="ghost" 
+            onClick={handleSignOut}
+            className={cn("w-full gap-2 text-muted-foreground hover:text-foreground", !sidebarOpen && "px-0")}
+          >
+            <LogOut className="h-4 w-4" />
+            {sidebarOpen && "Sign Out"}
+          </Button>
+        </div>
+      </aside>
+
+      {/* Main Content */}
+      <main className={cn(
+        "flex-1 transition-all duration-300",
+        sidebarOpen ? "ml-64" : "ml-16"
+      )}>
+        {/* Header */}
+        <header className="border-b border-border bg-card/50 backdrop-blur-sm sticky top-0 z-40">
+          <div className="px-6 py-4 flex items-center justify-between">
+            <div>
+              <h2 className="text-2xl font-semibold text-foreground capitalize">{activeSection}</h2>
+              <p className="text-sm text-muted-foreground">
+                {activeSection === 'projects' && `${totalProjects} total projects`}
+                {activeSection === 'renders' && `${totalRenders} renders generated`}
+                {activeSection === 'earnings' && `Total earnings: ${formatINR(totalEarnings)}`}
+                {activeSection === 'tools' && 'Quick access to all tools'}
+              </p>
+            </div>
+          </div>
+        </header>
+
+        <div className="p-6">
+          {/* Projects Section */}
+          {activeSection === 'projects' && (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {loading ? (
                 [...Array(6)].map((_, i) => (
@@ -416,10 +449,10 @@ export default function Dashboard() {
                 ))
               )}
             </div>
-          </TabsContent>
+          )}
 
-          {/* Renders Tab */}
-          <TabsContent value="renders">
+          {/* Renders Section */}
+          {activeSection === 'renders' && (
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
               {loading ? (
                 [...Array(8)].map((_, i) => (
@@ -497,10 +530,10 @@ export default function Dashboard() {
                 ))
               )}
             </div>
-          </TabsContent>
+          )}
 
-          {/* Earnings Tab */}
-          <TabsContent value="earnings">
+          {/* Earnings Section */}
+          {activeSection === 'earnings' && (
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
               {/* Earnings Summary */}
               <Card className="bg-card border-border">
@@ -583,12 +616,12 @@ export default function Dashboard() {
                     )}
                   </ScrollArea>
                 </CardContent>
-              </Card>
+            </Card>
             </div>
-          </TabsContent>
+          )}
 
-          {/* Quick Tools Tab */}
-          <TabsContent value="tools">
+          {/* Quick Tools Section */}
+          {activeSection === 'tools' && (
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
               <Card 
                 className="bg-card border-border hover:border-primary/50 transition-colors cursor-pointer group"
@@ -668,8 +701,8 @@ export default function Dashboard() {
                 </CardContent>
               </Card>
             </div>
-          </TabsContent>
-        </Tabs>
+          )}
+        </div>
       </main>
 
       {/* Custom Furniture Modal */}
