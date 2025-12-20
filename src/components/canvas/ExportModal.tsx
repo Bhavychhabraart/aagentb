@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { FileText, Presentation, Download, Loader2, IndianRupee, X } from 'lucide-react';
+import { FileText, Presentation, Download, Loader2 } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -12,18 +12,15 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Separator } from '@/components/ui/separator';
 import { useToast } from '@/hooks/use-toast';
 import {
   generatePPT,
   generateProformaInvoice,
-  calculateTotals,
-  formatINR,
   generateInvoiceNumber,
   ProjectData,
   InvoiceDetails,
-  FurnitureItem,
 } from '@/services/documentService';
+import { InvoiceItemsEditor, InvoiceItem } from './InvoiceItemsEditor';
 
 interface ExportModalProps {
   open: boolean;
@@ -44,14 +41,27 @@ export function ExportModal({ open, onOpenChange, projectData }: ExportModalProp
   const [notes, setNotes] = useState('');
   const [invoiceNumber, setInvoiceNumber] = useState('');
   
-  // Generate invoice number on mount
+  // Invoice items with quantity management
+  const [invoiceItems, setInvoiceItems] = useState<InvoiceItem[]>([]);
+  
+  // Initialize invoice items from staged furniture when modal opens
   useEffect(() => {
     if (open) {
       setInvoiceNumber(generateInvoiceNumber());
+      // Convert staged furniture to invoice items
+      const items: InvoiceItem[] = projectData.furnitureItems.map((item) => ({
+        id: item.id,
+        name: item.name,
+        category: item.category,
+        description: item.description,
+        imageUrl: item.imageUrl,
+        price: item.price || 0,
+        quantity: item.quantity ?? 1,
+        included: true,
+      }));
+      setInvoiceItems(items);
     }
-  }, [open]);
-  
-  const totals = calculateTotals(projectData.furnitureItems);
+  }, [open, projectData.furnitureItems]);
   
   const handleGeneratePPT = async () => {
     setIsGenerating(true);
@@ -75,6 +85,17 @@ export function ExportModal({ open, onOpenChange, projectData }: ExportModalProp
   };
   
   const handleGenerateInvoice = async () => {
+    const includedItems = invoiceItems.filter((item) => item.included);
+    
+    if (includedItems.length === 0) {
+      toast({
+        variant: 'destructive',
+        title: 'No Items Selected',
+        description: 'Please include at least one item in the invoice.',
+      });
+      return;
+    }
+    
     if (!clientName.trim()) {
       toast({
         variant: 'destructive',
@@ -100,7 +121,23 @@ export function ExportModal({ open, onOpenChange, projectData }: ExportModalProp
         notes: notes.trim() || undefined,
       };
       
-      await generateProformaInvoice(projectData, invoiceDetails);
+      // Convert included invoice items to furniture items for PDF
+      const furnitureForInvoice = includedItems.map((item) => ({
+        id: item.id,
+        name: item.name,
+        category: item.category,
+        description: item.description,
+        imageUrl: item.imageUrl,
+        price: item.price,
+        quantity: item.quantity,
+      }));
+      
+      const invoiceProjectData = {
+        ...projectData,
+        furnitureItems: furnitureForInvoice,
+      };
+      
+      await generateProformaInvoice(invoiceProjectData, invoiceDetails);
       toast({
         title: 'Invoice Generated',
         description: 'Your proforma invoice has been downloaded.',
@@ -210,45 +247,17 @@ export function ExportModal({ open, onOpenChange, projectData }: ExportModalProp
           
           {/* Invoice Tab */}
           <TabsContent value="invoice" className="space-y-4 mt-4">
-            {/* Invoice Preview */}
-            <div className="rounded-lg border border-border bg-muted/30 p-4">
-              <div className="flex items-center justify-between mb-3">
-                <h4 className="font-medium">Invoice Summary</h4>
-                <span className="text-xs text-muted-foreground font-mono">{invoiceNumber}</span>
-              </div>
-              
-              <div className="space-y-2 text-sm">
-                {projectData.furnitureItems.slice(0, 3).map((item, idx) => (
-                  <div key={item.id} className="flex justify-between text-muted-foreground">
-                    <span className="truncate max-w-[200px]">{item.name}</span>
-                    <span className="font-mono">{formatINR(item.price)}</span>
-                  </div>
-                ))}
-                {projectData.furnitureItems.length > 3 && (
-                  <div className="text-muted-foreground text-xs">
-                    + {projectData.furnitureItems.length - 3} more items
-                  </div>
-                )}
-                
-                <Separator className="my-2" />
-                
-                <div className="flex justify-between text-muted-foreground">
-                  <span>Subtotal</span>
-                  <span className="font-mono">{formatINR(totals.subtotal)}</span>
-                </div>
-                <div className="flex justify-between text-muted-foreground">
-                  <span>Commission (20%)</span>
-                  <span className="font-mono">{formatINR(totals.commission)}</span>
-                </div>
-                <div className="flex justify-between font-medium text-primary pt-1">
-                  <span className="flex items-center gap-1">
-                    <IndianRupee className="h-3.5 w-3.5" />
-                    Grand Total
-                  </span>
-                  <span className="font-mono text-lg">{formatINR(totals.grandTotal)}</span>
-                </div>
-              </div>
+            {/* Invoice Number */}
+            <div className="flex items-center justify-between">
+              <span className="text-sm text-muted-foreground">Invoice #</span>
+              <span className="text-sm font-mono">{invoiceNumber}</span>
             </div>
+            
+            {/* Invoice Items Editor */}
+            <InvoiceItemsEditor
+              items={invoiceItems}
+              onItemsChange={setInvoiceItems}
+            />
             
             {/* Client Details Form */}
             <div className="space-y-3">
@@ -308,7 +317,7 @@ export function ExportModal({ open, onOpenChange, projectData }: ExportModalProp
             
             <Button 
               onClick={handleGenerateInvoice} 
-              disabled={isGenerating || projectData.furnitureItems.length === 0}
+              disabled={isGenerating || invoiceItems.filter(i => i.included).length === 0}
               className="w-full"
             >
               {isGenerating ? (
@@ -323,12 +332,6 @@ export function ExportModal({ open, onOpenChange, projectData }: ExportModalProp
                 </>
               )}
             </Button>
-            
-            {projectData.furnitureItems.length === 0 && (
-              <p className="text-xs text-muted-foreground text-center">
-                Add furniture items to generate an invoice
-              </p>
-            )}
           </TabsContent>
         </Tabs>
       </DialogContent>

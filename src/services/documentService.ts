@@ -9,6 +9,7 @@ export interface FurnitureItem {
   description?: string;
   imageUrl?: string;
   price: number;
+  quantity?: number;
 }
 
 export interface ProjectData {
@@ -43,7 +44,10 @@ export const formatINR = (amount: number): string => {
 
 // Calculate totals with 20% commission
 export const calculateTotals = (items: FurnitureItem[]) => {
-  const subtotal = items.reduce((sum, item) => sum + (item.price || 0), 0);
+  const subtotal = items.reduce((sum, item) => {
+    const qty = item.quantity ?? 1;
+    return sum + (item.price || 0) * qty;
+  }, 0);
   const commissionRate = 0.20; // 20%
   const commission = subtotal * commissionRate;
   const grandTotal = subtotal + commission;
@@ -343,17 +347,23 @@ export const generatePPT = async (data: ProjectData): Promise<void> => {
         { text: '#', options: { bold: true, color: lightText, fill: { color: '2D2D44' } } },
         { text: 'Item', options: { bold: true, color: lightText, fill: { color: '2D2D44' } } },
         { text: 'Category', options: { bold: true, color: lightText, fill: { color: '2D2D44' } } },
-        { text: 'Price (INR)', options: { bold: true, color: lightText, fill: { color: '2D2D44' }, align: 'right' } },
+        { text: 'Qty', options: { bold: true, color: lightText, fill: { color: '2D2D44' }, align: 'center' } },
+        { text: 'Unit Price', options: { bold: true, color: lightText, fill: { color: '2D2D44' }, align: 'right' } },
+        { text: 'Total', options: { bold: true, color: lightText, fill: { color: '2D2D44' }, align: 'right' } },
       ],
     ];
     
     // Items
     data.furnitureItems.forEach((item, idx) => {
+      const qty = item.quantity ?? 1;
+      const lineTotal = (item.price || 0) * qty;
       tableRows.push([
         { text: (idx + 1).toString(), options: { color: mutedText } },
         { text: item.name, options: { color: lightText } },
         { text: item.category, options: { color: mutedText } },
-        { text: formatINR(item.price), options: { color: lightText, align: 'right' } },
+        { text: qty.toString(), options: { color: lightText, align: 'center' } },
+        { text: formatINR(item.price), options: { color: mutedText, align: 'right' } },
+        { text: formatINR(lineTotal), options: { color: lightText, align: 'right' } },
       ]);
     });
     
@@ -361,8 +371,8 @@ export const generatePPT = async (data: ProjectData): Promise<void> => {
       x: 0.5,
       y: 1,
       w: 9,
-      colW: [0.5, 4, 2, 2.5],
-      fontSize: 11,
+      colW: [0.4, 3, 1.5, 0.6, 1.5, 2],
+      fontSize: 10,
       fontFace: 'Arial',
       border: { type: 'solid', pt: 0.5, color: '3D3D5C' },
     });
@@ -547,17 +557,22 @@ export const generateProformaInvoice = async (
   doc.text('Furniture Items', 15, yPos);
   yPos += 5;
   
-  const tableData = data.furnitureItems.map((item, idx) => [
-    (idx + 1).toString(),
-    item.name,
-    item.category,
-    item.description?.slice(0, 40) || '-',
-    formatINR(item.price),
-  ]);
+  const tableData = data.furnitureItems.map((item, idx) => {
+    const qty = item.quantity ?? 1;
+    const lineTotal = (item.price || 0) * qty;
+    return [
+      (idx + 1).toString(),
+      item.name,
+      item.category,
+      qty.toString(),
+      formatINR(item.price),
+      formatINR(lineTotal),
+    ];
+  });
   
   autoTable(doc, {
     startY: yPos,
-    head: [['#', 'Item Name', 'Category', 'Description', 'Price (INR)']],
+    head: [['#', 'Item Name', 'Category', 'Qty', 'Unit Price', 'Total (INR)']],
     body: tableData,
     theme: 'striped',
     headStyles: {
@@ -572,10 +587,11 @@ export const generateProformaInvoice = async (
     },
     columnStyles: {
       0: { cellWidth: 10, halign: 'center' },
-      1: { cellWidth: 45 },
+      1: { cellWidth: 50 },
       2: { cellWidth: 30 },
-      3: { cellWidth: 60 },
+      3: { cellWidth: 15, halign: 'center' },
       4: { cellWidth: 35, halign: 'right' },
+      5: { cellWidth: 35, halign: 'right' },
     },
     margin: { left: 15, right: 15 },
   });
