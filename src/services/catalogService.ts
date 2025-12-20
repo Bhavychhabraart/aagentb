@@ -8,12 +8,13 @@ export interface CatalogFurnitureItem {
   id: string;
   name: string;
   category: string;
-  description: string;
-  price: number;
+  description?: string;
+  price?: number;
   imageUrl?: string;
   brand?: string;
   vendorId?: string;
   isVendorProduct?: boolean;
+  source?: 'catalog' | 'vendor' | 'custom';
 }
 
 interface BentchairProduct {
