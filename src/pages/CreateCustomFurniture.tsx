@@ -10,13 +10,15 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
 import { 
   Palette, Upload, Loader2, RefreshCw, Check, IndianRupee, ImageIcon, 
-  ZoomIn, ZoomOut, X, History, ArrowLeft, Sparkles, FileText
+  ZoomIn, ZoomOut, X, History, ArrowLeft, Sparkles, FileText, Package
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { BOMAnalysisPanel } from '@/components/creation/BOMAnalysisPanel';
+import { CatalogPickerSection } from '@/components/creation/CatalogPickerSection';
+import { CatalogFurnitureItem } from '@/services/catalogService';
 
 const CATEGORIES = ['Seating', 'Tables', 'Storage', 'Lighting', 'Beds', 'Decor', 'Outdoor', 'Office'];
 const MATERIALS = ['Wood', 'Metal', 'Fabric', 'Leather', 'Glass', 'Marble', 'Rattan', 'Velvet'];
@@ -62,6 +64,8 @@ export default function CreateCustomFurniture() {
   const [projects, setProjects] = useState<{ id: string; name: string }[]>([]);
   const [selectedProjectId, setSelectedProjectId] = useState<string>(projectIdParam || '');
   const [activeRightTab, setActiveRightTab] = useState('preview');
+  const [creationMode, setCreationMode] = useState<'scratch' | 'catalog'>('scratch');
+  const [selectedCatalogItem, setSelectedCatalogItem] = useState<CatalogFurnitureItem | null>(null);
   const [isEditing, setIsEditing] = useState(false);
 
   useEffect(() => {
@@ -136,8 +140,24 @@ export default function CreateCustomFurniture() {
     );
   };
 
+  const handleCatalogItemSelect = (item: CatalogFurnitureItem) => {
+    setSelectedCatalogItem(item);
+    setName(`${item.name} (Custom)`);
+    setCategory(CATEGORIES.find(c => c.toLowerCase() === item.category.toLowerCase()) || item.category);
+    setEstimatedPrice(item.price?.toString() || '');
+    if (item.imageUrl) {
+      setReferenceImages([item.imageUrl]);
+    }
+    setPrompt('');
+  };
+
   const buildPrompt = () => {
     let fullPrompt = prompt;
+    
+    // Add context for catalog-based customization
+    if (creationMode === 'catalog' && selectedCatalogItem) {
+      fullPrompt = `Customize this ${selectedCatalogItem.category} item (${selectedCatalogItem.name}): ${prompt}`;
+    }
     
     if (selectedMaterials.length > 0) {
       fullPrompt += ` Materials: ${selectedMaterials.join(', ')}.`;
@@ -327,6 +347,57 @@ export default function CreateCustomFurniture() {
         <div className="w-[400px] border-r border-border flex flex-col bg-card/50">
           <ScrollArea className="flex-1">
             <div className="p-6 space-y-6">
+              {/* Creation Mode Toggle */}
+              <div className="space-y-2">
+                <Label>Start From</Label>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    onClick={() => {
+                      setCreationMode('scratch');
+                      setSelectedCatalogItem(null);
+                    }}
+                    className={cn(
+                      "flex flex-col items-center gap-2 p-4 rounded-lg border-2 transition-all",
+                      creationMode === 'scratch'
+                        ? "border-primary bg-primary/5"
+                        : "border-border hover:border-primary/50"
+                    )}
+                  >
+                    <Sparkles className={cn("h-6 w-6", creationMode === 'scratch' ? "text-primary" : "text-muted-foreground")} />
+                    <div className="text-center">
+                      <p className="text-sm font-medium">From Scratch</p>
+                      <p className="text-xs text-muted-foreground">Describe your ideal piece</p>
+                    </div>
+                  </button>
+                  <button
+                    onClick={() => setCreationMode('catalog')}
+                    className={cn(
+                      "flex flex-col items-center gap-2 p-4 rounded-lg border-2 transition-all",
+                      creationMode === 'catalog'
+                        ? "border-primary bg-primary/5"
+                        : "border-border hover:border-primary/50"
+                    )}
+                  >
+                    <Package className={cn("h-6 w-6", creationMode === 'catalog' ? "text-primary" : "text-muted-foreground")} />
+                    <div className="text-center">
+                      <p className="text-sm font-medium">From Catalog</p>
+                      <p className="text-xs text-muted-foreground">Pick & customize</p>
+                    </div>
+                  </button>
+                </div>
+              </div>
+
+              {/* Catalog Picker (shown when catalog mode selected) */}
+              {creationMode === 'catalog' && (
+                <div className="space-y-2">
+                  <Label>Select Base Item</Label>
+                  <CatalogPickerSection
+                    onSelect={handleCatalogItemSelect}
+                    selectedItemId={selectedCatalogItem?.id || null}
+                  />
+                </div>
+              )}
+
               {/* Project Selection */}
               <div className="space-y-2">
                 <Label>Save to Project</Label>
@@ -357,11 +428,15 @@ export default function CreateCustomFurniture() {
 
               {/* Description */}
               <div className="space-y-2">
-                <Label>Description *</Label>
+                <Label>{creationMode === 'catalog' ? 'Customization Details *' : 'Description *'}</Label>
                 <Textarea
                   value={prompt}
                   onChange={(e) => setPrompt(e.target.value)}
-                  placeholder="Describe your furniture in detail... e.g., Modern oak dining table with brass legs and minimalist design, seats 6 people"
+                  placeholder={
+                    creationMode === 'catalog' && selectedCatalogItem
+                      ? `Describe what you want to change... e.g., Change color to navy blue, use leather instead of fabric, make it smaller`
+                      : "Describe your furniture in detail... e.g., Modern oak dining table with brass legs and minimalist design, seats 6 people"
+                  }
                   rows={4}
                   className="bg-muted/50"
                 />
