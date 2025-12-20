@@ -10,6 +10,7 @@ import Dashboard from "./pages/Dashboard";
 import VendorDashboard from "./pages/VendorDashboard";
 import CustomFurnitureLibrary from "./pages/CustomFurnitureLibrary";
 import CreateCustomFurniture from "./pages/CreateCustomFurniture";
+import LayoutCreator from "./pages/LayoutCreator";
 import Auth from "./pages/Auth";
 import NotFound from "./pages/NotFound";
 
@@ -29,6 +30,8 @@ const App = () => (
             <Route path="/vendor" element={<VendorDashboard />} />
             <Route path="/custom-furniture" element={<CustomFurnitureLibrary />} />
             <Route path="/custom-furniture/create" element={<CreateCustomFurniture />} />
+            <Route path="/layout-creator" element={<LayoutCreator />} />
+            <Route path="/layout-creator/:id" element={<LayoutCreator />} />
             <Route path="/auth" element={<Auth />} />
             <Route path="*" element={<NotFound />} />
           </Routes>

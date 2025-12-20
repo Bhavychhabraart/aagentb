@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Plus, FolderOpen, LogOut, User, MoreHorizontal, Pencil, Trash2, Check, X, LayoutDashboard, Store, Palette } from 'lucide-react';
+import { Plus, FolderOpen, LogOut, User, MoreHorizontal, Pencil, Trash2, Check, X, LayoutDashboard, Store, Palette, Grid3X3 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -188,6 +188,14 @@ export function AppSidebar({ currentProjectId, onProjectSelect, onNewProject }: 
           >
             <Palette className="h-4 w-4" />
             Custom Library
+          </Button>
+          <Button 
+            onClick={() => navigate('/layout-creator')}
+            className="w-full justify-start gap-2"
+            variant="ghost"
+          >
+            <Grid3X3 className="h-4 w-4" />
+            Layout Creator
           </Button>
           <Button 
             onClick={onNewProject}
