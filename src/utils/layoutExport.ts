@@ -36,6 +36,14 @@ export function getRoomLabel(dimensions: RoomDimensions): string {
   return `${dimensions.width}${dimensions.unit === 'ft' ? "'" : dimensions.unit} × ${dimensions.depth}${dimensions.unit === 'ft' ? "'" : dimensions.unit}`;
 }
 
+export function formatDimensions(dimensions: RoomDimensions): string {
+  return getRoomLabel(dimensions);
+}
+
+export function downloadJson(data: object, filename: string) {
+  downloadJSON(data, filename);
+}
+
 export function pixelsToUnit(pixels: number, unit: string, pixelsPerInch: number): number {
   const inches = pixels / pixelsPerInch;
   switch (unit) {
