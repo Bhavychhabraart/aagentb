@@ -142,8 +142,25 @@ export default function Landing() {
 
       await Promise.all(uploadPromises);
 
-      // Navigate to workspace with prompt and upload info in URL
+      // Check if this is a "room photo only" scenario - go to staging mode
+      const isRoomPhotoOnlyFlow = 
+        session.roomPhoto && 
+        !session.layout && 
+        !session.prompt.trim() && 
+        session.styleRefs.length === 0 &&
+        session.products.length === 0;
+
       const params = new URLSearchParams({ project: project.id });
+
+      if (isRoomPhotoOnlyFlow) {
+        // Navigate to staging mode instead of triggering AI generation
+        params.set("mode", "staging");
+        params.set("hasRoom", "true");
+        navigate(`/workspace?${params.toString()}`);
+        return;
+      }
+
+      // Standard flow - navigate with generation params
       if (session.prompt.trim()) {
         params.set("prompt", encodeURIComponent(session.prompt));
       }

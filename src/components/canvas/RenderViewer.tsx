@@ -10,6 +10,7 @@ interface RenderViewerProps {
   imageUrl: string | null;
   isGenerating: boolean;
   layoutImageUrl?: string | null;
+  roomPhotoUrl?: string | null;
   onClose?: () => void;
   onPositionFurniture?: () => void;
   onExport?: () => void;
@@ -21,7 +22,8 @@ interface RenderViewerProps {
 export function RenderViewer({ 
   imageUrl, 
   isGenerating, 
-  layoutImageUrl, 
+  layoutImageUrl,
+  roomPhotoUrl,
   onClose, 
   onPositionFurniture, 
   onExport, 
@@ -29,6 +31,9 @@ export function RenderViewer({
   onSelectiveEdit,
   isSelectiveEditing = false
 }: RenderViewerProps) {
+  // Use room photo as fallback when no render is available (staging mode)
+  const displayUrl = imageUrl || roomPhotoUrl;
+  const isStagingMode = !imageUrl && !!roomPhotoUrl;
   const [zoom, setZoom] = useState(1);
   const [position, setPosition] = useState({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState(false);
@@ -394,11 +399,11 @@ export function RenderViewer({
                     </p>
                   </div>
                 </div>
-              ) : imageUrl ? (
+              ) : displayUrl ? (
                 <>
                   <img
-                    src={imageUrl}
-                    alt="Render"
+                    src={displayUrl}
+                    alt={isStagingMode ? "Room Photo - Staging" : "Render"}
                     className="absolute inset-0 w-full h-full object-contain transition-transform duration-200 select-none"
                     style={{
                       transform: selectionMode ? 'none' : `scale(${zoom}) translate(${position.x / zoom}px, ${position.y / zoom}px)`,
@@ -406,8 +411,15 @@ export function RenderViewer({
                     draggable={false}
                   />
                   
+                  {/* Staging mode indicator */}
+                  {isStagingMode && (
+                    <div className="absolute top-4 left-4 z-20 px-3 py-1.5 bg-amber-500/20 backdrop-blur-sm rounded-full border border-amber-500/30">
+                      <span className="text-xs font-medium text-amber-400">Staging Mode — Browse catalog to add furniture</span>
+                    </div>
+                  )}
+                  
                   {/* Selection overlay */}
-                  {selectionMode && (
+                  {selectionMode && imageUrl && (
                     <SelectionOverlay
                       imageUrl={imageUrl}
                       isActive={selectionMode && !currentSelection}

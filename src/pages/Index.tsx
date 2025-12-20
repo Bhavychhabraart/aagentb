@@ -48,6 +48,8 @@ const Index = () => {
   const hasTriggeredGeneration = useRef(false);
   const [stagedItems, setStagedItems] = useState<CatalogFurnitureItem[]>([]);
   const [layoutImageUrl, setLayoutImageUrl] = useState<string | null>(null);
+  const [roomPhotoUrl, setRoomPhotoUrl] = useState<string | null>(null);
+  const [isStagingMode, setIsStagingMode] = useState(false);
   const [showPositioner, setShowPositioner] = useState(false);
   const [showExportModal, setShowExportModal] = useState(false);
   const [showOrderModal, setShowOrderModal] = useState(false);
@@ -83,8 +85,23 @@ const Index = () => {
       loadLatestRender();
       loadStagedFurniture();
       loadLayoutImage();
+      loadRoomPhoto();
       loadProjectDetails();
       loadAllRenders();
+      
+      // Check for staging mode from URL params
+      const mode = searchParams.get('mode');
+      if (mode === 'staging') {
+        setIsStagingMode(true);
+        // Clear the mode param from URL
+        const newParams = new URLSearchParams(searchParams);
+        newParams.delete('mode');
+        newParams.delete('hasRoom');
+        setSearchParams(newParams, { replace: true });
+        
+        // Add welcome message for staging mode
+        addStagingWelcomeMessage();
+      }
     }
   }, [currentProjectId]);
 
@@ -101,6 +118,54 @@ const Index = () => {
       .maybeSingle();
     
     setLayoutImageUrl(data?.file_url || null);
+  };
+
+  // Load room photo for staging mode
+  const loadRoomPhoto = async () => {
+    if (!currentProjectId) return;
+    
+    const { data } = await supabase
+      .from('room_uploads')
+      .select('file_url')
+      .eq('project_id', currentProjectId)
+      .eq('upload_type', 'room_photo')
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    
+    setRoomPhotoUrl(data?.file_url || null);
+  };
+
+  // Add staging mode welcome message
+  const addStagingWelcomeMessage = async () => {
+    if (!currentProjectId || !user) return;
+    
+    const welcomeContent = `Room photo uploaded! You're now in staging mode.\n\nBrowse the **Catalog** tab to add furniture, then use **Position Furniture** to place items in your room. When you're ready, describe your design vision to generate an AI render.`;
+    
+    // Check if we already have a welcome message
+    const { data: existingMessages } = await supabase
+      .from('chat_messages')
+      .select('id')
+      .eq('project_id', currentProjectId)
+      .limit(1);
+    
+    if (existingMessages && existingMessages.length > 0) return;
+    
+    await supabase.from('chat_messages').insert({
+      project_id: currentProjectId,
+      user_id: user.id,
+      role: 'assistant',
+      content: welcomeContent,
+      metadata: { type: 'text' },
+    });
+    
+    setMessages(prev => [...prev, {
+      id: `staging-welcome-${Date.now()}`,
+      role: 'assistant',
+      content: welcomeContent,
+      metadata: { type: 'text' },
+      created_at: new Date().toISOString(),
+    }]);
   };
 
   // Load project name and style references
@@ -1033,6 +1098,7 @@ Ready to generate a render! Describe your vision.`;
           imageUrl={currentRenderUrl}
           isGenerating={isGenerating}
           layoutImageUrl={layoutImageUrl}
+          roomPhotoUrl={roomPhotoUrl}
           onPositionFurniture={stagedItems.length > 0 && currentRenderUrl ? () => setShowPositioner(true) : undefined}
           onExport={() => setShowExportModal(true)}
           onStartOrder={stagedItems.length > 0 ? () => setShowOrderModal(true) : undefined}
