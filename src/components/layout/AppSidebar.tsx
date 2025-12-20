@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Plus, FolderOpen, LogOut, User, MoreHorizontal, Pencil, Trash2, Check, X } from 'lucide-react';
+import { Plus, FolderOpen, LogOut, User, MoreHorizontal, Pencil, Trash2, Check, X, LayoutDashboard } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -171,8 +171,16 @@ export function AppSidebar({ currentProjectId, onProjectSelect, onNewProject }: 
           <p className="text-xs text-muted-foreground mt-0.5">Design Workspace</p>
         </div>
 
-        {/* New Project Button */}
-        <div className="p-3">
+        {/* Dashboard Link */}
+        <div className="p-3 space-y-2">
+          <Button 
+            onClick={() => navigate('/dashboard')}
+            className="w-full justify-start gap-2"
+            variant="ghost"
+          >
+            <LayoutDashboard className="h-4 w-4" />
+            Dashboard
+          </Button>
           <Button 
             onClick={onNewProject}
             className="w-full justify-start gap-2"
