@@ -1,11 +1,12 @@
 import { useState } from 'react';
-import { ZoomIn, ZoomOut, RotateCcw, Download, X, Maximize2, LayoutGrid, Image, Move, FileDown, ShoppingCart, Crop } from 'lucide-react';
+import { ZoomIn, ZoomOut, RotateCcw, Download, X, Maximize2, LayoutGrid, Image, Move, FileDown, ShoppingCart, Crop, Undo2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from '@/components/ui/tooltip';
 import { SelectionOverlay, SelectionRegion } from './SelectionOverlay';
 import { SelectiveEditPanel } from './SelectiveEditPanel';
 import { CatalogFurnitureItem } from '@/services/catalogService';
+import { RenderHistoryCarousel, RenderHistoryItem } from './RenderHistoryCarousel';
 
 interface RenderViewerProps {
   imageUrl: string | null;
@@ -18,6 +19,12 @@ interface RenderViewerProps {
   onStartOrder?: () => void;
   onSelectiveEdit?: (region: SelectionRegion, prompt: string, catalogItem?: CatalogFurnitureItem) => void;
   isSelectiveEditing?: boolean;
+  // Render history props
+  allRenders?: RenderHistoryItem[];
+  currentRenderId?: string | null;
+  onRenderHistorySelect?: (render: RenderHistoryItem) => void;
+  onUndo?: () => void;
+  canUndo?: boolean;
 }
 
 export function RenderViewer({ 
@@ -30,7 +37,12 @@ export function RenderViewer({
   onExport, 
   onStartOrder,
   onSelectiveEdit,
-  isSelectiveEditing = false
+  isSelectiveEditing = false,
+  allRenders = [],
+  currentRenderId,
+  onRenderHistorySelect,
+  onUndo,
+  canUndo = false,
 }: RenderViewerProps) {
   // Use room photo as fallback when no render is available (staging mode)
   const displayUrl = imageUrl || roomPhotoUrl;
@@ -276,6 +288,31 @@ export function RenderViewer({
                 </TooltipContent>
               </Tooltip>
             )}
+            {/* Undo button */}
+            {onUndo && (
+              <>
+                <div className="w-px h-4 bg-border/50 mx-1" />
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={onUndo}
+                      disabled={!canUndo}
+                      className={cn(
+                        "h-8 w-8",
+                        canUndo ? "hover:bg-primary/20 text-primary" : "text-muted-foreground/50"
+                      )}
+                    >
+                      <Undo2 className="h-4 w-4" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>{canUndo ? 'Undo to previous version' : 'No previous version'}</p>
+                  </TooltipContent>
+                </Tooltip>
+              </>
+            )}
             <Button
               variant="ghost"
               size="icon"
@@ -470,8 +507,22 @@ export function RenderViewer({
           </div>
         )}
 
+        {/* Render History Carousel */}
+        {allRenders.length > 1 && onRenderHistorySelect && !showComparison && !selectionMode && !isGenerating && !isSelectiveEditing && (
+          <RenderHistoryCarousel
+            renders={allRenders}
+            currentRenderId={currentRenderId || null}
+            onSelect={onRenderHistorySelect}
+          />
+        )}
+
         {/* Bottom info bar */}
-        <div className="absolute bottom-[10%] left-1/2 -translate-x-1/2 z-20">
+        <div className={cn(
+          "absolute left-1/2 -translate-x-1/2 z-20",
+          allRenders.length > 1 && onRenderHistorySelect && !showComparison && !selectionMode && !isGenerating && !isSelectiveEditing
+            ? "bottom-[22%]"
+            : "bottom-[10%]"
+        )}>
           <div className="flex items-center gap-4 px-4 py-2 bg-black/60 backdrop-blur-md rounded-full border border-border/30">
             <span className="text-xs font-mono text-muted-foreground">16:9</span>
             <div className="w-px h-3 bg-border/50" />
