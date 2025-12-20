@@ -830,23 +830,7 @@ Ready to generate a render! Describe your vision.`;
   // Determine if in edit mode
   const isEditMode = currentRenderUrl !== null && stagedItems.length > 0;
 
-  // Loading state
-  if (authLoading) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-background">
-        <div className="text-center">
-          <div className="h-12 w-12 rounded-full bg-gradient-brand mx-auto mb-4 animate-pulse" />
-          <p className="text-sm text-muted-foreground">Loading...</p>
-        </div>
-      </div>
-    );
-  }
-
-  if (!user) {
-    return null;
-  }
-
-  // Handle composite mode with positioned furniture
+  // Handle composite mode with positioned furniture - MUST be before early returns
   const handleCompositeConfirm = useCallback(async (placements: FurniturePlacement[]) => {
     if (!user || !currentProjectId || !currentRenderUrl) return;
 
@@ -932,6 +916,22 @@ Ready to generate a render! Describe your vision.`;
       setIsGenerating(false);
     }
   }, [user, currentProjectId, currentRenderUrl, currentRenderId, currentUpload, addMessage, toast]);
+
+  // Loading state - early returns AFTER all hooks
+  if (authLoading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background">
+        <div className="text-center">
+          <div className="h-12 w-12 rounded-full bg-gradient-brand mx-auto mb-4 animate-pulse" />
+          <p className="text-sm text-muted-foreground">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return null;
+  }
 
   return (
     <SidebarProvider>
