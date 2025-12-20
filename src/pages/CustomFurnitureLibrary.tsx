@@ -23,7 +23,6 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
-import { CustomFurnitureWorkspace } from '@/components/creation/CustomFurnitureWorkspace';
 import { BOMAnalysisPanel } from '@/components/creation/BOMAnalysisPanel';
 import { VendorRequestModal } from '@/components/creation/VendorRequestModal';
 
@@ -51,8 +50,7 @@ export default function CustomFurnitureLibrary() {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
-  const [workspaceOpen, setWorkspaceOpen] = useState(false);
-  const [editingItem, setEditingItem] = useState<CustomFurnitureItem | null>(null);
+  const [viewingItem, setViewingItem] = useState<CustomFurnitureItem | null>(null);
   const [bomItem, setBomItem] = useState<CustomFurnitureItem | null>(null);
   const [vendorRequestItem, setVendorRequestItem] = useState<CustomFurnitureItem | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -146,7 +144,7 @@ export default function CustomFurnitureLibrary() {
                 </p>
               </div>
             </div>
-            <Button onClick={() => setWorkspaceOpen(true)} className="gap-2">
+            <Button onClick={() => navigate('/custom-furniture/create')} className="gap-2">
               <Plus className="h-4 w-4" />
               Create New
             </Button>
@@ -226,7 +224,7 @@ export default function CustomFurnitureLibrary() {
                 : 'Try adjusting your filters or search query'}
             </p>
             {items.length === 0 && (
-              <Button onClick={() => setWorkspaceOpen(true)} className="gap-2">
+              <Button onClick={() => navigate('/custom-furniture/create')} className="gap-2">
                 <Plus className="h-4 w-4" />
                 Create Custom Furniture
               </Button>
@@ -238,8 +236,8 @@ export default function CustomFurnitureLibrary() {
               <FurnitureCard 
                 key={item.id} 
                 item={item}
-                onView={() => setEditingItem(item)}
-                onEdit={() => setEditingItem(item)}
+                onView={() => setViewingItem(item)}
+                onEdit={() => navigate(`/custom-furniture/create?edit=${item.id}`)}
                 onDelete={() => { setItemToDelete(item); setDeleteDialogOpen(true); }}
                 onBOM={() => setBomItem(item)}
                 onVendorRequest={() => setVendorRequestItem(item)}
@@ -252,8 +250,8 @@ export default function CustomFurnitureLibrary() {
               <FurnitureListItem
                 key={item.id}
                 item={item}
-                onView={() => setEditingItem(item)}
-                onEdit={() => setEditingItem(item)}
+                onView={() => setViewingItem(item)}
+                onEdit={() => navigate(`/custom-furniture/create?edit=${item.id}`)}
                 onDelete={() => { setItemToDelete(item); setDeleteDialogOpen(true); }}
                 onBOM={() => setBomItem(item)}
                 onVendorRequest={() => setVendorRequestItem(item)}
@@ -263,14 +261,44 @@ export default function CustomFurnitureLibrary() {
         )}
       </main>
 
-      {/* Workspace Modal */}
-      <CustomFurnitureWorkspace
-        open={workspaceOpen}
-        onOpenChange={setWorkspaceOpen}
-        editingItem={editingItem}
-        onClose={() => { setWorkspaceOpen(false); setEditingItem(null); }}
-        onSave={() => { fetchCustomFurniture(); setWorkspaceOpen(false); setEditingItem(null); }}
-      />
+      {/* View Item Modal */}
+      {viewingItem && (
+        <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-8" onClick={() => setViewingItem(null)}>
+          <div className="max-w-2xl w-full bg-card rounded-xl overflow-hidden" onClick={e => e.stopPropagation()}>
+            <img 
+              src={viewingItem.item_image_url || '/placeholder.svg'} 
+              alt={viewingItem.item_name}
+              className="w-full aspect-square object-contain bg-muted"
+            />
+            <div className="p-6">
+              <div className="flex items-center justify-between mb-2">
+                <h2 className="text-xl font-bold">{viewingItem.item_name}</h2>
+                <Badge>{viewingItem.item_category}</Badge>
+              </div>
+              {viewingItem.item_description && (
+                <p className="text-muted-foreground mb-4">{viewingItem.item_description}</p>
+              )}
+              {viewingItem.item_price && (
+                <p className="text-2xl font-bold text-primary">₹{viewingItem.item_price.toLocaleString('en-IN')}</p>
+              )}
+              <div className="flex gap-2 mt-6">
+                <Button onClick={() => { setViewingItem(null); navigate(`/custom-furniture/create?edit=${viewingItem.id}`); }} className="flex-1 gap-2">
+                  <Edit className="h-4 w-4" />
+                  Edit
+                </Button>
+                <Button variant="outline" onClick={() => { setViewingItem(null); setBomItem(viewingItem); }} className="gap-2">
+                  <FileText className="h-4 w-4" />
+                  BOM
+                </Button>
+                <Button variant="outline" onClick={() => { setViewingItem(null); setVendorRequestItem(viewingItem); }} className="gap-2">
+                  <Send className="h-4 w-4" />
+                  Request
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* BOM Analysis Panel */}
       <BOMAnalysisPanel
