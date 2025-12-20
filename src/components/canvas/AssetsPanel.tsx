@@ -24,6 +24,7 @@ interface AssetsPanelProps {
   projectId: string | null;
   onAssetSelect?: (asset: Asset) => void;
   onCatalogItemSelect?: (item: CatalogFurnitureItem) => void;
+  onCustomItemSelect?: (item: CatalogFurnitureItem) => void;
   stagedItemIds?: string[];
 }
 
@@ -43,7 +44,7 @@ export type { CatalogFurnitureItem };
 
 const ITEMS_PER_PAGE = 20;
 
-export function AssetsPanel({ projectId, onAssetSelect, onCatalogItemSelect, stagedItemIds = [] }: AssetsPanelProps) {
+export function AssetsPanel({ projectId, onAssetSelect, onCatalogItemSelect, onCustomItemSelect, stagedItemIds = [] }: AssetsPanelProps) {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { toast } = useToast();
@@ -160,34 +161,22 @@ export function AssetsPanel({ projectId, onAssetSelect, onCatalogItemSelect, sta
     }
   };
 
-  const handleAddToCurrentProject = async (item: CustomFurnitureItem) => {
-    if (!projectId || !user) return;
+  const handleCustomItemToggle = (item: CustomFurnitureItem) => {
+    // Convert custom item to CatalogFurnitureItem format for staging
+    const catalogItem: CatalogFurnitureItem = {
+      id: item.catalog_item_id,
+      name: item.item_name,
+      category: item.item_category,
+      description: item.item_description || '',
+      imageUrl: item.item_image_url || undefined,
+      price: item.item_price || 0,
+    };
     
-    // Check if already in current project
-    if (item.project_id === projectId) {
-      toast({ title: 'Already in this project', variant: 'default' });
-      return;
-    }
-
-    try {
-      const { error } = await supabase.from('staged_furniture').insert({
-        project_id: projectId,
-        user_id: user.id,
-        catalog_item_id: item.catalog_item_id,
-        item_name: item.item_name,
-        item_category: item.item_category,
-        item_description: item.item_description,
-        item_image_url: item.item_image_url,
-        item_price: item.item_price,
-      });
-
-      if (error) throw error;
-      
-      toast({ title: 'Added to project staging' });
-      fetchCustomItems();
-    } catch (error) {
-      console.error('Failed to add to project:', error);
-      toast({ title: 'Failed to add item', variant: 'destructive' });
+    // Use the custom item select handler if provided, otherwise fall back to catalog handler
+    if (onCustomItemSelect) {
+      onCustomItemSelect(catalogItem);
+    } else if (onCatalogItemSelect) {
+      onCatalogItemSelect(catalogItem);
     }
   };
 
@@ -573,8 +562,8 @@ export function AssetsPanel({ projectId, onAssetSelect, onCatalogItemSelect, sta
                           <CustomItemThumbnail
                             key={item.id}
                             item={item}
-                            isInCurrentProject={item.project_id === projectId}
-                            onAddToProject={() => handleAddToCurrentProject(item)}
+                            isStaged={stagedItemIds.includes(item.catalog_item_id)}
+                            onClick={() => handleCustomItemToggle(item)}
                           />
                         ))}
                       </div>
@@ -710,19 +699,22 @@ function CatalogThumbnail({ item, isSelected, onClick }: CatalogThumbnailProps) 
 
 interface CustomItemThumbnailProps {
   item: CustomFurnitureItem;
-  isInCurrentProject: boolean;
-  onAddToProject: () => void;
+  isStaged: boolean;
+  onClick: () => void;
 }
 
-function CustomItemThumbnail({ item, isInCurrentProject, onAddToProject }: CustomItemThumbnailProps) {
+function CustomItemThumbnail({ item, isStaged, onClick }: CustomItemThumbnailProps) {
   return (
-    <div
+    <button
+      onClick={onClick}
       className={cn(
         'relative aspect-square rounded-lg overflow-hidden border-2 transition-all group',
-        isInCurrentProject 
-          ? 'border-primary/50 ring-1 ring-primary/20' 
+        'hover:scale-105 hover:shadow-lg',
+        isStaged 
+          ? 'border-primary ring-2 ring-primary/30' 
           : 'border-border/50 hover:border-amber-500/50'
       )}
+      title={`${item.item_name} - Click to ${isStaged ? 'remove from' : 'add to'} staging`}
     >
       <img
         src={item.item_image_url || '/placeholder.svg'}
@@ -733,8 +725,8 @@ function CustomItemThumbnail({ item, isInCurrentProject, onAddToProject }: Custo
       <div className="absolute top-0.5 left-0.5 p-0.5 rounded bg-amber-500/90 text-white">
         <Sparkles className="h-2.5 w-2.5" />
       </div>
-      {/* In project indicator */}
-      {isInCurrentProject && (
+      {/* Staged checkmark */}
+      {isStaged && (
         <div className="absolute top-0.5 right-0.5 p-0.5 rounded-full bg-primary text-primary-foreground">
           <svg className="h-2.5 w-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
@@ -746,19 +738,10 @@ function CustomItemThumbnail({ item, isInCurrentProject, onAddToProject }: Custo
         <span className="text-[8px] text-white line-clamp-2 leading-tight text-center">
           {item.item_name}
         </span>
-        {!isInCurrentProject && (
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              onAddToProject();
-            }}
-            className="flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-primary text-primary-foreground text-[8px] hover:bg-primary/90"
-          >
-            <Plus className="h-2 w-2" />
-            Add
-          </button>
-        )}
+        <span className="text-[8px] text-white/80">
+          {isStaged ? 'Click to remove' : 'Click to stage'}
+        </span>
       </div>
-    </div>
+    </button>
   );
 }
