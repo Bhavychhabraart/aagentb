@@ -8,10 +8,11 @@ import { ChatPanel, ChatMessage } from '@/components/canvas/ChatPanel';
 import { RenderViewer } from '@/components/canvas/RenderViewer';
 import { UploadDialog } from '@/components/canvas/UploadDialog';
 import { AssetsPanel } from '@/components/canvas/AssetsPanel';
+import { ExportModal } from '@/components/canvas/ExportModal';
 import { SidebarProvider } from '@/components/ui/sidebar';
 import { CatalogFurnitureItem } from '@/services/catalogService';
 import { FurniturePositioner, FurniturePlacement } from '@/components/canvas/FurniturePositioner';
-
+import { ProjectData } from '@/services/documentService';
 interface RoomUpload {
   id: string;
   file_url: string;
@@ -45,6 +46,10 @@ const Index = () => {
   const [stagedItems, setStagedItems] = useState<CatalogFurnitureItem[]>([]);
   const [layoutImageUrl, setLayoutImageUrl] = useState<string | null>(null);
   const [showPositioner, setShowPositioner] = useState(false);
+  const [showExportModal, setShowExportModal] = useState(false);
+  const [projectName, setProjectName] = useState('Untitled Project');
+  const [styleRefUrls, setStyleRefUrls] = useState<string[]>([]);
+  const [allRenderUrls, setAllRenderUrls] = useState<string[]>([]);
 
   // Redirect to auth if not logged in
   useEffect(() => {
@@ -73,6 +78,8 @@ const Index = () => {
       loadLatestRender();
       loadStagedFurniture();
       loadLayoutImage();
+      loadProjectDetails();
+      loadAllRenders();
     }
   }, [currentProjectId]);
 
@@ -89,6 +96,44 @@ const Index = () => {
       .maybeSingle();
     
     setLayoutImageUrl(data?.file_url || null);
+  };
+
+  // Load project name and style references
+  const loadProjectDetails = async () => {
+    if (!currentProjectId) return;
+    
+    // Load project name
+    const { data: project } = await supabase
+      .from('projects')
+      .select('name')
+      .eq('id', currentProjectId)
+      .single();
+    
+    if (project?.name) {
+      setProjectName(project.name);
+    }
+    
+    // Load style reference URLs
+    const { data: styleUploads } = await supabase
+      .from('style_uploads')
+      .select('file_url')
+      .eq('project_id', currentProjectId);
+    
+    setStyleRefUrls(styleUploads?.map(s => s.file_url) || []);
+  };
+
+  // Load all renders for the project
+  const loadAllRenders = async () => {
+    if (!currentProjectId) return;
+    
+    const { data: renders } = await supabase
+      .from('renders')
+      .select('render_url')
+      .eq('project_id', currentProjectId)
+      .eq('status', 'completed')
+      .order('created_at', { ascending: false });
+    
+    setAllRenderUrls(renders?.map(r => r.render_url).filter(Boolean) as string[] || []);
   };
 
   const loadOrCreateProject = async () => {
@@ -896,52 +941,75 @@ Ready to generate a render! Describe your vision.`;
         />
         
         <div className="flex flex-1 overflow-hidden">
-          <RenderViewer
-            imageUrl={currentRenderUrl}
-            isGenerating={isGenerating}
-            layoutImageUrl={layoutImageUrl}
-            onPositionFurniture={stagedItems.length > 0 && currentRenderUrl ? () => setShowPositioner(true) : undefined}
-          />
-          
-          <div className="w-96 shrink-0 flex flex-col">
-            <div className="flex-1 overflow-hidden">
-              <ChatPanel
-                messages={messages}
-                isLoading={isProcessing || isGenerating}
-                onSendMessage={handleSendMessage}
-                onUploadClick={() => setUploadDialogOpen(true)}
-                stagedItems={stagedItems}
-                onClearStagedItems={handleClearStagedItems}
-                isEditMode={isEditMode}
-              />
-            </div>
-            <AssetsPanel 
-              projectId={currentProjectId} 
-              onCatalogItemSelect={handleCatalogItemSelect}
-              stagedItemIds={stagedItems.map(i => i.id)}
+        <RenderViewer
+          imageUrl={currentRenderUrl}
+          isGenerating={isGenerating}
+          layoutImageUrl={layoutImageUrl}
+          onPositionFurniture={stagedItems.length > 0 && currentRenderUrl ? () => setShowPositioner(true) : undefined}
+          onExport={() => setShowExportModal(true)}
+        />
+        
+        <div className="w-96 shrink-0 flex flex-col">
+          <div className="flex-1 overflow-hidden">
+            <ChatPanel
+              messages={messages}
+              isLoading={isProcessing || isGenerating}
+              onSendMessage={handleSendMessage}
+              onUploadClick={() => setUploadDialogOpen(true)}
+              stagedItems={stagedItems}
+              onClearStagedItems={handleClearStagedItems}
+              isEditMode={isEditMode}
             />
           </div>
-        </div>
-
-        <UploadDialog
-          open={uploadDialogOpen}
-          onOpenChange={setUploadDialogOpen}
-          onUpload={handleUpload}
-          isUploading={isUploading}
-        />
-
-        {showPositioner && currentRenderUrl && (
-          <FurniturePositioner
-            renderUrl={currentRenderUrl}
-            stagedItems={stagedItems}
-            onConfirm={handleCompositeConfirm}
-            onCancel={() => setShowPositioner(false)}
-            isProcessing={isGenerating}
+          <AssetsPanel 
+            projectId={currentProjectId} 
+            onCatalogItemSelect={handleCatalogItemSelect}
+            stagedItemIds={stagedItems.map(i => i.id)}
           />
-        )}
+        </div>
       </div>
-    </SidebarProvider>
-  );
+
+      <UploadDialog
+        open={uploadDialogOpen}
+        onOpenChange={setUploadDialogOpen}
+        onUpload={handleUpload}
+        isUploading={isUploading}
+      />
+
+      <ExportModal
+        open={showExportModal}
+        onOpenChange={setShowExportModal}
+        projectData={{
+          projectName,
+          projectId: currentProjectId || '',
+          layoutImageUrl,
+          roomPhotoUrl: currentUpload?.file_url || null,
+          styleRefUrls,
+          renderUrls: allRenderUrls,
+          currentRenderUrl,
+          furnitureItems: stagedItems.map(item => ({
+            id: item.id,
+            name: item.name,
+            category: item.category,
+            description: item.description,
+            imageUrl: item.imageUrl,
+            price: item.price || 0,
+          })),
+        }}
+      />
+
+      {showPositioner && currentRenderUrl && (
+        <FurniturePositioner
+          renderUrl={currentRenderUrl}
+          stagedItems={stagedItems}
+          onConfirm={handleCompositeConfirm}
+          onCancel={() => setShowPositioner(false)}
+          isProcessing={isGenerating}
+        />
+      )}
+    </div>
+  </SidebarProvider>
+);
 };
 
 export default Index;

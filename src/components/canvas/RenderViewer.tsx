@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ZoomIn, ZoomOut, RotateCcw, Download, X, Maximize2, LayoutGrid, Image, Move } from 'lucide-react';
+import { ZoomIn, ZoomOut, RotateCcw, Download, X, Maximize2, LayoutGrid, Image, Move, FileDown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from '@/components/ui/tooltip';
@@ -10,9 +10,10 @@ interface RenderViewerProps {
   layoutImageUrl?: string | null;
   onClose?: () => void;
   onPositionFurniture?: () => void;
+  onExport?: () => void;
 }
 
-export function RenderViewer({ imageUrl, isGenerating, layoutImageUrl, onClose, onPositionFurniture }: RenderViewerProps) {
+export function RenderViewer({ imageUrl, isGenerating, layoutImageUrl, onClose, onPositionFurniture, onExport }: RenderViewerProps) {
   const [zoom, setZoom] = useState(1);
   const [position, setPosition] = useState({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState(false);
@@ -161,6 +162,23 @@ export function RenderViewer({ imageUrl, isGenerating, layoutImageUrl, onClose, 
             >
               <Download className="h-4 w-4" />
             </Button>
+            {onExport && (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={onExport}
+                    className="h-8 w-8 hover:bg-primary/20 text-primary"
+                  >
+                    <FileDown className="h-4 w-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>Export PPT / Invoice</p>
+                </TooltipContent>
+              </Tooltip>
+            )}
             <Button
               variant="ghost"
               size="icon"
