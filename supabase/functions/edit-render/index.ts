@@ -10,9 +10,20 @@ interface FurnitureItem {
   category: string;
   description: string;
   imageUrl?: string;
-  position?: { x: number; y: number }; // Percentage position (0-100) for composite mode
-  scale?: number; // Scale factor for composite mode
-  originalLabel?: string; // Label of item being replaced
+  position?: { x: number; y: number };
+  scale?: number;
+  originalLabel?: string;
+}
+
+interface LayoutAnalysis {
+  roomShape: string;
+  dimensions: { width: number; depth: number; height: number; unit: string };
+  aspectRatio: string;
+  walls: { position: string; length: number; features: { type: string; positionPercent: number; widthPercent: number }[] }[];
+  windows: { wall: string; positionPercent: number; widthPercent: number; heightPercent: number; type: string }[];
+  doors: { wall: string; positionPercent: number; widthPercent: number; type: string; swingDirection: string }[];
+  furnitureZones: { name: string; label: string; xStart: number; xEnd: number; yStart: number; yEnd: number; suggestedItems: string[] }[];
+  cameraRecommendation: { position: string; angle: number; height: string; fov: string };
 }
 
 // Convert coordinates to natural language spatial description
@@ -43,6 +54,33 @@ function getCategoryReplacementInstruction(category: string): string {
   return categoryMap[category] || category.toLowerCase();
 }
 
+// Find the matching furniture zone for a given position
+function findZoneForPosition(x: number, y: number, zones: LayoutAnalysis['furnitureZones']): string | null {
+  for (const zone of zones) {
+    if (x >= zone.xStart && x <= zone.xEnd && y >= zone.yStart && y <= zone.yEnd) {
+      return zone.label;
+    }
+  }
+  return null;
+}
+
+// Build layout constraints string
+function buildLayoutConstraints(analysis: LayoutAnalysis): string {
+  return `
+LAYOUT CONSTRAINTS (from floor plan analysis):
+═══════════════════════════════════════════════════════════════
+Room: ${analysis.roomShape} (${analysis.dimensions.width}×${analysis.dimensions.depth}${analysis.dimensions.unit === 'feet' ? 'ft' : 'm'})
+Windows: ${analysis.windows.map(w => `${w.wall} wall @${Math.round(w.positionPercent)}%`).join(', ') || 'None visible'}
+Doors: ${analysis.doors.map(d => `${d.wall} wall @${Math.round(d.positionPercent)}%`).join(', ') || 'None visible'}
+
+FURNITURE ZONES:
+${analysis.furnitureZones.map(z => `• ${z.label}: X(${z.xStart}-${z.xEnd}%) Y(${z.yStart}-${z.yEnd}%)`).join('\n')}
+
+⚠️ CRITICAL: Do NOT move or modify any architectural elements (walls, windows, doors, floors, ceilings)
+═══════════════════════════════════════════════════════════════
+`;
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -55,7 +93,8 @@ serve(async (req) => {
       userPrompt,
       layoutImageUrl,
       styleRefUrls,
-      compositeMode = false // Use precise coordinate-based compositing
+      layoutAnalysis, // NEW: Pre-parsed layout data for 111% accuracy
+      compositeMode = false
     } = await req.json();
     
     const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
@@ -71,8 +110,11 @@ serve(async (req) => {
     console.log('Editing render with furniture items:', furnitureItems?.length || 0);
     console.log('Current render URL:', currentRenderUrl.substring(0, 100) + '...');
     console.log('Layout reference:', layoutImageUrl ? 'provided' : 'none');
+    console.log('Layout analysis:', layoutAnalysis ? 'provided (111% accuracy mode)' : 'none');
     console.log('Style references:', styleRefUrls?.length || 0);
     console.log('Composite mode:', compositeMode);
+
+    const analysis = layoutAnalysis as LayoutAnalysis | undefined;
 
     // Check if we have furniture items with position data for Master Staging
     const furnitureWithPositions = (furnitureItems as FurnitureItem[] || []).filter(
@@ -106,7 +148,7 @@ serve(async (req) => {
         }
       }
 
-      // Build NUMBERED CHANGE LIST (exactly like the working code)
+      // Build NUMBERED CHANGE LIST
       let changeInstructions = "";
       const furnitureIndices: number[] = [];
 
@@ -114,12 +156,21 @@ serve(async (req) => {
         const item = furnitureWithPositions[i];
         const posDesc = getPositionDescription(item.position!.x, item.position!.y);
         
+        // Find zone from layout analysis if available
+        let zoneInfo = '';
+        if (analysis) {
+          const zone = findZoneForPosition(item.position!.x, item.position!.y, analysis.furnitureZones);
+          if (zone) {
+            zoneInfo = ` (Zone: ${zone})`;
+          }
+        }
+        
         // Add furniture image to content
         content.push({ type: 'image_url', image_url: { url: item.imageUrl! } });
         const itemIndex = imageIndex++;
         furnitureIndices.push(itemIndex);
 
-        changeInstructions += `${i + 1}. At coordinates ${Math.round(item.position!.x)}% X, ${Math.round(item.position!.y)}% Y (${posDesc}):
+        changeInstructions += `${i + 1}. At coordinates ${Math.round(item.position!.x)}% X, ${Math.round(item.position!.y)}% Y (${posDesc})${zoneInfo}:
    Replace the existing ${item.originalLabel || item.category || 'object'} with "${item.name}".
    -> Visual Reference: IMAGE ${itemIndex}
    -> Scale: ${Math.round(item.scale! * 100)}% of natural size
@@ -127,13 +178,21 @@ serve(async (req) => {
 `;
       }
 
-      // Build the MASTER STAGING ARCHITECT prompt (from working code)
-      let masterPrompt = `Role: Master Staging Architect.
-Task: BATCH FURNITURE REPLACEMENT.
+      // Build the MASTER STAGING ARCHITECT prompt
+      let masterPrompt = `Role: Master Staging Architect with 111% ARCHITECTURAL ACCURACY.
+Task: BATCH FURNITURE REPLACEMENT while PRESERVING all architectural elements.
 
 Input: A room image (IMAGE ${baseRenderIndex}).
 
-Execute the following list of changes SIMULTANEOUSLY in a single pass.
+`;
+
+      // Add layout constraints if analysis provided
+      if (analysis) {
+        masterPrompt += buildLayoutConstraints(analysis);
+        masterPrompt += '\n';
+      }
+
+      masterPrompt += `Execute the following list of changes SIMULTANEOUSLY in a single pass.
 
 === REFERENCE IMAGES ===
 
@@ -142,6 +201,7 @@ IMAGE ${baseRenderIndex}: BASE ROOM RENDER
 - Keep the room COMPLETELY UNCHANGED: walls, floors, ceiling, windows, lighting, shadows
 - Do NOT modify any part of the room - only ADD/REPLACE furniture
 - Maintain the EXACT same camera angle, perspective, and lighting
+${analysis ? '- All architectural elements (windows, doors) MUST remain in their exact positions' : ''}
 
 `;
 
@@ -149,6 +209,7 @@ IMAGE ${baseRenderIndex}: BASE ROOM RENDER
         masterPrompt += `IMAGE ${layoutIndex}: FLOOR PLAN LAYOUT
 - Use this to verify furniture positions match the intended layout
 - Furniture should be placed at positions that correspond to this floor plan
+${analysis ? '- Architectural elements have already been extracted and constraints are listed above' : ''}
 
 `;
       }
@@ -175,6 +236,7 @@ ${changeInstructions}
 6. Maintain perfect perspective, scale, and lighting consistency with the rest of the room.
 7. Do NOT modify any parts of the room NOT listed in the Change List.
 8. Ensure high-end photorealism with realistic shadows for each placed item.
+${analysis ? '9. NEVER alter any architectural elements - windows, doors, walls must remain EXACTLY as in the base render.' : ''}
 
 VISUAL IDENTITY TO PRESERVE:
 - If a product has a unique shape (curved, angular, organic) → KEEP THAT EXACT SHAPE
@@ -198,11 +260,13 @@ The staged products should look like they were CUT from their reference images a
 4. Maintain 16:9 LANDSCAPE aspect ratio
 5. Apply realistic shadows for each placed item
 6. Final result should look like a professional furniture staging
+${analysis ? '7. VERIFY: All architectural elements (windows, doors) remain exactly as in the original' : ''}
 
 ⚠️ QUALITY CHECK: 
 After compositing, each furniture item will be compared side-by-side with its reference.
+${analysis ? 'The render will also be validated against the architectural constraints.' : ''}
 ANY deviation in shape, color, or details is a failure.
-The goal is 100% visual accuracy - as if the catalog image was cut out and pasted into the room.
+The goal is 111% visual and architectural accuracy.
 
 Output: ONLY the final image.`;
 
@@ -299,17 +363,26 @@ Output: ONLY the final image.`;
     }
 
     // Build the editing instruction prompt with numbered change list
-    let editInstruction = `Role: Master Staging Architect.
-Task: FURNITURE REPLACEMENT.
+    let editInstruction = `Role: Master Staging Architect with 111% ARCHITECTURAL ACCURACY.
+Task: FURNITURE REPLACEMENT while PRESERVING all architectural elements.
 
 Input: A room image (IMAGE ${currentRenderIndex}).
 
-=== REFERENCE IMAGES ===
+`;
+
+    // Add layout constraints if analysis provided
+    if (analysis) {
+      editInstruction += buildLayoutConstraints(analysis);
+      editInstruction += '\n';
+    }
+
+    editInstruction += `=== REFERENCE IMAGES ===
 
 IMAGE ${currentRenderIndex}: This is the CURRENT ROOM RENDER to edit.
 - This is your base image - modify it according to the instructions below
 - Keep the room architecture, walls, floors, windows, and lighting UNCHANGED
 - Maintain the same camera angle and perspective
+${analysis ? '- All architectural elements MUST remain exactly as shown' : ''}
 
 `;
 
@@ -318,6 +391,7 @@ IMAGE ${currentRenderIndex}: This is the CURRENT ROOM RENDER to edit.
 - When placing furniture, positions MUST match this layout
 - Do NOT move furniture to positions that contradict this floor plan
 - Use this to verify correct spatial placement
+${analysis ? '- Architectural constraints have been extracted above - follow them precisely' : ''}
 
 `;
     }
@@ -343,10 +417,25 @@ IMAGE ${currentRenderIndex}: This is the CURRENT ROOM RENDER to edit.
       for (let i = 0; i < furnitureImageIndices.length; i++) {
         const { name, category, index } = furnitureImageIndices[i];
         const categoryTarget = getCategoryReplacementInstruction(category);
+        
+        // Find matching zone from layout analysis
+        let zoneInstruction = '';
+        if (analysis) {
+          const matchingZone = analysis.furnitureZones.find(z => 
+            z.suggestedItems.some(item => 
+              item.toLowerCase().includes(category.toLowerCase()) ||
+              category.toLowerCase().includes(item.toLowerCase())
+            )
+          );
+          if (matchingZone) {
+            zoneInstruction = `\n   -> PLACEMENT ZONE: ${matchingZone.label} (X: ${matchingZone.xStart}-${matchingZone.xEnd}%, Y: ${matchingZone.yStart}-${matchingZone.yEnd}%)`;
+          }
+        }
+        
         editInstruction += `${i + 1}. Find any ${categoryTarget} in the room (IMAGE ${currentRenderIndex}) and REPLACE it with "${name}".
    -> Visual Reference: IMAGE ${index}
    -> COPY this product EXACTLY as shown - zero modifications allowed
-   -> The product shape, colors, and textures must be IDENTICAL to IMAGE ${index}
+   -> The product shape, colors, and textures must be IDENTICAL to IMAGE ${index}${zoneInstruction}
    ${layoutIndex !== null ? `-> Place according to floor plan in IMAGE ${layoutIndex}` : ''}
 
 `;
@@ -360,6 +449,7 @@ IMAGE ${currentRenderIndex}: This is the CURRENT ROOM RENDER to edit.
 4. Do NOT "improve", "adapt", or "harmonize" products.
 5. Maintain perfect perspective, scale, and lighting consistency.
 6. The staged products should look like they were CUT from their references and PASTED into the room.
+${analysis ? '7. NEVER alter any architectural elements - windows, doors, walls must remain EXACTLY as in the base render.' : ''}
 
 `;
     }
@@ -375,6 +465,11 @@ IMAGE ${currentRenderIndex}: This is the CURRENT ROOM RENDER to edit.
 3. Products MUST appear IDENTICALLY to their reference images
 4. Apply realistic lighting and shadows to placed products
 5. Room architecture must remain completely unchanged
+${analysis ? '6. VERIFY: All windows, doors, and architectural features remain in exact positions' : ''}
+
+⚠️ QUALITY CHECK:
+${analysis ? 'The render will be validated against architectural constraints.\n' : ''}ANY deviation in product appearance or architectural elements is a failure.
+The goal is 111% accuracy.
 
 Output: ONLY the final image.`;
 
