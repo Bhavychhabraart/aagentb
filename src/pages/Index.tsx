@@ -418,11 +418,27 @@ const Index = () => {
   };
 
   const handleProjectSelect = (projectId: string) => {
-    setCurrentProjectId(projectId);
+    // Reset all state immediately before switching
     setMessages([]);
     setCurrentRenderUrl(null);
     setCurrentRenderId(null);
     setCurrentUpload(null);
+    setStagedItems([]);
+    setLayoutImageUrl(null);
+    setRoomPhotoUrl(null);
+    setStyleRefUrls([]);
+    setAllRenderUrls([]);
+    setProjectName('Untitled Project');
+    setIsStagingMode(false);
+    setShowPositioner(false);
+    setIsSelectiveEditing(false);
+    hasTriggeredGeneration.current = false;
+    
+    // Update URL with new project ID
+    setSearchParams({ project: projectId }, { replace: true });
+    
+    // Set new project ID (triggers data reload via useEffect)
+    setCurrentProjectId(projectId);
   };
 
   const addMessage = useCallback(async (role: 'user' | 'assistant', content: string, metadata?: ChatMessage['metadata']) => {
