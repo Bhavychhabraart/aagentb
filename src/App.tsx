@@ -8,6 +8,7 @@ import Landing from "./pages/Landing";
 import Index from "./pages/Index";
 import Dashboard from "./pages/Dashboard";
 import VendorDashboard from "./pages/VendorDashboard";
+import CustomFurnitureLibrary from "./pages/CustomFurnitureLibrary";
 import Auth from "./pages/Auth";
 import NotFound from "./pages/NotFound";
 
@@ -25,6 +26,7 @@ const App = () => (
             <Route path="/workspace" element={<Index />} />
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/vendor" element={<VendorDashboard />} />
+            <Route path="/custom-furniture" element={<CustomFurnitureLibrary />} />
             <Route path="/auth" element={<Auth />} />
             <Route path="*" element={<NotFound />} />
           </Routes>

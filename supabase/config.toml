@@ -23,3 +23,6 @@ verify_jwt = false
 
 [functions.validate-render]
 verify_jwt = false
+
+[functions.analyze-furniture-bom]
+verify_jwt = false

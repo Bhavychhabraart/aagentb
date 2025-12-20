@@ -491,6 +491,51 @@ export type Database = {
         }
         Relationships: []
       }
+      vendor_requests: {
+        Row: {
+          bom_data: Json | null
+          created_at: string
+          deadline: string | null
+          furniture_description: string | null
+          furniture_image_url: string | null
+          furniture_name: string
+          id: string
+          notes: string | null
+          quantity: number | null
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          bom_data?: Json | null
+          created_at?: string
+          deadline?: string | null
+          furniture_description?: string | null
+          furniture_image_url?: string | null
+          furniture_name: string
+          id?: string
+          notes?: string | null
+          quantity?: number | null
+          status?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          bom_data?: Json | null
+          created_at?: string
+          deadline?: string | null
+          furniture_description?: string | null
+          furniture_image_url?: string | null
+          furniture_name?: string
+          id?: string
+          notes?: string | null
+          quantity?: number | null
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
