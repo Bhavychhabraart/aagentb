@@ -26,7 +26,7 @@ export function ProductDetailModal({
   };
 
   return (
-    <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
+    <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()} modal={false}>
       <DialogContent className="sm:max-w-md p-0 overflow-hidden bg-card border-border">
         {/* Image Section */}
         <div className="relative aspect-square bg-muted">

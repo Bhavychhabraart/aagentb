@@ -178,7 +178,8 @@ export function AssetsPanel({ projectId, onAssetSelect, onCatalogItemSelect, sta
                   <p className="text-xs">No assets yet</p>
                 </div>
               ) : (
-                <ScrollArea className="max-h-36">
+                <div className="h-36 overflow-hidden">
+                <ScrollArea className="h-full">
                   <div className="space-y-3">
                     {/* Room uploads */}
                     {roomAssets.length > 0 && (
@@ -247,6 +248,7 @@ export function AssetsPanel({ projectId, onAssetSelect, onCatalogItemSelect, sta
                     )}
                   </div>
                 </ScrollArea>
+                </div>
               )}
             </TabsContent>
 
@@ -286,7 +288,8 @@ export function AssetsPanel({ projectId, onAssetSelect, onCatalogItemSelect, sta
                     ))}
                   </div>
 
-                  <ScrollArea className="max-h-32">
+                  <div className="h-32 overflow-hidden">
+                  <ScrollArea className="h-full">
                     <div className="grid grid-cols-4 gap-1.5">
                       {filteredCatalogItems.slice(0, 20).map((item) => (
                         <CatalogThumbnail
@@ -298,6 +301,7 @@ export function AssetsPanel({ projectId, onAssetSelect, onCatalogItemSelect, sta
                       ))}
                     </div>
                   </ScrollArea>
+                  </div>
                 </div>
               )}
             </TabsContent>
