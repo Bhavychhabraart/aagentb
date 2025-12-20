@@ -1,8 +1,10 @@
 import { useState } from 'react';
-import { ZoomIn, ZoomOut, RotateCcw, Download, X, Maximize2, LayoutGrid, Image, Move, FileDown, ShoppingCart } from 'lucide-react';
+import { ZoomIn, ZoomOut, RotateCcw, Download, X, Maximize2, LayoutGrid, Image, Move, FileDown, ShoppingCart, Crop } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from '@/components/ui/tooltip';
+import { SelectionOverlay, SelectionRegion } from './SelectionOverlay';
+import { SelectiveEditPanel } from './SelectiveEditPanel';
 
 interface RenderViewerProps {
   imageUrl: string | null;
@@ -12,15 +14,29 @@ interface RenderViewerProps {
   onPositionFurniture?: () => void;
   onExport?: () => void;
   onStartOrder?: () => void;
+  onSelectiveEdit?: (region: SelectionRegion, prompt: string) => void;
+  isSelectiveEditing?: boolean;
 }
 
-export function RenderViewer({ imageUrl, isGenerating, layoutImageUrl, onClose, onPositionFurniture, onExport, onStartOrder }: RenderViewerProps) {
+export function RenderViewer({ 
+  imageUrl, 
+  isGenerating, 
+  layoutImageUrl, 
+  onClose, 
+  onPositionFurniture, 
+  onExport, 
+  onStartOrder,
+  onSelectiveEdit,
+  isSelectiveEditing = false
+}: RenderViewerProps) {
   const [zoom, setZoom] = useState(1);
   const [position, setPosition] = useState({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState(false);
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [showComparison, setShowComparison] = useState(false);
+  const [selectionMode, setSelectionMode] = useState(false);
+  const [currentSelection, setCurrentSelection] = useState<SelectionRegion | null>(null);
 
   const handleZoomIn = () => setZoom((z) => Math.min(z + 0.25, 3));
   const handleZoomOut = () => setZoom((z) => Math.max(z - 0.25, 0.5));
@@ -39,14 +55,14 @@ export function RenderViewer({ imageUrl, isGenerating, layoutImageUrl, onClose, 
   };
 
   const handleMouseDown = (e: React.MouseEvent) => {
-    if (zoom > 1) {
+    if (zoom > 1 && !selectionMode) {
       setIsDragging(true);
       setDragStart({ x: e.clientX - position.x, y: e.clientY - position.y });
     }
   };
 
   const handleMouseMove = (e: React.MouseEvent) => {
-    if (isDragging) {
+    if (isDragging && !selectionMode) {
       setPosition({
         x: e.clientX - dragStart.x,
         y: e.clientY - dragStart.y,
@@ -59,7 +75,36 @@ export function RenderViewer({ imageUrl, isGenerating, layoutImageUrl, onClose, 
   const toggleFullscreen = () => setIsFullscreen(!isFullscreen);
   const toggleComparison = () => setShowComparison(!showComparison);
 
+  const toggleSelectionMode = () => {
+    if (selectionMode) {
+      // Exiting selection mode
+      setSelectionMode(false);
+      setCurrentSelection(null);
+    } else {
+      // Entering selection mode
+      setSelectionMode(true);
+      setShowComparison(false); // Disable comparison when selecting
+    }
+  };
+
+  const handleSelectionComplete = (region: SelectionRegion | null) => {
+    setCurrentSelection(region);
+  };
+
+  const handleSelectiveEditSubmit = (prompt: string) => {
+    if (currentSelection && onSelectiveEdit) {
+      onSelectiveEdit(currentSelection, prompt);
+      // Don't exit selection mode yet - let the parent handle that after processing
+    }
+  };
+
+  const handleSelectiveEditCancel = () => {
+    setCurrentSelection(null);
+    setSelectionMode(false);
+  };
+
   const hasLayoutToCompare = !!layoutImageUrl && !!imageUrl;
+  const canSelectArea = !!imageUrl && !isGenerating && !showComparison && onSelectiveEdit;
 
   return (
     <TooltipProvider>
@@ -76,8 +121,33 @@ export function RenderViewer({ imageUrl, isGenerating, layoutImageUrl, onClose, 
         {/* Controls */}
         <div className="absolute top-[10%] right-4 z-20 flex items-center gap-2">
           <div className="flex items-center gap-1 bg-black/70 backdrop-blur-md rounded-lg border border-border/50 p-1">
+            {/* Selection tool button */}
+            {canSelectArea && (
+              <>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={toggleSelectionMode}
+                      className={cn(
+                        "h-8 w-8",
+                        selectionMode ? "bg-amber-500/30 text-amber-400" : "hover:bg-primary/20"
+                      )}
+                    >
+                      <Crop className="h-4 w-4" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>{selectionMode ? 'Exit selection mode' : 'Select area to edit'}</p>
+                  </TooltipContent>
+                </Tooltip>
+                <div className="w-px h-4 bg-border/50 mx-1" />
+              </>
+            )}
+
             {/* Comparison toggle button */}
-            {hasLayoutToCompare && (
+            {hasLayoutToCompare && !selectionMode && (
               <>
                 <Tooltip>
                   <TooltipTrigger asChild>
@@ -102,7 +172,7 @@ export function RenderViewer({ imageUrl, isGenerating, layoutImageUrl, onClose, 
             )}
 
             {/* Position furniture button */}
-            {onPositionFurniture && (
+            {onPositionFurniture && !selectionMode && (
               <>
                 <Tooltip>
                   <TooltipTrigger asChild>
@@ -127,7 +197,7 @@ export function RenderViewer({ imageUrl, isGenerating, layoutImageUrl, onClose, 
               variant="ghost"
               size="icon"
               onClick={handleZoomOut}
-              disabled={zoom <= 0.5 || !imageUrl}
+              disabled={zoom <= 0.5 || !imageUrl || selectionMode}
               className="h-8 w-8 hover:bg-primary/20"
             >
               <ZoomOut className="h-4 w-4" />
@@ -139,7 +209,7 @@ export function RenderViewer({ imageUrl, isGenerating, layoutImageUrl, onClose, 
               variant="ghost"
               size="icon"
               onClick={handleZoomIn}
-              disabled={zoom >= 3 || !imageUrl}
+              disabled={zoom >= 3 || !imageUrl || selectionMode}
               className="h-8 w-8 hover:bg-primary/20"
             >
               <ZoomIn className="h-4 w-4" />
@@ -292,8 +362,9 @@ export function RenderViewer({ imageUrl, isGenerating, layoutImageUrl, onClose, 
                 'relative w-full max-w-5xl aspect-video rounded-lg overflow-hidden',
                 'bg-black/40 border border-border/30',
                 'shadow-2xl shadow-black/50',
-                isDragging && 'cursor-grabbing',
-                zoom > 1 && !isDragging && 'cursor-grab'
+                !selectionMode && isDragging && 'cursor-grabbing',
+                !selectionMode && zoom > 1 && !isDragging && 'cursor-grab',
+                selectionMode && 'cursor-crosshair'
               )}
               onMouseDown={handleMouseDown}
               onMouseMove={handleMouseMove}
@@ -303,7 +374,7 @@ export function RenderViewer({ imageUrl, isGenerating, layoutImageUrl, onClose, 
               {/* Subtle vignette effect */}
               <div className="absolute inset-0 pointer-events-none bg-[radial-gradient(ellipse_at_center,transparent_0%,rgba(0,0,0,0.3)_100%)] z-10" />
               
-              {isGenerating ? (
+              {isGenerating || isSelectiveEditing ? (
                 <div className="absolute inset-0 flex items-center justify-center">
                   {/* Cinematic loading skeleton */}
                   <div className="absolute inset-4 rounded bg-muted/20 animate-pulse" />
@@ -319,20 +390,31 @@ export function RenderViewer({ imageUrl, isGenerating, layoutImageUrl, onClose, 
                       </div>
                     </div>
                     <p className="text-sm text-muted-foreground font-mono tracking-wider uppercase">
-                      Generating render...
+                      {isSelectiveEditing ? 'Applying selective edit...' : 'Generating render...'}
                     </p>
                   </div>
                 </div>
               ) : imageUrl ? (
-                <img
-                  src={imageUrl}
-                  alt="Render"
-                  className="absolute inset-0 w-full h-full object-contain transition-transform duration-200 select-none"
-                  style={{
-                    transform: `scale(${zoom}) translate(${position.x / zoom}px, ${position.y / zoom}px)`,
-                  }}
-                  draggable={false}
-                />
+                <>
+                  <img
+                    src={imageUrl}
+                    alt="Render"
+                    className="absolute inset-0 w-full h-full object-contain transition-transform duration-200 select-none"
+                    style={{
+                      transform: selectionMode ? 'none' : `scale(${zoom}) translate(${position.x / zoom}px, ${position.y / zoom}px)`,
+                    }}
+                    draggable={false}
+                  />
+                  
+                  {/* Selection overlay */}
+                  {selectionMode && (
+                    <SelectionOverlay
+                      imageUrl={imageUrl}
+                      isActive={selectionMode && !currentSelection}
+                      onSelectionComplete={handleSelectionComplete}
+                    />
+                  )}
+                </>
               ) : (
                 <div className="absolute inset-0 flex items-center justify-center">
                   <div className="text-center max-w-md px-8">
@@ -355,6 +437,26 @@ export function RenderViewer({ imageUrl, isGenerating, layoutImageUrl, onClose, 
           )}
         </div>
 
+        {/* Selective edit panel */}
+        {currentSelection && selectionMode && !isSelectiveEditing && (
+          <SelectiveEditPanel
+            selection={currentSelection}
+            onSubmit={handleSelectiveEditSubmit}
+            onCancel={handleSelectiveEditCancel}
+            isProcessing={isSelectiveEditing}
+          />
+        )}
+
+        {/* Selection mode indicator */}
+        {selectionMode && !currentSelection && (
+          <div className="absolute top-[10%] left-4 z-20">
+            <div className="flex items-center gap-2 px-3 py-2 bg-amber-500/20 backdrop-blur-md rounded-lg border border-amber-500/30">
+              <Crop className="h-4 w-4 text-amber-400" />
+              <span className="text-xs font-medium text-amber-400">Selection Mode</span>
+            </div>
+          </div>
+        )}
+
         {/* Bottom info bar */}
         <div className="absolute bottom-[10%] left-1/2 -translate-x-1/2 z-20">
           <div className="flex items-center gap-4 px-4 py-2 bg-black/60 backdrop-blur-md rounded-full border border-border/30">
@@ -367,7 +469,13 @@ export function RenderViewer({ imageUrl, isGenerating, layoutImageUrl, onClose, 
                 <span className="text-xs font-mono text-primary">Comparing</span>
               </>
             )}
-            {!showComparison && imageUrl && (
+            {selectionMode && (
+              <>
+                <div className="w-px h-3 bg-border/50" />
+                <span className="text-xs font-mono text-amber-400">Selecting</span>
+              </>
+            )}
+            {!showComparison && !selectionMode && imageUrl && (
               <>
                 <div className="w-px h-3 bg-border/50" />
                 <span className="text-xs font-mono text-primary">Ready</span>

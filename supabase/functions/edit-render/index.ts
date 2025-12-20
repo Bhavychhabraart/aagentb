@@ -93,8 +93,9 @@ serve(async (req) => {
       userPrompt,
       layoutImageUrl,
       styleRefUrls,
-      layoutAnalysis, // NEW: Pre-parsed layout data for 111% accuracy
-      compositeMode = false
+      layoutAnalysis,
+      compositeMode = false,
+      maskRegion // NEW: For selective area editing { x, y, width, height } as percentages
     } = await req.json();
     
     const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
@@ -113,6 +114,76 @@ serve(async (req) => {
     console.log('Layout analysis:', layoutAnalysis ? 'provided (111% accuracy mode)' : 'none');
     console.log('Style references:', styleRefUrls?.length || 0);
     console.log('Composite mode:', compositeMode);
+    console.log('Mask region:', maskRegion ? `${maskRegion.x}%,${maskRegion.y}% (${maskRegion.width}%×${maskRegion.height}%)` : 'none');
+
+    // Handle SELECTIVE AREA EDIT mode
+    if (maskRegion && userPrompt) {
+      console.log('Using SELECTIVE AREA EDIT mode');
+      
+      const content: Array<{ type: string; text?: string; image_url?: { url: string } }> = [];
+      
+      content.push({ type: 'image_url', image_url: { url: currentRenderUrl } });
+      
+      const selectivePrompt = `You are a precise image editor. Edit ONLY the specified region of this room image.
+
+REGION TO EDIT:
+- Position: ${Math.round(maskRegion.x)}% from left, ${Math.round(maskRegion.y)}% from top
+- Size: ${Math.round(maskRegion.width)}% width × ${Math.round(maskRegion.height)}% height
+
+EDIT INSTRUCTION: ${userPrompt}
+
+CRITICAL RULES:
+1. ONLY modify content within the specified region
+2. Keep EVERYTHING outside this region EXACTLY unchanged - pixel perfect
+3. Maintain consistent lighting, shadows, and perspective with surrounding areas
+4. The edit should blend seamlessly with the rest of the image
+5. Preserve the same camera angle and image quality
+
+Output: The edited image with ONLY the specified region modified.`;
+
+      content.push({ type: 'text', text: selectivePrompt });
+
+      const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${LOVABLE_API_KEY}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: 'google/gemini-3-pro-image-preview',
+          messages: [{ role: 'user', content }],
+          modalities: ['image', 'text'],
+        }),
+      });
+
+      if (!response.ok) {
+        if (response.status === 429) {
+          return new Response(JSON.stringify({ error: 'Rate limit exceeded. Please try again later.' }), {
+            status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+        if (response.status === 402) {
+          return new Response(JSON.stringify({ error: 'Usage limit reached. Please add credits.' }), {
+            status: 402, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+        const errorText = await response.text();
+        console.error('AI gateway error:', response.status, errorText);
+        throw new Error(`AI gateway error: ${errorText}`);
+      }
+
+      const data = await response.json();
+      const imageUrl = data.choices?.[0]?.message?.images?.[0]?.image_url?.url;
+
+      if (!imageUrl) {
+        throw new Error('No image generated from selective edit request');
+      }
+
+      console.log('Selective area edit completed successfully');
+      return new Response(JSON.stringify({ imageUrl, mode: 'selective-edit' }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
 
     const analysis = layoutAnalysis as LayoutAnalysis | undefined;
 

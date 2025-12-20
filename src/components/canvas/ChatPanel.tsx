@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { Send, Upload, Loader2, Image as ImageIcon, Sparkles, FileImage, Clock, X, Package, Edit3 } from 'lucide-react';
+import { Send, Upload, Loader2, Image as ImageIcon, Sparkles, FileImage, Clock, X, Package, Edit3, Eye } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -28,6 +28,8 @@ interface ChatPanelProps {
   stagedItems?: CatalogFurnitureItem[];
   onClearStagedItems?: () => void;
   isEditMode?: boolean;
+  currentRenderUrl?: string | null;
+  onRenderSelect?: (imageUrl: string) => void;
 }
 
 function getMessageIcon(metadata?: ChatMessage['metadata']) {
@@ -52,7 +54,9 @@ export function ChatPanel({
   onUploadClick, 
   stagedItems = [], 
   onClearStagedItems,
-  isEditMode = false 
+  isEditMode = false,
+  currentRenderUrl,
+  onRenderSelect
 }: ChatPanelProps) {
   const [input, setInput] = useState('');
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -145,11 +149,44 @@ export function ChatPanel({
                 {/* Message content */}
                 <div className="px-3 pb-2">
                   {message.metadata?.imageUrl && (
-                    <img
-                      src={message.metadata.imageUrl}
-                      alt="Uploaded"
-                      className="rounded-md mb-2 max-w-full border border-border/50"
-                    />
+                    <div className="relative group mb-2">
+                      <img
+                        src={message.metadata.imageUrl}
+                        alt={message.metadata.type === 'render' ? 'Generated render' : 'Uploaded'}
+                        className={cn(
+                          "rounded-md max-w-full border transition-all duration-200",
+                          message.metadata.type === 'render' && onRenderSelect && "cursor-pointer",
+                          message.metadata.imageUrl === currentRenderUrl 
+                            ? "border-primary ring-2 ring-primary/30" 
+                            : "border-border/50 hover:border-primary/50"
+                        )}
+                        onClick={() => {
+                          if (message.metadata?.type === 'render' && message.metadata.imageUrl && onRenderSelect) {
+                            onRenderSelect(message.metadata.imageUrl);
+                          }
+                        }}
+                      />
+                      {/* View indicator on hover for render images */}
+                      {message.metadata.type === 'render' && onRenderSelect && (
+                        <div className={cn(
+                          "absolute inset-0 rounded-md flex items-center justify-center transition-opacity",
+                          message.metadata.imageUrl === currentRenderUrl 
+                            ? "opacity-0" 
+                            : "opacity-0 group-hover:opacity-100 bg-black/40"
+                        )}>
+                          <div className="flex items-center gap-1.5 px-3 py-1.5 bg-primary rounded-full text-primary-foreground text-xs font-medium">
+                            <Eye className="h-3.5 w-3.5" />
+                            View
+                          </div>
+                        </div>
+                      )}
+                      {/* Current indicator badge */}
+                      {message.metadata.type === 'render' && message.metadata.imageUrl === currentRenderUrl && (
+                        <div className="absolute top-2 right-2 px-2 py-1 bg-primary text-primary-foreground text-[10px] font-medium rounded-full">
+                          Current
+                        </div>
+                      )}
+                    </div>
                   )}
                   <p className="whitespace-pre-wrap text-foreground/90">{message.content}</p>
                   {message.metadata?.status && (
