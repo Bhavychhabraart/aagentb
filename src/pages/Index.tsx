@@ -1123,6 +1123,7 @@ Ready to generate a render! Describe your vision.`;
           <AssetsPanel 
             projectId={currentProjectId} 
             onCatalogItemSelect={handleCatalogItemSelect}
+            onCustomItemSelect={handleCatalogItemSelect}
             stagedItemIds={stagedItems.map(i => i.id)}
           />
         </div>
