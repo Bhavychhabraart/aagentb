@@ -36,6 +36,7 @@ export default function Landing() {
     prompt: "",
   });
 
+  const [projectName, setProjectName] = useState("");
   const [activeModal, setActiveModal] = useState<"layout" | "room" | "style" | "products" | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
 
@@ -88,12 +89,13 @@ export default function Landing() {
     setIsGenerating(true);
 
     try {
-      // Create a new project
+      // Create a new project with name or fallback
+      const finalProjectName = projectName.trim() || session.prompt.slice(0, 50) || "New Design";
       const { data: project, error: projectError } = await supabase
         .from("projects")
         .insert({
           user_id: user.id,
-          name: session.prompt.slice(0, 50) || "New Design",
+          name: finalProjectName,
           description: session.prompt,
         })
         .select()
@@ -369,8 +371,20 @@ export default function Landing() {
           </Button>
         </div>
 
-        {/* Prompt input */}
-        <div className="w-full max-w-2xl">
+        {/* Project name + Prompt input */}
+        <div className="w-full max-w-2xl space-y-3">
+          {/* Project Name Input */}
+          <div className="relative">
+            <input
+              type="text"
+              value={projectName}
+              onChange={(e) => setProjectName(e.target.value)}
+              placeholder="Project name (optional)"
+              className="w-full px-4 py-2 rounded-lg bg-card/80 backdrop-blur-sm border border-border focus:border-primary/50 focus:outline-none text-sm"
+            />
+          </div>
+          
+          {/* Prompt Textarea */}
           <div className="relative">
             <Textarea
               value={session.prompt}

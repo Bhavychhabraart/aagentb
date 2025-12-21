@@ -241,19 +241,9 @@ export default function Dashboard() {
     }
   };
 
-  const handleNewProject = async () => {
-    if (!user) return;
-    const { data, error } = await supabase
-      .from('projects')
-      .insert({ user_id: user.id, name: 'Untitled Project' })
-      .select('id')
-      .single();
-
-    if (error) {
-      toast({ variant: 'destructive', title: 'Error', description: 'Failed to create project.' });
-    } else {
-      navigate(`/workspace?project=${data.id}`);
-    }
+  const handleNewProject = () => {
+    // Navigate to Landing page to start fresh project creation flow
+    navigate('/');
   };
 
   const handleOpenProject = (projectId: string) => {
@@ -282,6 +272,7 @@ export default function Dashboard() {
   ];
 
   const quickLinks = [
+    { label: 'Home', icon: LayoutGrid, onClick: () => navigate('/') },
     { label: 'Workspace', icon: Layers, onClick: () => projects.length > 0 && navigate(`/workspace?project=${projects[0].id}`) },
     { label: 'Custom Library', icon: Library, onClick: () => navigate('/custom-furniture') },
     { label: 'Custom Furniture', icon: Palette, onClick: () => setShowCustomFurniture(true) },
