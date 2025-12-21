@@ -16,6 +16,7 @@ import { FurniturePositioner, FurniturePlacement } from '@/components/canvas/Fur
 import { ProjectData } from '@/services/documentService';
 import { SelectionRegion } from '@/components/canvas/SelectionOverlay';
 import { RenderHistoryItem } from '@/components/canvas/RenderHistoryCarousel';
+import { CameraView } from '@/components/canvas/MulticamPanel';
 
 interface RoomUpload {
   id: string;
@@ -61,6 +62,13 @@ const Index = () => {
   const [allRenders, setAllRenders] = useState<RenderHistoryItem[]>([]);
   const [isSelectiveEditing, setIsSelectiveEditing] = useState(false);
   const [isProjectSwitching, setIsProjectSwitching] = useState(false);
+  const [isMulticamGenerating, setIsMulticamGenerating] = useState(false);
+  const [multicamViews, setMulticamViews] = useState<Record<CameraView, string | null>>({
+    perspective: null,
+    front: null,
+    side: null,
+    top: null,
+  });
 
   // Redirect to auth if not logged in
   useEffect(() => {
@@ -1239,6 +1247,60 @@ Ready to generate a render! Describe your vision.`;
     }
   }, [user, currentProjectId, currentRenderUrl, currentRenderId, currentUpload, addMessage, toast]);
 
+  // Handle Multicam view generation
+  const handleMulticamGenerate = useCallback(async (view: CameraView) => {
+    if (!user || !currentProjectId || !currentRenderUrl) return;
+
+    setIsMulticamGenerating(true);
+    
+    const viewPrompts: Record<CameraView, string> = {
+      perspective: 'Render this room from a 3/4 perspective angle, showing depth and dimension',
+      front: 'Render this room from a straight-on front view, facing the main focal wall',
+      side: 'Render this room from a side view, showing the profile of the space',
+      top: "Render this room from a bird's eye top-down view, showing the floor plan layout",
+    };
+
+    try {
+      await addMessage('user', `📷 Generating ${view} view...`, { type: 'text' });
+
+      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/edit-render`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+        },
+        body: JSON.stringify({
+          originalImageUrl: currentRenderUrl,
+          prompt: viewPrompts[view],
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || 'Multicam generation failed');
+      }
+
+      const { imageUrl } = await response.json();
+
+      setMulticamViews(prev => ({ ...prev, [view]: imageUrl }));
+
+      await addMessage('assistant', `${view.charAt(0).toUpperCase() + view.slice(1)} view generated!`, {
+        type: 'render',
+        imageUrl,
+        status: 'ready',
+      });
+
+      toast({ title: 'View generated', description: `${view.charAt(0).toUpperCase() + view.slice(1)} view ready.` });
+    } catch (error) {
+      console.error('Multicam generation failed:', error);
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      await addMessage('assistant', `Failed to generate ${view} view: ${message}`, { type: 'text', status: 'failed' });
+      toast({ variant: 'destructive', title: 'Failed', description: message });
+    } finally {
+      setIsMulticamGenerating(false);
+    }
+  }, [user, currentProjectId, currentRenderUrl, addMessage, toast]);
+
   // Check if undo is possible
   const canUndo = (() => {
     if (!currentRenderId || !allRenders.length) return false;
@@ -1292,7 +1354,10 @@ Ready to generate a render! Describe your vision.`;
           onStartOrder={stagedItems.length > 0 ? () => setShowOrderModal(true) : undefined}
           onSelectiveEdit={handleSelectiveEdit}
           onAIDirectorChange={handleAIDirectorChange}
+          onMulticamGenerate={handleMulticamGenerate}
           isSelectiveEditing={isSelectiveEditing}
+          isMulticamGenerating={isMulticamGenerating}
+          multicamViews={multicamViews}
           allRenders={allRenders}
           currentRenderId={currentRenderId}
           onRenderHistorySelect={handleRenderHistorySelect}
