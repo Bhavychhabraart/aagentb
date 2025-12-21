@@ -1,10 +1,11 @@
 import { useState } from 'react';
-import { ZoomIn, ZoomOut, RotateCcw, Download, X, Maximize2, LayoutGrid, Image, Move, FileDown, ShoppingCart, Crop, Undo2 } from 'lucide-react';
+import { ZoomIn, ZoomOut, RotateCcw, Download, X, Maximize2, LayoutGrid, Image, Move, FileDown, ShoppingCart, Crop, Undo2, Wand2, Camera } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from '@/components/ui/tooltip';
 import { SelectionOverlay, SelectionRegion } from './SelectionOverlay';
 import { SelectiveEditPanel } from './SelectiveEditPanel';
+import { AIDirectorPanel } from './AIDirectorPanel';
 import { CatalogFurnitureItem } from '@/services/catalogService';
 import { RenderHistoryCarousel, RenderHistoryItem } from './RenderHistoryCarousel';
 
@@ -18,6 +19,7 @@ interface RenderViewerProps {
   onExport?: () => void;
   onStartOrder?: () => void;
   onSelectiveEdit?: (region: SelectionRegion, prompt: string, catalogItem?: CatalogFurnitureItem) => void;
+  onAIDirectorChange?: (prompt: string) => void;
   isSelectiveEditing?: boolean;
   // Render history props
   allRenders?: RenderHistoryItem[];
@@ -37,6 +39,7 @@ export function RenderViewer({
   onExport, 
   onStartOrder,
   onSelectiveEdit,
+  onAIDirectorChange,
   isSelectiveEditing = false,
   allRenders = [],
   currentRenderId,
@@ -55,6 +58,7 @@ export function RenderViewer({
   const [showComparison, setShowComparison] = useState(false);
   const [selectionMode, setSelectionMode] = useState(false);
   const [currentSelection, setCurrentSelection] = useState<SelectionRegion | null>(null);
+  const [showAIDirector, setShowAIDirector] = useState(false);
 
   const handleZoomIn = () => setZoom((z) => Math.min(z + 0.25, 3));
   const handleZoomOut = () => setZoom((z) => Math.max(z - 0.25, 0.5));
@@ -123,6 +127,7 @@ export function RenderViewer({
 
   const hasLayoutToCompare = !!layoutImageUrl && !!imageUrl;
   const canSelectArea = !!imageUrl && !isGenerating && !showComparison && onSelectiveEdit;
+  const canUseDirector = !!imageUrl && !isGenerating && !selectionMode && onAIDirectorChange;
 
   return (
     <TooltipProvider>
