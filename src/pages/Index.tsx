@@ -29,6 +29,7 @@ interface ProjectReferences {
   layoutUrl: string | null;
   roomPhotoUrl: string | null;
   styleRefUrls: string[];
+  productItems: Array<{ name: string; imageUrl: string }>;
 }
 
 const Index = () => {
@@ -399,7 +400,7 @@ const Index = () => {
     }
   };
 
-  // Fetch all project reference images (layout, room photo, style refs)
+  // Fetch all project reference images (layout, room photo, style refs, products)
   const fetchProjectReferences = async (projectId: string): Promise<ProjectReferences> => {
     // Get layout and room photos from room_uploads
     const { data: uploads } = await supabase
@@ -413,10 +414,19 @@ const Index = () => {
       .select('file_url')
       .eq('project_id', projectId);
     
+    // Get product items
+    const { data: products } = await supabase
+      .from('product_items')
+      .select('name, image_url')
+      .eq('project_id', projectId);
+    
     return {
       layoutUrl: uploads?.find(u => u.upload_type === 'layout')?.file_url || null,
       roomPhotoUrl: uploads?.find(u => u.upload_type === 'room_photo')?.file_url || null,
       styleRefUrls: styleRefs?.map(s => s.file_url) || [],
+      productItems: (products || [])
+        .filter(p => p.image_url)
+        .map(p => ({ name: p.name, imageUrl: p.image_url! })),
     };
   };
 
@@ -736,19 +746,36 @@ Ready to generate a render! Describe your vision.`;
       // Fetch all project reference images
       const references = await fetchProjectReferences(currentProjectId);
       
+      // Combine staged furniture with project products
+      const allProducts = [
+        ...furnitureItems.map(item => ({
+          name: item.name,
+          category: item.category,
+          description: item.description,
+          imageUrl: item.imageUrl,
+        })),
+        ...references.productItems.map(p => ({
+          name: p.name,
+          category: 'Product',
+          description: `User-uploaded product: ${p.name}`,
+          imageUrl: p.imageUrl,
+        })),
+      ];
+      
       console.log('Generation references:', {
         hasLayout: !!references.layoutUrl,
         hasRoomPhoto: !!references.roomPhotoUrl,
         styleCount: references.styleRefUrls.length,
+        productCount: allProducts.length,
       });
 
       // Build enhanced prompt with furniture context
       let enhancedPrompt = content;
-      if (furnitureItems.length > 0) {
-        const furnitureContext = furnitureItems.map(item => 
+      if (allProducts.length > 0) {
+        const furnitureContext = allProducts.map(item => 
           `- ${item.name} (${item.category}): ${item.description}`
         ).join('\n');
-        enhancedPrompt = `${content}\n\n[Include these specific furniture pieces in the design:\n${furnitureContext}]`;
+        enhancedPrompt = `${content}\n\n[Include these specific products/furniture in the design:\n${furnitureContext}]`;
       }
 
       // Create render record
@@ -770,10 +797,11 @@ Ready to generate a render! Describe your vision.`;
         references.layoutUrl ? 'layout' : null,
         references.roomPhotoUrl ? 'room photo' : null,
         references.styleRefUrls.length > 0 ? `${references.styleRefUrls.length} style ref${references.styleRefUrls.length > 1 ? 's' : ''}` : null,
+        allProducts.length > 0 ? `${allProducts.length} product${allProducts.length > 1 ? 's' : ''}` : null,
       ].filter(Boolean).join(', ');
 
-      await addMessage('assistant', furnitureItems.length > 0 
-        ? `Generating your render with ${furnitureItems.length} furniture piece${furnitureItems.length > 1 ? 's' : ''}${refInfo ? ` using ${refInfo}` : ''}...`
+      await addMessage('assistant', allProducts.length > 0 
+        ? `Generating your render with ${allProducts.length} product${allProducts.length > 1 ? 's' : ''}${refInfo ? ` using ${refInfo}` : ''}...`
         : `Generating your render${refInfo ? ` using ${refInfo}` : ''}...`, 
         { type: 'text', status: 'pending' }
       );
@@ -790,12 +818,7 @@ Ready to generate a render! Describe your vision.`;
           layoutImageUrl: references.layoutUrl,
           roomPhotoUrl: references.roomPhotoUrl,
           styleRefUrls: references.styleRefUrls,
-          furnitureItems: furnitureItems.map(item => ({
-            name: item.name,
-            category: item.category,
-            description: item.description,
-            imageUrl: item.imageUrl,
-          })),
+          furnitureItems: allProducts,
         }),
       });
 
