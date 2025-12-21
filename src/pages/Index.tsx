@@ -1188,7 +1188,18 @@ Ready to generate a render! Describe your vision.`;
 
   // Handle AI Director changes - applies global prompt to current render
   const handleAIDirectorChange = useCallback(async (prompt: string) => {
-    if (!user || !currentProjectId || !currentRenderUrl) return;
+    if (!user) {
+      toast({ variant: 'destructive', title: 'Error', description: 'You must be logged in' });
+      return;
+    }
+    if (!currentProjectId) {
+      toast({ variant: 'destructive', title: 'Error', description: 'No project selected' });
+      return;
+    }
+    if (!currentRenderUrl) {
+      toast({ variant: 'destructive', title: 'Render required', description: 'Generate a render first to use AI Director' });
+      return;
+    }
 
     setIsSelectiveEditing(true);
     
