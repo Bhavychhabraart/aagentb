@@ -1,11 +1,14 @@
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
+import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
+import { Textarea } from '@/components/ui/textarea';
 import { 
   Loader2, Download, ZoomIn, ZoomOut, FileImage, FileText,
-  Ruler, Box, Layers, LayoutGrid, RefreshCw
+  Ruler, Box, Layers, LayoutGrid, RefreshCw, FileCode, Type, 
+  ArrowRight, Trash2, Save, X, Move
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
@@ -31,6 +34,16 @@ interface GeneratedDrawing {
   timestamp: Date;
 }
 
+interface Annotation {
+  id: string;
+  type: 'text' | 'dimension' | 'arrow';
+  x: number; // percentage
+  y: number; // percentage
+  text?: string;
+  endX?: number; // for arrows
+  endY?: number; // for arrows
+}
+
 const DRAWING_TYPES: { id: DrawingType; label: string; description: string; icon: React.ElementType }[] = [
   { id: 'orthographic', label: 'Orthographic', description: 'Front, Side, Top views', icon: LayoutGrid },
   { id: 'assembly', label: 'Assembly', description: 'Exploded parts view', icon: Layers },
@@ -45,12 +58,20 @@ export function TechnicalDrawingPanel({
   materials,
 }: TechnicalDrawingPanelProps) {
   const { toast } = useToast();
+  const canvasRef = useRef<HTMLDivElement>(null);
   
   const [selectedType, setSelectedType] = useState<DrawingType>('orthographic');
   const [isGenerating, setIsGenerating] = useState(false);
   const [generatedDrawing, setGeneratedDrawing] = useState<string | null>(null);
   const [drawingHistory, setDrawingHistory] = useState<GeneratedDrawing[]>([]);
   const [zoom, setZoom] = useState(100);
+  
+  // Annotation state
+  const [annotations, setAnnotations] = useState<Annotation[]>([]);
+  const [annotationMode, setAnnotationMode] = useState<'none' | 'text' | 'dimension' | 'arrow'>('none');
+  const [newAnnotationText, setNewAnnotationText] = useState('');
+  const [pendingAnnotation, setPendingAnnotation] = useState<Partial<Annotation> | null>(null);
+  const [selectedAnnotation, setSelectedAnnotation] = useState<string | null>(null);
 
   const handleGenerate = async () => {
     if (!furnitureImage) {
@@ -82,6 +103,7 @@ export function TechnicalDrawingPanel({
 
       const { imageUrl } = await response.json();
       setGeneratedDrawing(imageUrl);
+      setAnnotations([]); // Clear annotations for new drawing
       
       // Add to history
       const newDrawing: GeneratedDrawing = {
@@ -161,7 +183,7 @@ export function TechnicalDrawingPanel({
       await new Promise<void>((resolve, reject) => {
         img.onload = () => {
           const maxWidth = 380;
-          const maxHeight = 230;
+          const maxHeight = 200;
           const imgRatio = img.width / img.height;
           
           let drawWidth = maxWidth;
@@ -176,6 +198,23 @@ export function TechnicalDrawingPanel({
           const y = 55;
           
           pdf.addImage(img, 'PNG', x, y, drawWidth, drawHeight);
+          
+          // Add annotations as text overlays
+          if (annotations.length > 0) {
+            pdf.setFontSize(8);
+            annotations.forEach(ann => {
+              if (ann.type === 'text' && ann.text) {
+                const annX = x + (drawWidth * ann.x / 100);
+                const annY = y + (drawHeight * ann.y / 100);
+                pdf.text(ann.text, annX, annY);
+              } else if (ann.type === 'dimension' && ann.text) {
+                const annX = x + (drawWidth * ann.x / 100);
+                const annY = y + (drawHeight * ann.y / 100);
+                pdf.text(`↔ ${ann.text}`, annX, annY);
+              }
+            });
+          }
+          
           resolve();
         };
         img.onerror = reject;
@@ -190,17 +229,115 @@ export function TechnicalDrawingPanel({
     }
   };
 
+  const handleDownloadSVG = () => {
+    if (!generatedDrawing) return;
+    
+    // Create an SVG with the image and annotations
+    const svgWidth = 800;
+    const svgHeight = 600;
+    
+    let annotationsSvg = '';
+    annotations.forEach(ann => {
+      const x = (svgWidth * ann.x / 100);
+      const y = (svgHeight * ann.y / 100);
+      
+      if (ann.type === 'text' && ann.text) {
+        annotationsSvg += `<text x="${x}" y="${y}" font-size="12" fill="#333">${ann.text}</text>\n`;
+      } else if (ann.type === 'dimension' && ann.text) {
+        annotationsSvg += `<text x="${x}" y="${y}" font-size="10" fill="#666">↔ ${ann.text}</text>\n`;
+      } else if (ann.type === 'arrow' && ann.endX !== undefined && ann.endY !== undefined) {
+        const endX = (svgWidth * ann.endX / 100);
+        const endY = (svgHeight * ann.endY / 100);
+        annotationsSvg += `<line x1="${x}" y1="${y}" x2="${endX}" y2="${endY}" stroke="#333" stroke-width="2" marker-end="url(#arrow)"/>\n`;
+      }
+    });
+    
+    const svgContent = `<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="${svgWidth}" height="${svgHeight}">
+  <defs>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto">
+      <path d="M0,0 L0,6 L9,3 z" fill="#333"/>
+    </marker>
+  </defs>
+  <image xlink:href="${generatedDrawing}" width="${svgWidth}" height="${svgHeight}"/>
+  ${annotationsSvg}
+</svg>`;
+    
+    const blob = new Blob([svgContent], { type: 'image/svg+xml' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `technical-drawing-${selectedType}-${Date.now()}.svg`;
+    a.click();
+    URL.revokeObjectURL(url);
+    toast({ title: 'Downloaded SVG!', description: 'Can be imported into CAD software.' });
+  };
+
+  const handleCanvasClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (annotationMode === 'none' || !generatedDrawing) return;
+    
+    const rect = canvasRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    
+    const x = ((e.clientX - rect.left) / rect.width) * 100;
+    const y = ((e.clientY - rect.top) / rect.height) * 100;
+    
+    if (annotationMode === 'arrow') {
+      if (!pendingAnnotation) {
+        setPendingAnnotation({ type: 'arrow', x, y });
+        toast({ title: 'Click endpoint for arrow' });
+      } else {
+        const newAnnotation: Annotation = {
+          id: Date.now().toString(),
+          type: 'arrow',
+          x: pendingAnnotation.x!,
+          y: pendingAnnotation.y!,
+          endX: x,
+          endY: y,
+        };
+        setAnnotations(prev => [...prev, newAnnotation]);
+        setPendingAnnotation(null);
+        setAnnotationMode('none');
+      }
+    } else {
+      setPendingAnnotation({ type: annotationMode, x, y });
+    }
+  };
+
+  const handleAddAnnotation = () => {
+    if (!pendingAnnotation || !newAnnotationText.trim()) return;
+    
+    const newAnnotation: Annotation = {
+      id: Date.now().toString(),
+      type: pendingAnnotation.type as 'text' | 'dimension',
+      x: pendingAnnotation.x!,
+      y: pendingAnnotation.y!,
+      text: newAnnotationText.trim(),
+    };
+    
+    setAnnotations(prev => [...prev, newAnnotation]);
+    setNewAnnotationText('');
+    setPendingAnnotation(null);
+    setAnnotationMode('none');
+  };
+
+  const handleDeleteAnnotation = (id: string) => {
+    setAnnotations(prev => prev.filter(a => a.id !== id));
+    setSelectedAnnotation(null);
+  };
+
   const selectFromHistory = (drawing: GeneratedDrawing) => {
     setGeneratedDrawing(drawing.imageUrl);
     setSelectedType(drawing.type);
+    setAnnotations([]);
   };
 
   return (
     <div className="flex flex-col h-full">
       {/* Drawing Type Selector */}
-      <div className="p-4 border-b border-border">
-        <Label className="text-sm font-medium mb-3 block">Drawing Type</Label>
-        <div className="grid grid-cols-2 gap-2">
+      <div className="p-3 border-b border-border">
+        <Label className="text-xs font-medium mb-2 block">Drawing Type</Label>
+        <div className="grid grid-cols-2 gap-1.5">
           {DRAWING_TYPES.map((type) => {
             const Icon = type.icon;
             return (
@@ -208,19 +345,18 @@ export function TechnicalDrawingPanel({
                 key={type.id}
                 onClick={() => setSelectedType(type.id)}
                 className={cn(
-                  "flex items-center gap-2 p-3 rounded-lg border-2 transition-all text-left",
+                  "flex items-center gap-1.5 p-2 rounded-lg border-2 transition-all text-left",
                   selectedType === type.id
                     ? "border-primary bg-primary/5"
                     : "border-border hover:border-primary/50"
                 )}
               >
                 <Icon className={cn(
-                  "h-4 w-4 shrink-0",
+                  "h-3.5 w-3.5 shrink-0",
                   selectedType === type.id ? "text-primary" : "text-muted-foreground"
                 )} />
                 <div className="min-w-0">
-                  <p className="text-xs font-medium truncate">{type.label}</p>
-                  <p className="text-[10px] text-muted-foreground truncate">{type.description}</p>
+                  <p className="text-[10px] font-medium truncate">{type.label}</p>
                 </div>
               </button>
             );
@@ -229,21 +365,22 @@ export function TechnicalDrawingPanel({
       </div>
 
       {/* Generate Button */}
-      <div className="p-4 border-b border-border">
+      <div className="p-3 border-b border-border">
         <Button
           onClick={handleGenerate}
           disabled={isGenerating || !furnitureImage}
           className="w-full gap-2"
+          size="sm"
         >
           {isGenerating ? (
             <>
-              <Loader2 className="h-4 w-4 animate-spin" />
-              Generating Drawing...
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              Generating...
             </>
           ) : (
             <>
-              <Ruler className="h-4 w-4" />
-              Generate Technical Drawing
+              <Ruler className="h-3.5 w-3.5" />
+              Generate Drawing
             </>
           )}
         </Button>
@@ -253,73 +390,196 @@ export function TechnicalDrawingPanel({
       <div className="flex-1 flex flex-col min-h-0">
         {generatedDrawing ? (
           <>
-            {/* Zoom & Download Controls */}
-            <div className="flex items-center justify-between px-4 py-2 border-b border-border">
+            {/* Toolbar */}
+            <div className="flex items-center justify-between px-3 py-2 border-b border-border">
               <div className="flex items-center gap-1">
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-7 w-7"
-                  onClick={() => setZoom(prev => Math.max(50, prev - 25))}
-                >
+                <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setZoom(prev => Math.max(50, prev - 25))}>
                   <ZoomOut className="h-3 w-3" />
                 </Button>
-                <span className="text-xs text-muted-foreground w-10 text-center">{zoom}%</span>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-7 w-7"
-                  onClick={() => setZoom(prev => Math.min(200, prev + 25))}
-                >
+                <span className="text-[10px] text-muted-foreground w-8 text-center">{zoom}%</span>
+                <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setZoom(prev => Math.min(200, prev + 25))}>
                   <ZoomIn className="h-3 w-3" />
                 </Button>
               </div>
-              <div className="flex items-center gap-1">
-                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={handleDownloadPNG}>
+              <div className="flex items-center gap-0.5">
+                <Button variant="ghost" size="icon" className="h-6 w-6" onClick={handleDownloadPNG} title="Download PNG">
                   <FileImage className="h-3 w-3" />
                 </Button>
-                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={handleDownloadPDF}>
+                <Button variant="ghost" size="icon" className="h-6 w-6" onClick={handleDownloadPDF} title="Download PDF">
                   <FileText className="h-3 w-3" />
                 </Button>
-                <Button 
-                  variant="ghost" 
-                  size="icon" 
-                  className="h-7 w-7" 
-                  onClick={handleGenerate}
-                  disabled={isGenerating}
-                >
+                <Button variant="ghost" size="icon" className="h-6 w-6" onClick={handleDownloadSVG} title="Export SVG (CAD)">
+                  <FileCode className="h-3 w-3" />
+                </Button>
+                <Button variant="ghost" size="icon" className="h-6 w-6" onClick={handleGenerate} disabled={isGenerating}>
                   <RefreshCw className={cn("h-3 w-3", isGenerating && "animate-spin")} />
                 </Button>
               </div>
             </div>
 
-            {/* Drawing Preview */}
-            <div className="flex-1 overflow-auto p-4 bg-muted/30">
+            {/* Annotation Tools */}
+            <div className="flex items-center gap-1 px-3 py-1.5 border-b border-border bg-muted/30">
+              <span className="text-[10px] text-muted-foreground mr-1">Annotate:</span>
+              <Button
+                variant={annotationMode === 'text' ? 'secondary' : 'ghost'}
+                size="icon"
+                className="h-6 w-6"
+                onClick={() => setAnnotationMode(annotationMode === 'text' ? 'none' : 'text')}
+                title="Add Text"
+              >
+                <Type className="h-3 w-3" />
+              </Button>
+              <Button
+                variant={annotationMode === 'dimension' ? 'secondary' : 'ghost'}
+                size="icon"
+                className="h-6 w-6"
+                onClick={() => setAnnotationMode(annotationMode === 'dimension' ? 'none' : 'dimension')}
+                title="Add Dimension"
+              >
+                <Ruler className="h-3 w-3" />
+              </Button>
+              <Button
+                variant={annotationMode === 'arrow' ? 'secondary' : 'ghost'}
+                size="icon"
+                className="h-6 w-6"
+                onClick={() => setAnnotationMode(annotationMode === 'arrow' ? 'none' : 'arrow')}
+                title="Add Arrow"
+              >
+                <ArrowRight className="h-3 w-3" />
+              </Button>
+              {annotations.length > 0 && (
+                <>
+                  <div className="w-px h-4 bg-border mx-1" />
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-6 w-6 text-destructive"
+                    onClick={() => setAnnotations([])}
+                    title="Clear All"
+                  >
+                    <Trash2 className="h-3 w-3" />
+                  </Button>
+                  <span className="text-[10px] text-muted-foreground ml-1">({annotations.length})</span>
+                </>
+              )}
+            </div>
+
+            {/* Pending Annotation Input */}
+            {pendingAnnotation && pendingAnnotation.type !== 'arrow' && (
+              <div className="flex items-center gap-2 px-3 py-2 bg-primary/5 border-b border-primary/20">
+                <Input
+                  value={newAnnotationText}
+                  onChange={(e) => setNewAnnotationText(e.target.value)}
+                  placeholder={pendingAnnotation.type === 'dimension' ? "e.g., 120cm" : "Label text..."}
+                  className="h-7 text-xs flex-1"
+                  autoFocus
+                  onKeyDown={(e) => e.key === 'Enter' && handleAddAnnotation()}
+                />
+                <Button size="sm" className="h-7 px-2" onClick={handleAddAnnotation}>
+                  <Save className="h-3 w-3" />
+                </Button>
+                <Button size="sm" variant="ghost" className="h-7 px-2" onClick={() => { setPendingAnnotation(null); setNewAnnotationText(''); }}>
+                  <X className="h-3 w-3" />
+                </Button>
+              </div>
+            )}
+
+            {/* Drawing Preview with Annotations */}
+            <div className="flex-1 overflow-auto p-3 bg-muted/30">
               <div 
-                className="mx-auto bg-background border border-border rounded-lg overflow-hidden shadow-sm"
+                ref={canvasRef}
+                className={cn(
+                  "relative mx-auto bg-background border border-border rounded-lg overflow-hidden shadow-sm",
+                  annotationMode !== 'none' && "cursor-crosshair"
+                )}
                 style={{ 
-                  width: `${Math.min(280, 280 * (zoom / 100))}px`,
+                  width: `${Math.min(260, 260 * (zoom / 100))}px`,
                 }}
+                onClick={handleCanvasClick}
               >
                 {isGenerating ? (
                   <div className="aspect-[4/3] flex items-center justify-center">
                     <Loader2 className="h-8 w-8 animate-spin text-primary" />
                   </div>
                 ) : (
-                  <img 
-                    src={generatedDrawing} 
-                    alt="Technical Drawing" 
-                    className="w-full"
-                  />
+                  <>
+                    <img 
+                      src={generatedDrawing} 
+                      alt="Technical Drawing" 
+                      className="w-full"
+                      draggable={false}
+                    />
+                    {/* Render Annotations */}
+                    {annotations.map(ann => (
+                      <div
+                        key={ann.id}
+                        className={cn(
+                          "absolute group",
+                          selectedAnnotation === ann.id && "ring-2 ring-primary"
+                        )}
+                        style={{ 
+                          left: `${ann.x}%`, 
+                          top: `${ann.y}%`,
+                          transform: 'translate(-50%, -50%)'
+                        }}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setSelectedAnnotation(ann.id);
+                        }}
+                      >
+                        {ann.type === 'text' && (
+                          <div className="px-1.5 py-0.5 bg-white/90 border border-gray-300 rounded text-[10px] font-medium shadow-sm whitespace-nowrap">
+                            {ann.text}
+                          </div>
+                        )}
+                        {ann.type === 'dimension' && (
+                          <div className="px-1.5 py-0.5 bg-blue-100 border border-blue-300 rounded text-[10px] font-mono shadow-sm whitespace-nowrap">
+                            ↔ {ann.text}
+                          </div>
+                        )}
+                        {ann.type === 'arrow' && ann.endX !== undefined && ann.endY !== undefined && (
+                          <svg 
+                            className="absolute overflow-visible pointer-events-none"
+                            style={{ left: 0, top: 0 }}
+                          >
+                            <defs>
+                              <marker id={`arrow-${ann.id}`} markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
+                                <path d="M0,0 L0,8 L8,4 z" fill="#ef4444"/>
+                              </marker>
+                            </defs>
+                            <line
+                              x1="0"
+                              y1="0"
+                              x2={`${(ann.endX - ann.x) * 2.6}px`}
+                              y2={`${(ann.endY - ann.y) * 2.6}px`}
+                              stroke="#ef4444"
+                              strokeWidth="2"
+                              markerEnd={`url(#arrow-${ann.id})`}
+                            />
+                          </svg>
+                        )}
+                        {/* Delete button on hover */}
+                        <button
+                          className="absolute -top-2 -right-2 h-4 w-4 rounded-full bg-destructive text-white opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDeleteAnnotation(ann.id);
+                          }}
+                        >
+                          <X className="h-2.5 w-2.5" />
+                        </button>
+                      </div>
+                    ))}
+                  </>
                 )}
               </div>
             </div>
           </>
         ) : (
-          <div className="flex-1 flex flex-col items-center justify-center p-6 text-center text-muted-foreground">
-            <Ruler className="h-12 w-12 mb-4 opacity-50" />
-            <p className="text-sm font-medium">No drawing generated</p>
-            <p className="text-xs mt-1">Select a type and generate</p>
+          <div className="flex-1 flex flex-col items-center justify-center p-4 text-center text-muted-foreground">
+            <Ruler className="h-10 w-10 mb-3 opacity-50" />
+            <p className="text-xs font-medium">No drawing generated</p>
+            <p className="text-[10px] mt-1">Select a type and generate</p>
           </div>
         )}
       </div>
@@ -327,17 +587,17 @@ export function TechnicalDrawingPanel({
       {/* History */}
       {drawingHistory.length > 0 && (
         <div className="border-t border-border">
-          <div className="p-3">
-            <Label className="text-xs text-muted-foreground">History</Label>
+          <div className="p-2">
+            <Label className="text-[10px] text-muted-foreground">History</Label>
           </div>
-          <ScrollArea className="h-24">
-            <div className="px-3 pb-3 flex gap-2">
+          <ScrollArea className="h-20">
+            <div className="px-2 pb-2 flex gap-1.5">
               {drawingHistory.map((drawing) => (
                 <button
                   key={drawing.id}
                   onClick={() => selectFromHistory(drawing)}
                   className={cn(
-                    "shrink-0 w-16 rounded-md overflow-hidden border-2 transition-all",
+                    "shrink-0 w-14 rounded-md overflow-hidden border-2 transition-all",
                     generatedDrawing === drawing.imageUrl
                       ? "border-primary"
                       : "border-border hover:border-primary/50"
@@ -348,7 +608,7 @@ export function TechnicalDrawingPanel({
                     alt={drawing.type} 
                     className="w-full aspect-square object-cover"
                   />
-                  <Badge variant="secondary" className="w-full rounded-none text-[8px] justify-center">
+                  <Badge variant="secondary" className="w-full rounded-none text-[7px] justify-center py-0">
                     {drawing.type.slice(0, 4)}
                   </Badge>
                 </button>

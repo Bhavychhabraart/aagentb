@@ -1,4 +1,5 @@
 // Finishes library with categories for selection tool
+import { supabase } from '@/integrations/supabase/client';
 
 export interface FinishItem {
   id: string;
@@ -7,10 +8,12 @@ export interface FinishItem {
   imageUrl?: string;
   colorHex?: string;
   description?: string;
+  isCustom?: boolean;
 }
 
 export const FINISH_CATEGORIES = [
   'All',
+  'My Finishes',
   'Paint Colors',
   'Wood Finishes',
   'Laminates',
@@ -109,15 +112,38 @@ export const DEFAULT_FINISHES: FinishItem[] = [
   { id: 'wall-concrete', name: 'Concrete Wall', category: 'Wallpapers', colorHex: '#B8B8B8' },
 ];
 
-export function getFinishesByCategory(category: FinishCategory): FinishItem[] {
+// Fetch custom finishes from database
+export async function fetchCustomFinishes(): Promise<FinishItem[]> {
+  const { data, error } = await supabase
+    .from('custom_finishes')
+    .select('*')
+    .order('created_at', { ascending: false });
+
+  if (error || !data) return [];
+
+  return data.map(item => ({
+    id: item.id,
+    name: item.name,
+    category: item.category || 'My Finishes',
+    imageUrl: item.image_url,
+    colorHex: item.color_hex || undefined,
+    description: item.description || undefined,
+    isCustom: true,
+  }));
+}
+
+export function getFinishesByCategory(category: FinishCategory, customFinishes: FinishItem[] = []): FinishItem[] {
   if (category === 'All') {
-    return DEFAULT_FINISHES;
+    return [...customFinishes, ...DEFAULT_FINISHES];
+  }
+  if (category === 'My Finishes') {
+    return customFinishes;
   }
   return DEFAULT_FINISHES.filter(f => f.category === category);
 }
 
-export function searchFinishes(query: string, category: FinishCategory = 'All'): FinishItem[] {
-  const finishes = getFinishesByCategory(category);
+export function searchFinishes(query: string, category: FinishCategory = 'All', customFinishes: FinishItem[] = []): FinishItem[] {
+  const finishes = getFinishesByCategory(category, customFinishes);
   if (!query.trim()) return finishes;
   
   const lowerQuery = query.toLowerCase();

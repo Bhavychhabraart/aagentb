@@ -52,6 +52,39 @@ export type Database = {
           },
         ]
       }
+      custom_finishes: {
+        Row: {
+          category: string
+          color_hex: string | null
+          created_at: string
+          description: string | null
+          id: string
+          image_url: string
+          name: string
+          user_id: string
+        }
+        Insert: {
+          category?: string
+          color_hex?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          image_url: string
+          name: string
+          user_id: string
+        }
+        Update: {
+          category?: string
+          color_hex?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          image_url?: string
+          name?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       layouts: {
         Row: {
           canvas_data: Json | null
