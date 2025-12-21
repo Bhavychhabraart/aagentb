@@ -1,10 +1,12 @@
 import { useState } from 'react';
-import { Send, X, Loader2, Crop, Type, Package } from 'lucide-react';
+import { Send, X, Loader2, Crop, Type, Package, Paintbrush } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { SelectionRegion } from './SelectionOverlay';
 import { SelectiveEditCatalog } from './SelectiveEditCatalog';
+import { SelectiveEditFinishes } from './SelectiveEditFinishes';
 import { CatalogFurnitureItem } from '@/services/catalogService';
+import { FinishItem } from '@/services/finishesLibrary';
 import { cn } from '@/lib/utils';
 
 interface SelectiveEditPanelProps {
@@ -14,7 +16,7 @@ interface SelectiveEditPanelProps {
   isProcessing: boolean;
 }
 
-type EditMode = 'prompt' | 'catalog';
+type EditMode = 'prompt' | 'catalog' | 'finish';
 
 export function SelectiveEditPanel({ 
   selection, 
@@ -25,6 +27,7 @@ export function SelectiveEditPanel({
   const [prompt, setPrompt] = useState('');
   const [editMode, setEditMode] = useState<EditMode>('prompt');
   const [selectedCatalogItem, setSelectedCatalogItem] = useState<CatalogFurnitureItem | null>(null);
+  const [selectedFinish, setSelectedFinish] = useState<FinishItem | null>(null);
   const [additionalInstructions, setAdditionalInstructions] = useState('');
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -35,12 +38,19 @@ export function SelectiveEditPanel({
       if (prompt.trim()) {
         onSubmit(prompt.trim());
       }
-    } else {
+    } else if (editMode === 'catalog') {
       if (selectedCatalogItem) {
         const finalPrompt = additionalInstructions.trim() 
           ? `Replace with ${selectedCatalogItem.name}. ${additionalInstructions.trim()}`
           : `Replace with ${selectedCatalogItem.name}`;
         onSubmit(finalPrompt, selectedCatalogItem);
+      }
+    } else if (editMode === 'finish') {
+      if (selectedFinish) {
+        const finalPrompt = additionalInstructions.trim()
+          ? `Apply ${selectedFinish.name} (${selectedFinish.category}) finish. ${additionalInstructions.trim()}`
+          : `Apply ${selectedFinish.name} (${selectedFinish.category}) finish to this area`;
+        onSubmit(finalPrompt);
       }
     }
   };
@@ -57,7 +67,9 @@ export function SelectiveEditPanel({
 
   const canSubmit = editMode === 'prompt' 
     ? prompt.trim().length > 0 
-    : selectedCatalogItem !== null;
+    : editMode === 'catalog'
+      ? selectedCatalogItem !== null
+      : selectedFinish !== null;
 
   return (
     <div className="absolute bottom-[12%] left-1/2 -translate-x-1/2 z-30 w-full max-w-lg px-4">
@@ -91,33 +103,44 @@ export function SelectiveEditPanel({
             <button
               onClick={() => setEditMode('prompt')}
               className={cn(
-                "flex-1 flex items-center justify-center gap-2 py-2 px-3 rounded-lg text-sm font-medium transition-colors",
+                "flex-1 flex items-center justify-center gap-1.5 py-2 px-2 rounded-lg text-xs font-medium transition-colors",
                 editMode === 'prompt'
                   ? "bg-primary text-primary-foreground"
                   : "bg-muted text-muted-foreground hover:bg-muted/80"
               )}
             >
-              <Type className="h-4 w-4" />
-              Text Prompt
+              <Type className="h-3.5 w-3.5" />
+              Prompt
             </button>
             <button
               onClick={() => setEditMode('catalog')}
               className={cn(
-                "flex-1 flex items-center justify-center gap-2 py-2 px-3 rounded-lg text-sm font-medium transition-colors",
+                "flex-1 flex items-center justify-center gap-1.5 py-2 px-2 rounded-lg text-xs font-medium transition-colors",
                 editMode === 'catalog'
                   ? "bg-primary text-primary-foreground"
                   : "bg-muted text-muted-foreground hover:bg-muted/80"
               )}
             >
-              <Package className="h-4 w-4" />
-              From Catalog
+              <Package className="h-3.5 w-3.5" />
+              Product
+            </button>
+            <button
+              onClick={() => setEditMode('finish')}
+              className={cn(
+                "flex-1 flex items-center justify-center gap-1.5 py-2 px-2 rounded-lg text-xs font-medium transition-colors",
+                editMode === 'finish'
+                  ? "bg-primary text-primary-foreground"
+                  : "bg-muted text-muted-foreground hover:bg-muted/80"
+              )}
+            >
+              <Paintbrush className="h-3.5 w-3.5" />
+              Finish
             </button>
           </div>
         </div>
 
-        {/* Input area */}
         <form onSubmit={handleSubmit} className="p-4 pt-2">
-          {editMode === 'prompt' ? (
+          {editMode === 'prompt' && (
             <Textarea
               value={prompt}
               onChange={(e) => setPrompt(e.target.value)}
@@ -127,7 +150,9 @@ export function SelectiveEditPanel({
               className="min-h-[80px] resize-none mb-3"
               autoFocus
             />
-          ) : (
+          )}
+          
+          {editMode === 'catalog' && (
             <div className="mb-3">
               <SelectiveEditCatalog
                 selectedItem={selectedCatalogItem}
@@ -147,14 +172,39 @@ export function SelectiveEditPanel({
               </div>
             </div>
           )}
+
+          {editMode === 'finish' && (
+            <div className="mb-3">
+              <SelectiveEditFinishes
+                selectedFinish={selectedFinish}
+                onFinishSelect={setSelectedFinish}
+              />
+              
+              {/* Optional additional instructions */}
+              <div className="mt-3">
+                <Textarea
+                  value={additionalInstructions}
+                  onChange={(e) => setAdditionalInstructions(e.target.value)}
+                  onKeyDown={handleKeyDown}
+                  placeholder="Optional: Additional instructions (e.g., 'Add slight texture' or 'Matte finish')"
+                  disabled={isProcessing}
+                  className="min-h-[50px] resize-none text-xs"
+                />
+              </div>
+            </div>
+          )}
           
           <div className="flex items-center justify-between">
             <p className="text-xs text-muted-foreground">
               {editMode === 'prompt' 
                 ? 'Press Enter to apply, Esc to cancel'
-                : selectedCatalogItem 
-                  ? `Selected: ${selectedCatalogItem.name}`
-                  : 'Select an item from the catalog'}
+                : editMode === 'catalog'
+                  ? selectedCatalogItem 
+                    ? `Selected: ${selectedCatalogItem.name}`
+                    : 'Select a product from the catalog'
+                  : selectedFinish
+                    ? `Selected: ${selectedFinish.name}`
+                    : 'Select a finish from the library'}
             </p>
             <div className="flex gap-2">
               <Button
