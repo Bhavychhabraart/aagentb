@@ -1167,6 +1167,78 @@ Ready to generate a render! Describe your vision.`;
     toast({ title: 'Undo successful', description: 'Reverted to previous render version.' });
   }, [currentRenderId, allRenders, toast]);
 
+  // Handle AI Director changes - applies global prompt to current render
+  const handleAIDirectorChange = useCallback(async (prompt: string) => {
+    if (!user || !currentProjectId || !currentRenderUrl) return;
+
+    setIsSelectiveEditing(true);
+    
+    try {
+      // Create a new render record as a child of current
+      const { data: renderRecord, error: renderError } = await supabase
+        .from('renders')
+        .insert({
+          project_id: currentProjectId,
+          user_id: user.id,
+          prompt: `AI Director: ${prompt}`,
+          status: 'pending',
+          room_upload_id: currentUpload?.id || null,
+          parent_render_id: currentRenderId,
+        })
+        .select()
+        .single();
+
+      if (renderError) throw renderError;
+
+      await addMessage('user', `🎬 AI Director: ${prompt}`, { type: 'text' });
+
+      // Call edit-render with the global prompt
+      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/edit-render`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+        },
+        body: JSON.stringify({
+          originalImageUrl: currentRenderUrl,
+          prompt: prompt,
+          // No region = global edit
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || 'AI Director edit failed');
+      }
+
+      const { imageUrl } = await response.json();
+
+      await supabase
+        .from('renders')
+        .update({ render_url: imageUrl, status: 'completed' })
+        .eq('id', renderRecord.id);
+
+      setCurrentRenderUrl(imageUrl);
+      setCurrentRenderId(renderRecord.id);
+
+      await addMessage('assistant', 'AI Director changes applied successfully!', {
+        type: 'render',
+        imageUrl,
+        status: 'ready',
+      });
+
+      loadAllRenders();
+      toast({ title: 'Changes applied', description: 'AI Director modifications complete.' });
+    } catch (error) {
+      console.error('AI Director failed:', error);
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      await addMessage('assistant', `AI Director failed: ${message}`, { type: 'text', status: 'failed' });
+      toast({ variant: 'destructive', title: 'Failed', description: message });
+    } finally {
+      setIsSelectiveEditing(false);
+    }
+  }, [user, currentProjectId, currentRenderUrl, currentRenderId, currentUpload, addMessage, toast]);
+
   // Check if undo is possible
   const canUndo = (() => {
     if (!currentRenderId || !allRenders.length) return false;
@@ -1219,6 +1291,7 @@ Ready to generate a render! Describe your vision.`;
           onExport={() => setShowExportModal(true)}
           onStartOrder={stagedItems.length > 0 ? () => setShowOrderModal(true) : undefined}
           onSelectiveEdit={handleSelectiveEdit}
+          onAIDirectorChange={handleAIDirectorChange}
           isSelectiveEditing={isSelectiveEditing}
           allRenders={allRenders}
           currentRenderId={currentRenderId}
