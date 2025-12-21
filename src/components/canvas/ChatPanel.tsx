@@ -1,8 +1,14 @@
 import { useState, useRef, useEffect } from 'react';
-import { Send, Upload, Loader2, Image as ImageIcon, Sparkles, FileImage, Clock, X, Package, Edit3, Eye } from 'lucide-react';
+import { Send, Loader2, Image as ImageIcon, Sparkles, FileImage, Clock, Package, Edit3, Eye, Plus, Grid3X3, Camera, Palette, Box } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 import { CatalogFurnitureItem } from '@/services/catalogService';
@@ -20,11 +26,13 @@ export interface ChatMessage {
   created_at: string;
 }
 
+export type ChatInputType = 'layout' | 'room' | 'style' | 'products';
+
 interface ChatPanelProps {
   messages: ChatMessage[];
   isLoading: boolean;
   onSendMessage: (content: string) => void;
-  onUploadClick: () => void;
+  onInputTypeSelect: (type: ChatInputType) => void;
   stagedItems?: CatalogFurnitureItem[];
   onClearStagedItems?: () => void;
   isEditMode?: boolean;
@@ -51,7 +59,7 @@ export function ChatPanel({
   messages, 
   isLoading, 
   onSendMessage, 
-  onUploadClick, 
+  onInputTypeSelect, 
   stagedItems = [], 
   onClearStagedItems,
   isEditMode = false,
@@ -294,16 +302,37 @@ export function ChatPanel({
         
         <form onSubmit={handleSubmit} className="flex flex-col gap-2">
           <div className="flex gap-2">
-            <Button
-              type="button"
-              variant="secondary"
-              size="icon"
-              onClick={onUploadClick}
-              disabled={isLoading}
-              className="shrink-0"
-            >
-              <Upload className="h-4 w-4" />
-            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="icon"
+                  disabled={isLoading}
+                  className="shrink-0"
+                >
+                  <Plus className="h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start" className="w-48">
+                <DropdownMenuItem onClick={() => onInputTypeSelect('layout')}>
+                  <Grid3X3 className="h-4 w-4 mr-2" />
+                  2D Layout
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => onInputTypeSelect('room')}>
+                  <Camera className="h-4 w-4 mr-2" />
+                  Room Photo
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => onInputTypeSelect('style')}>
+                  <Palette className="h-4 w-4 mr-2" />
+                  Style Reference
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => onInputTypeSelect('products')}>
+                  <Box className="h-4 w-4 mr-2" />
+                  Products
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
             <Textarea
               ref={textareaRef}
               value={input}

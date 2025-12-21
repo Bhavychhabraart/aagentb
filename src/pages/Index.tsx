@@ -4,7 +4,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { AppSidebar } from '@/components/layout/AppSidebar';
-import { ChatPanel, ChatMessage } from '@/components/canvas/ChatPanel';
+import { ChatPanel, ChatMessage, ChatInputType } from '@/components/canvas/ChatPanel';
 import { RenderViewer } from '@/components/canvas/RenderViewer';
 import { UploadDialog } from '@/components/canvas/UploadDialog';
 import { AssetsPanel } from '@/components/canvas/AssetsPanel';
@@ -17,6 +17,10 @@ import { ProjectData } from '@/services/documentService';
 import { SelectionRegion } from '@/components/canvas/SelectionOverlay';
 import { RenderHistoryItem } from '@/components/canvas/RenderHistoryCarousel';
 import { CameraView } from '@/components/canvas/MulticamPanel';
+import { LayoutUploadModal } from '@/components/creation/LayoutUploadModal';
+import { RoomPhotoModal } from '@/components/creation/RoomPhotoModal';
+import { StyleRefModal } from '@/components/creation/StyleRefModal';
+import { ProductPickerModal, ProductItem } from '@/components/creation/ProductPickerModal';
 
 interface RoomUpload {
   id: string;
@@ -70,6 +74,12 @@ const Index = () => {
     top: null,
     custom: null,
   });
+  
+  // Chat input modals
+  const [showLayoutModal, setShowLayoutModal] = useState(false);
+  const [showRoomPhotoModal, setShowRoomPhotoModal] = useState(false);
+  const [showStyleRefModal, setShowStyleRefModal] = useState(false);
+  const [showProductsModal, setShowProductsModal] = useState(false);
 
   // Redirect to auth if not logged in
   useEffect(() => {
@@ -1308,6 +1318,165 @@ Ready to generate a render! Describe your vision.`;
     setCurrentRenderUrl(imageUrl);
   }, []);
 
+  // Handle chat input type selection (open modals)
+  const handleChatInputTypeSelect = useCallback((type: ChatInputType) => {
+    switch (type) {
+      case 'layout':
+        setShowLayoutModal(true);
+        break;
+      case 'room':
+        setShowRoomPhotoModal(true);
+        break;
+      case 'style':
+        setShowStyleRefModal(true);
+        break;
+      case 'products':
+        setShowProductsModal(true);
+        break;
+    }
+  }, []);
+
+  // Handle layout upload from chat
+  const handleLayoutUploadFromChat = useCallback(async (item: { file?: File; preview: string; name: string }) => {
+    if (!user || !currentProjectId || !item.file) return;
+    
+    try {
+      const fileName = `${user.id}/${currentProjectId}/${Date.now()}-${item.name}`;
+      const { error: uploadError } = await supabase.storage
+        .from('room-uploads')
+        .upload(fileName, item.file);
+      
+      if (uploadError) throw uploadError;
+      
+      const { data: { publicUrl } } = supabase.storage
+        .from('room-uploads')
+        .getPublicUrl(fileName);
+      
+      await supabase.from('room_uploads').insert({
+        project_id: currentProjectId,
+        user_id: user.id,
+        file_name: item.name,
+        file_url: publicUrl,
+        upload_type: 'layout',
+        analysis_status: 'completed',
+      });
+      
+      setLayoutImageUrl(publicUrl);
+      await addMessage('user', `Added 2D layout: ${item.name}`, { type: 'upload', imageUrl: publicUrl });
+      toast({ title: 'Layout added' });
+      setShowLayoutModal(false);
+    } catch (error) {
+      console.error('Layout upload failed:', error);
+      toast({ variant: 'destructive', title: 'Upload failed' });
+    }
+  }, [user, currentProjectId, addMessage, toast]);
+
+  // Handle room photo upload from chat
+  const handleRoomPhotoFromChat = useCallback(async (item: { file?: File; preview: string; name: string }) => {
+    if (!user || !currentProjectId || !item.file) return;
+    
+    try {
+      const fileName = `${user.id}/${currentProjectId}/${Date.now()}-${item.name}`;
+      const { error: uploadError } = await supabase.storage
+        .from('room-uploads')
+        .upload(fileName, item.file);
+      
+      if (uploadError) throw uploadError;
+      
+      const { data: { publicUrl } } = supabase.storage
+        .from('room-uploads')
+        .getPublicUrl(fileName);
+      
+      const { data: uploadRecord } = await supabase.from('room_uploads').insert({
+        project_id: currentProjectId,
+        user_id: user.id,
+        file_name: item.name,
+        file_url: publicUrl,
+        upload_type: 'room_photo',
+        analysis_status: 'pending',
+      }).select().single();
+      
+      setRoomPhotoUrl(publicUrl);
+      await addMessage('user', `Added room photo: ${item.name}`, { type: 'upload', imageUrl: publicUrl });
+      toast({ title: 'Room photo added', description: 'Analyzing room...' });
+      setShowRoomPhotoModal(false);
+      
+      if (uploadRecord) {
+        analyzeRoom(uploadRecord.id, publicUrl);
+      }
+    } catch (error) {
+      console.error('Room photo upload failed:', error);
+      toast({ variant: 'destructive', title: 'Upload failed' });
+    }
+  }, [user, currentProjectId, addMessage, toast]);
+
+  // Handle style references from chat
+  const handleStyleRefsFromChat = useCallback(async (items: Array<{ file?: File; preview: string; name: string }>) => {
+    if (!user || !currentProjectId) return;
+    
+    try {
+      const uploadedUrls: string[] = [];
+      
+      for (const item of items) {
+        if (!item.file) continue;
+        
+        const fileName = `${user.id}/${currentProjectId}/style-${Date.now()}-${item.name}`;
+        const { error: uploadError } = await supabase.storage
+          .from('room-uploads')
+          .upload(fileName, item.file);
+        
+        if (uploadError) throw uploadError;
+        
+        const { data: { publicUrl } } = supabase.storage
+          .from('room-uploads')
+          .getPublicUrl(fileName);
+        
+        await supabase.from('style_uploads').insert({
+          project_id: currentProjectId,
+          user_id: user.id,
+          file_name: item.name,
+          file_url: publicUrl,
+        });
+        
+        uploadedUrls.push(publicUrl);
+      }
+      
+      setStyleRefUrls(prev => [...prev, ...uploadedUrls]);
+      await addMessage('user', `Added ${items.length} style reference${items.length > 1 ? 's' : ''}`, { type: 'upload' });
+      toast({ title: 'Style references added' });
+      setShowStyleRefModal(false);
+    } catch (error) {
+      console.error('Style refs upload failed:', error);
+      toast({ variant: 'destructive', title: 'Upload failed' });
+    }
+  }, [user, currentProjectId, addMessage, toast]);
+
+  // Handle products from chat
+  const handleProductsFromChat = useCallback(async (products: ProductItem[], asCollage: boolean) => {
+    if (!user || !currentProjectId) return;
+    
+    try {
+      for (const product of products) {
+        if (!product.id) {
+          // New product - save to database
+          await supabase.from('product_items').insert({
+            project_id: currentProjectId,
+            user_id: user.id,
+            name: product.name,
+            image_url: product.imageUrl,
+          });
+        }
+      }
+      
+      await addMessage('user', `Added ${products.length} product${products.length > 1 ? 's' : ''} to project`, { type: 'upload' });
+      toast({ title: 'Products added' });
+      setShowProductsModal(false);
+    } catch (error) {
+      console.error('Products save failed:', error);
+      toast({ variant: 'destructive', title: 'Failed to save products' });
+    }
+  }, [user, currentProjectId, addMessage, toast]);
+
   // Check if undo is possible
   const canUndo = (() => {
     if (!currentRenderId || !allRenders.length) return false;
@@ -1379,7 +1548,7 @@ Ready to generate a render! Describe your vision.`;
               messages={messages}
               isLoading={isProcessing || isGenerating || isSelectiveEditing}
               onSendMessage={handleSendMessage}
-              onUploadClick={() => setUploadDialogOpen(true)}
+              onInputTypeSelect={handleChatInputTypeSelect}
               stagedItems={stagedItems}
               onClearStagedItems={handleClearStagedItems}
               isEditMode={isEditMode}
@@ -1469,6 +1638,35 @@ Ready to generate a render! Describe your vision.`;
           isProcessing={isGenerating}
         />
       )}
+
+      {/* Chat input modals */}
+      <LayoutUploadModal
+        open={showLayoutModal}
+        onOpenChange={setShowLayoutModal}
+        onUpload={handleLayoutUploadFromChat}
+      />
+      
+      <RoomPhotoModal
+        open={showRoomPhotoModal}
+        onOpenChange={setShowRoomPhotoModal}
+        onUpload={handleRoomPhotoFromChat}
+      />
+      
+      <StyleRefModal
+        open={showStyleRefModal}
+        onOpenChange={setShowStyleRefModal}
+        onUpload={handleStyleRefsFromChat}
+        currentUploads={[]}
+      />
+      
+      <ProductPickerModal
+        open={showProductsModal}
+        onOpenChange={setShowProductsModal}
+        onSave={handleProductsFromChat}
+        currentProducts={[]}
+        userId={user?.id}
+        projectId={currentProjectId || undefined}
+      />
     </div>
   </SidebarProvider>
 );
