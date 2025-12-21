@@ -1,22 +1,23 @@
 import { useState } from 'react';
-import { Send, X, Loader2, Crop, Type, Package, Paintbrush } from 'lucide-react';
+import { Send, X, Loader2, Crop, Type, Package, Paintbrush, Upload } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { SelectionRegion } from './SelectionOverlay';
 import { SelectiveEditCatalog } from './SelectiveEditCatalog';
 import { SelectiveEditFinishes } from './SelectiveEditFinishes';
+import { SelectiveEditUploader } from './SelectiveEditUploader';
 import { CatalogFurnitureItem } from '@/services/catalogService';
 import { FinishItem } from '@/services/finishesLibrary';
 import { cn } from '@/lib/utils';
 
 interface SelectiveEditPanelProps {
   selection: SelectionRegion;
-  onSubmit: (prompt: string, catalogItem?: CatalogFurnitureItem) => void;
+  onSubmit: (prompt: string, catalogItem?: CatalogFurnitureItem, referenceImageUrl?: string) => void;
   onCancel: () => void;
   isProcessing: boolean;
 }
 
-type EditMode = 'prompt' | 'catalog' | 'finish';
+type EditMode = 'prompt' | 'catalog' | 'finish' | 'upload';
 
 export function SelectiveEditPanel({ 
   selection, 
@@ -29,6 +30,7 @@ export function SelectiveEditPanel({
   const [selectedCatalogItem, setSelectedCatalogItem] = useState<CatalogFurnitureItem | null>(null);
   const [selectedFinish, setSelectedFinish] = useState<FinishItem | null>(null);
   const [additionalInstructions, setAdditionalInstructions] = useState('');
+  const [uploadedImageUrl, setUploadedImageUrl] = useState<string | null>(null);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -52,6 +54,13 @@ export function SelectiveEditPanel({
           : `Apply ${selectedFinish.name} (${selectedFinish.category}) finish to this area`;
         onSubmit(finalPrompt);
       }
+    } else if (editMode === 'upload') {
+      if (uploadedImageUrl) {
+        const finalPrompt = additionalInstructions.trim()
+          ? `Use this reference image to modify the selected area. ${additionalInstructions.trim()}`
+          : `Apply the uploaded reference image to this area`;
+        onSubmit(finalPrompt, undefined, uploadedImageUrl);
+      }
     }
   };
 
@@ -69,7 +78,9 @@ export function SelectiveEditPanel({
     ? prompt.trim().length > 0 
     : editMode === 'catalog'
       ? selectedCatalogItem !== null
-      : selectedFinish !== null;
+      : editMode === 'finish'
+        ? selectedFinish !== null
+        : uploadedImageUrl !== null;
 
   return (
     <div className="absolute bottom-[12%] left-1/2 -translate-x-1/2 z-30 w-full max-w-lg px-4">
@@ -99,42 +110,54 @@ export function SelectiveEditPanel({
 
         {/* Mode Toggle */}
         <div className="px-4 pt-3 pb-2">
-          <div className="flex gap-2">
+          <div className="flex gap-1">
             <button
               onClick={() => setEditMode('prompt')}
               className={cn(
-                "flex-1 flex items-center justify-center gap-1.5 py-2 px-2 rounded-lg text-xs font-medium transition-colors",
+                "flex-1 flex items-center justify-center gap-1 py-2 px-1.5 rounded-lg text-xs font-medium transition-colors",
                 editMode === 'prompt'
                   ? "bg-primary text-primary-foreground"
                   : "bg-muted text-muted-foreground hover:bg-muted/80"
               )}
             >
-              <Type className="h-3.5 w-3.5" />
+              <Type className="h-3 w-3" />
               Prompt
             </button>
             <button
               onClick={() => setEditMode('catalog')}
               className={cn(
-                "flex-1 flex items-center justify-center gap-1.5 py-2 px-2 rounded-lg text-xs font-medium transition-colors",
+                "flex-1 flex items-center justify-center gap-1 py-2 px-1.5 rounded-lg text-xs font-medium transition-colors",
                 editMode === 'catalog'
                   ? "bg-primary text-primary-foreground"
                   : "bg-muted text-muted-foreground hover:bg-muted/80"
               )}
             >
-              <Package className="h-3.5 w-3.5" />
+              <Package className="h-3 w-3" />
               Product
             </button>
             <button
               onClick={() => setEditMode('finish')}
               className={cn(
-                "flex-1 flex items-center justify-center gap-1.5 py-2 px-2 rounded-lg text-xs font-medium transition-colors",
+                "flex-1 flex items-center justify-center gap-1 py-2 px-1.5 rounded-lg text-xs font-medium transition-colors",
                 editMode === 'finish'
                   ? "bg-primary text-primary-foreground"
                   : "bg-muted text-muted-foreground hover:bg-muted/80"
               )}
             >
-              <Paintbrush className="h-3.5 w-3.5" />
+              <Paintbrush className="h-3 w-3" />
               Finish
+            </button>
+            <button
+              onClick={() => setEditMode('upload')}
+              className={cn(
+                "flex-1 flex items-center justify-center gap-1 py-2 px-1.5 rounded-lg text-xs font-medium transition-colors",
+                editMode === 'upload'
+                  ? "bg-primary text-primary-foreground"
+                  : "bg-muted text-muted-foreground hover:bg-muted/80"
+              )}
+            >
+              <Upload className="h-3 w-3" />
+              Upload
             </button>
           </div>
         </div>
@@ -193,6 +216,27 @@ export function SelectiveEditPanel({
               </div>
             </div>
           )}
+
+          {editMode === 'upload' && (
+            <div className="mb-3">
+              <SelectiveEditUploader
+                selectedImage={uploadedImageUrl}
+                onImageSelect={setUploadedImageUrl}
+              />
+              
+              {/* Instructions for how to apply the upload */}
+              <div className="mt-3">
+                <Textarea
+                  value={additionalInstructions}
+                  onChange={(e) => setAdditionalInstructions(e.target.value)}
+                  onKeyDown={handleKeyDown}
+                  placeholder="Describe how to apply this image (e.g., 'Use as fabric texture' or 'Replace with this chair')"
+                  disabled={isProcessing}
+                  className="min-h-[50px] resize-none text-xs"
+                />
+              </div>
+            </div>
+          )}
           
           <div className="flex items-center justify-between">
             <p className="text-xs text-muted-foreground">
@@ -202,9 +246,13 @@ export function SelectiveEditPanel({
                   ? selectedCatalogItem 
                     ? `Selected: ${selectedCatalogItem.name}`
                     : 'Select a product from the catalog'
-                  : selectedFinish
-                    ? `Selected: ${selectedFinish.name}`
-                    : 'Select a finish from the library'}
+                  : editMode === 'finish'
+                    ? selectedFinish
+                      ? `Selected: ${selectedFinish.name}`
+                      : 'Select a finish from the library'
+                    : uploadedImageUrl
+                      ? 'Image uploaded - add instructions'
+                      : 'Upload a reference image'}
             </p>
             <div className="flex gap-2">
               <Button
