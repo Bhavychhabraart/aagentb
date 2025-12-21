@@ -20,9 +20,10 @@ import { BOMAnalysisPanel } from '@/components/creation/BOMAnalysisPanel';
 import { CatalogPickerSection } from '@/components/creation/CatalogPickerSection';
 import { CatalogFurnitureItem } from '@/services/catalogService';
 import { TechnicalDrawingPanel } from '@/components/creation/TechnicalDrawingPanel';
+import { MaterialsPicker } from '@/components/creation/MaterialsPicker';
+import { MATERIALS_LIBRARY } from '@/services/materialsLibrary';
 
 const CATEGORIES = ['Seating', 'Tables', 'Storage', 'Lighting', 'Beds', 'Decor', 'Outdoor', 'Office'];
-const MATERIALS = ['Wood', 'Metal', 'Fabric', 'Leather', 'Glass', 'Marble', 'Rattan', 'Velvet'];
 const STYLES = ['Modern', 'Traditional', 'Minimalist', 'Industrial', 'Scandinavian', 'Bohemian', 'Art Deco', 'Mid-Century'];
 
 interface GenerationHistoryItem {
@@ -125,20 +126,20 @@ export default function CreateCustomFurniture() {
     setReferenceImages(prev => prev.filter((_, i) => i !== index));
   };
 
-  const toggleMaterial = (material: string) => {
-    setSelectedMaterials(prev => 
-      prev.includes(material) 
-        ? prev.filter(m => m !== material)
-        : [...prev, material]
-    );
-  };
-
   const toggleStyle = (style: string) => {
     setSelectedStyles(prev => 
       prev.includes(style) 
         ? prev.filter(s => s !== style)
         : [...prev, style]
     );
+  };
+
+  // Get material names from selected IDs for prompt building
+  const getSelectedMaterialNames = () => {
+    return selectedMaterials.map(id => {
+      const material = MATERIALS_LIBRARY.find(m => m.id === id);
+      return material?.name || id;
+    });
   };
 
   const handleCatalogItemSelect = (item: CatalogFurnitureItem) => {
@@ -160,8 +161,9 @@ export default function CreateCustomFurniture() {
       fullPrompt = `Customize this ${selectedCatalogItem.category} item (${selectedCatalogItem.name}): ${prompt}`;
     }
     
-    if (selectedMaterials.length > 0) {
-      fullPrompt += ` Materials: ${selectedMaterials.join(', ')}.`;
+    const materialNames = getSelectedMaterialNames();
+    if (materialNames.length > 0) {
+      fullPrompt += ` Materials: ${materialNames.join(', ')}.`;
     }
     if (selectedStyles.length > 0) {
       fullPrompt += ` Style: ${selectedStyles.join(', ')}.`;
@@ -475,19 +477,12 @@ export default function CreateCustomFurniture() {
 
               {/* Materials */}
               <div className="space-y-2">
-                <Label>Materials</Label>
-                <div className="flex flex-wrap gap-2">
-                  {MATERIALS.map(material => (
-                    <Badge
-                      key={material}
-                      variant={selectedMaterials.includes(material) ? 'default' : 'outline'}
-                      className="cursor-pointer transition-colors"
-                      onClick={() => toggleMaterial(material)}
-                    >
-                      {material}
-                    </Badge>
-                  ))}
-                </div>
+                <Label>Materials (100+ options)</Label>
+                <MaterialsPicker
+                  selectedMaterials={selectedMaterials}
+                  onSelectionChange={setSelectedMaterials}
+                  maxHeight="300px"
+                />
               </div>
 
               {/* Styles */}

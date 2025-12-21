@@ -17,6 +17,8 @@ import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { TechnicalDrawingPanel } from './TechnicalDrawingPanel';
+import { MaterialsPicker } from './MaterialsPicker';
+import { MATERIALS_LIBRARY } from '@/services/materialsLibrary';
 
 interface CustomFurnitureItem {
   id: string;
@@ -38,21 +40,6 @@ interface CustomFurnitureWorkspaceProps {
 }
 
 const CATEGORIES = ['Seating', 'Tables', 'Storage', 'Lighting', 'Beds', 'Decor', 'Outdoor', 'Office'];
-
-// Extended materials list with categories
-const MATERIALS = [
-  // Woods
-  'Solid Wood', 'Plywood', 'MDF', 'Particle Board', 'Veneer', 'Bamboo', 'Teak', 'Oak', 'Walnut', 'Rosewood',
-  // Metals
-  'Steel', 'Iron', 'Brass', 'Copper', 'Aluminum', 'Chrome', 'Bronze',
-  // Stone
-  'Marble', 'Granite', 'Quartz', 'Terrazzo', 'Slate', 'Sandstone', 'Onyx',
-  // Fabrics
-  'Cotton', 'Linen', 'Velvet', 'Silk', 'Jute', 'Canvas', 'Leather', 'Faux Leather',
-  // Other
-  'Glass', 'Acrylic', 'Ceramic', 'Concrete', 'Resin', 'Cane', 'Wicker', 'Rattan',
-];
-
 const STYLES = ['Modern', 'Traditional', 'Minimalist', 'Industrial', 'Scandinavian', 'Bohemian', 'Art Deco', 'Mid-Century'];
 
 interface GenerationHistoryItem {
