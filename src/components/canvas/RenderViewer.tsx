@@ -21,10 +21,11 @@ interface RenderViewerProps {
   onStartOrder?: () => void;
   onSelectiveEdit?: (region: SelectionRegion, prompt: string, catalogItem?: CatalogFurnitureItem) => void;
   onAIDirectorChange?: (prompt: string) => void;
-  onMulticamGenerate?: (view: CameraView) => void;
+  onMulticamGenerate?: (view: CameraView, customPrompt?: string) => void;
   isSelectiveEditing?: boolean;
   isMulticamGenerating?: boolean;
   multicamViews?: Record<CameraView, string | null>;
+  onSetMulticamAsMain?: (imageUrl: string) => void;
   // Render history props
   allRenders?: RenderHistoryItem[];
   currentRenderId?: string | null;
@@ -47,7 +48,8 @@ export function RenderViewer({
   onMulticamGenerate,
   isSelectiveEditing = false,
   isMulticamGenerating = false,
-  multicamViews = { perspective: null, front: null, side: null, top: null },
+  multicamViews = { perspective: null, front: null, side: null, top: null, custom: null },
+  onSetMulticamAsMain,
   allRenders = [],
   currentRenderId,
   onRenderHistorySelect,
@@ -594,6 +596,7 @@ export function RenderViewer({
             generatedViews={multicamViews}
             onSelectView={handleMulticamSelect}
             onClose={() => setShowMulticam(false)}
+            onSetAsMain={onSetMulticamAsMain}
           />
         )}
 

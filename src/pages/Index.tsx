@@ -68,6 +68,7 @@ const Index = () => {
     front: null,
     side: null,
     top: null,
+    custom: null,
   });
 
   // Redirect to auth if not logged in
@@ -1248,7 +1249,7 @@ Ready to generate a render! Describe your vision.`;
   }, [user, currentProjectId, currentRenderUrl, currentRenderId, currentUpload, addMessage, toast]);
 
   // Handle Multicam view generation
-  const handleMulticamGenerate = useCallback(async (view: CameraView) => {
+  const handleMulticamGenerate = useCallback(async (view: CameraView, customPrompt?: string) => {
     if (!user || !currentProjectId || !currentRenderUrl) return;
 
     setIsMulticamGenerating(true);
@@ -1258,6 +1259,7 @@ Ready to generate a render! Describe your vision.`;
       front: 'Render this room from a straight-on front view, facing the main focal wall',
       side: 'Render this room from a side view, showing the profile of the space',
       top: "Render this room from a bird's eye top-down view, showing the floor plan layout",
+      custom: customPrompt || 'Render this room from a custom camera angle',
     };
 
     try {
@@ -1271,7 +1273,7 @@ Ready to generate a render! Describe your vision.`;
         },
         body: JSON.stringify({
           originalImageUrl: currentRenderUrl,
-          prompt: viewPrompts[view],
+          prompt: view === 'custom' && customPrompt ? customPrompt : viewPrompts[view],
         }),
       });
 
@@ -1300,6 +1302,11 @@ Ready to generate a render! Describe your vision.`;
       setIsMulticamGenerating(false);
     }
   }, [user, currentProjectId, currentRenderUrl, addMessage, toast]);
+
+  // Handle setting a multicam view as main render
+  const handleSetMulticamAsMain = useCallback((imageUrl: string) => {
+    setCurrentRenderUrl(imageUrl);
+  }, []);
 
   // Check if undo is possible
   const canUndo = (() => {
@@ -1358,6 +1365,7 @@ Ready to generate a render! Describe your vision.`;
           isSelectiveEditing={isSelectiveEditing}
           isMulticamGenerating={isMulticamGenerating}
           multicamViews={multicamViews}
+          onSetMulticamAsMain={handleSetMulticamAsMain}
           allRenders={allRenders}
           currentRenderId={currentRenderId}
           onRenderHistorySelect={handleRenderHistorySelect}
