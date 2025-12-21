@@ -337,7 +337,7 @@ export function RenderViewer({
               </>
             )}
             {/* AI Director button */}
-            {canUseDirector && (
+            {onAIDirectorChange && (
               <>
                 <div className="w-px h-4 bg-border/50 mx-1" />
                 <Tooltip>
@@ -345,40 +345,42 @@ export function RenderViewer({
                     <Button
                       variant="ghost"
                       size="icon"
-                      onClick={() => setShowAIDirector(!showAIDirector)}
+                      onClick={canUseDirector ? () => setShowAIDirector(!showAIDirector) : undefined}
+                      disabled={!canUseDirector}
                       className={cn(
                         "h-8 w-8",
-                        showAIDirector ? "bg-primary/30 text-primary" : "hover:bg-primary/20 text-primary"
+                        showAIDirector ? "bg-primary/30 text-primary" : canUseDirector ? "hover:bg-primary/20 text-primary" : "opacity-50 cursor-not-allowed"
                       )}
                     >
                       <Wand2 className="h-4 w-4" />
                     </Button>
                   </TooltipTrigger>
                   <TooltipContent>
-                    <p>{showAIDirector ? 'Close AI Director' : 'AI Director - Quick global changes'}</p>
+                    <p>{!imageUrl ? 'Generate a render first to use AI Director' : showAIDirector ? 'Close AI Director' : 'AI Director - Quick global changes'}</p>
                   </TooltipContent>
                 </Tooltip>
               </>
             )}
             {/* Multicam button */}
-            {canUseMulticam && (
+            {onMulticamGenerate && (
               <>
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <Button
                       variant="ghost"
                       size="icon"
-                      onClick={() => setShowMulticam(!showMulticam)}
+                      onClick={canUseMulticam ? () => setShowMulticam(!showMulticam) : undefined}
+                      disabled={!canUseMulticam}
                       className={cn(
                         "h-8 w-8",
-                        showMulticam ? "bg-cyan-500/30 text-cyan-400" : "hover:bg-primary/20 text-cyan-400"
+                        showMulticam ? "bg-cyan-500/30 text-cyan-400" : canUseMulticam ? "hover:bg-primary/20 text-cyan-400" : "opacity-50 cursor-not-allowed"
                       )}
                     >
                       <Video className="h-4 w-4" />
                     </Button>
                   </TooltipTrigger>
                   <TooltipContent>
-                    <p>{showMulticam ? 'Close Multicam' : 'Multicam - Generate different views'}</p>
+                    <p>{!imageUrl ? 'Generate a render first to use Multicam' : showMulticam ? 'Close Multicam' : 'Multicam - Generate different views'}</p>
                   </TooltipContent>
                 </Tooltip>
               </>
