@@ -10,7 +10,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
 import { 
   Palette, Upload, Loader2, RefreshCw, Check, IndianRupee, ImageIcon, 
-  ZoomIn, ZoomOut, X, History, Trash2, Maximize2
+  ZoomIn, ZoomOut, X, History, Trash2, Maximize2, Share2, Download, Edit3
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
@@ -37,7 +37,21 @@ interface CustomFurnitureWorkspaceProps {
 }
 
 const CATEGORIES = ['Seating', 'Tables', 'Storage', 'Lighting', 'Beds', 'Decor', 'Outdoor', 'Office'];
-const MATERIALS = ['Wood', 'Metal', 'Fabric', 'Leather', 'Glass', 'Marble', 'Rattan', 'Velvet'];
+
+// Extended materials list with categories
+const MATERIALS = [
+  // Woods
+  'Solid Wood', 'Plywood', 'MDF', 'Particle Board', 'Veneer', 'Bamboo', 'Teak', 'Oak', 'Walnut', 'Rosewood',
+  // Metals
+  'Steel', 'Iron', 'Brass', 'Copper', 'Aluminum', 'Chrome', 'Bronze',
+  // Stone
+  'Marble', 'Granite', 'Quartz', 'Terrazzo', 'Slate', 'Sandstone', 'Onyx',
+  // Fabrics
+  'Cotton', 'Linen', 'Velvet', 'Silk', 'Jute', 'Canvas', 'Leather', 'Faux Leather',
+  // Other
+  'Glass', 'Acrylic', 'Ceramic', 'Concrete', 'Resin', 'Cane', 'Wicker', 'Rattan',
+];
+
 const STYLES = ['Modern', 'Traditional', 'Minimalist', 'Industrial', 'Scandinavian', 'Bohemian', 'Art Deco', 'Mid-Century'];
 
 interface GenerationHistoryItem {
@@ -64,6 +78,7 @@ export function CustomFurnitureWorkspace({
   const [category, setCategory] = useState('');
   const [estimatedPrice, setEstimatedPrice] = useState('');
   const [selectedMaterials, setSelectedMaterials] = useState<string[]>([]);
+  const [customMaterial, setCustomMaterial] = useState('');
   const [selectedStyles, setSelectedStyles] = useState<string[]>([]);
   const [dimensions, setDimensions] = useState({ width: '', depth: '', height: '' });
   const [colors, setColors] = useState<string[]>(['#8B4513', '#F5F5DC']);
@@ -81,6 +96,10 @@ export function CustomFurnitureWorkspace({
   const [zoom, setZoom] = useState(100);
   const [projects, setProjects] = useState<{ id: string; name: string }[]>([]);
   const [selectedProjectId, setSelectedProjectId] = useState<string>('');
+  
+  // Edit refinement state
+  const [isRefining, setIsRefining] = useState(false);
+  const [refinementPrompt, setRefinementPrompt] = useState('');
 
   useEffect(() => {
     if (user) {
@@ -121,12 +140,91 @@ export function CustomFurnitureWorkspace({
     setCategory('');
     setEstimatedPrice('');
     setSelectedMaterials([]);
+    setCustomMaterial('');
     setSelectedStyles([]);
     setDimensions({ width: '', depth: '', height: '' });
     setReferenceImages([]);
     setGeneratedImage(null);
     setGenerationHistory([]);
     setZoom(100);
+    setRefinementPrompt('');
+  };
+
+  const addCustomMaterial = () => {
+    if (customMaterial.trim() && !selectedMaterials.includes(customMaterial.trim())) {
+      setSelectedMaterials(prev => [...prev, customMaterial.trim()]);
+      setCustomMaterial('');
+    }
+  };
+
+  const handleRefinement = async () => {
+    if (!generatedImage || !refinementPrompt.trim()) return;
+    
+    setIsRefining(true);
+    try {
+      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-custom-furniture`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+        },
+        body: JSON.stringify({
+          prompt: `${prompt}. Refinement: ${refinementPrompt}`,
+          category: category || 'Furniture',
+          referenceImageUrl: generatedImage,
+        }),
+      });
+
+      if (!response.ok) throw new Error('Refinement failed');
+      
+      const { imageUrl } = await response.json();
+      setGeneratedImage(imageUrl);
+      
+      // Add to history
+      setGenerationHistory(prev => [{
+        id: Date.now().toString(),
+        imageUrl,
+        prompt: `Refined: ${refinementPrompt}`,
+        timestamp: new Date(),
+      }, ...prev].slice(0, 10));
+      
+      setRefinementPrompt('');
+      toast({ title: 'Furniture refined!' });
+    } catch (error) {
+      toast({ variant: 'destructive', title: 'Refinement failed' });
+    } finally {
+      setIsRefining(false);
+    }
+  };
+
+  const handleShare = async () => {
+    if (!generatedImage) return;
+    
+    try {
+      await navigator.clipboard.writeText(generatedImage);
+      toast({ title: 'Link copied!', description: 'Image URL copied to clipboard' });
+    } catch {
+      // Fallback: open in new tab
+      window.open(generatedImage, '_blank');
+    }
+  };
+
+  const handleDownload = async () => {
+    if (!generatedImage) return;
+    
+    try {
+      const response = await fetch(generatedImage);
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `custom-furniture-${Date.now()}.png`;
+      a.click();
+      URL.revokeObjectURL(url);
+      toast({ title: 'Downloaded!' });
+    } catch {
+      toast({ variant: 'destructive', title: 'Download failed' });
+    }
   };
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -392,18 +490,43 @@ export function CustomFurnitureWorkspace({
                   {/* Materials */}
                   <div className="space-y-2">
                     <Label>Materials</Label>
-                    <div className="flex flex-wrap gap-2">
-                      {MATERIALS.map(material => (
-                        <Badge
-                          key={material}
-                          variant={selectedMaterials.includes(material) ? 'default' : 'outline'}
-                          className="cursor-pointer"
-                          onClick={() => toggleMaterial(material)}
-                        >
-                          {material}
-                        </Badge>
-                      ))}
+                    <ScrollArea className="h-24">
+                      <div className="flex flex-wrap gap-1.5">
+                        {MATERIALS.map(material => (
+                          <Badge
+                            key={material}
+                            variant={selectedMaterials.includes(material) ? 'default' : 'outline'}
+                            className="cursor-pointer text-xs"
+                            onClick={() => toggleMaterial(material)}
+                          >
+                            {material}
+                          </Badge>
+                        ))}
+                      </div>
+                    </ScrollArea>
+                    {/* Custom material input */}
+                    <div className="flex gap-2 mt-2">
+                      <Input
+                        value={customMaterial}
+                        onChange={(e) => setCustomMaterial(e.target.value)}
+                        placeholder="Other material..."
+                        className="bg-muted/50 text-xs h-8"
+                        onKeyDown={(e) => e.key === 'Enter' && addCustomMaterial()}
+                      />
+                      <Button size="sm" variant="outline" onClick={addCustomMaterial} className="h-8">
+                        Add
+                      </Button>
                     </div>
+                    {/* Show selected custom materials */}
+                    {selectedMaterials.filter(m => !MATERIALS.includes(m)).length > 0 && (
+                      <div className="flex flex-wrap gap-1 mt-1">
+                        {selectedMaterials.filter(m => !MATERIALS.includes(m)).map(m => (
+                          <Badge key={m} variant="default" className="cursor-pointer text-xs" onClick={() => toggleMaterial(m)}>
+                            {m} ×
+                          </Badge>
+                        ))}
+                      </div>
+                    )}
                   </div>
 
                   {/* Styles */}
@@ -538,11 +661,19 @@ export function CustomFurnitureWorkspace({
                 <div className="flex items-center gap-2">
                   {generatedImage && (
                     <>
-                      <Button variant="outline" onClick={handleGenerate} disabled={isGenerating} className="gap-2">
+                      <Button variant="ghost" size="sm" onClick={handleShare} className="gap-1.5">
+                        <Share2 className="h-4 w-4" />
+                        Share
+                      </Button>
+                      <Button variant="ghost" size="sm" onClick={handleDownload} className="gap-1.5">
+                        <Download className="h-4 w-4" />
+                        Download
+                      </Button>
+                      <Button variant="outline" size="sm" onClick={handleGenerate} disabled={isGenerating || isRefining} className="gap-1.5">
                         <RefreshCw className={cn("h-4 w-4", isGenerating && "animate-spin")} />
                         Regenerate
                       </Button>
-                      <Button onClick={handleSave} disabled={isSaving} className="gap-2">
+                      <Button size="sm" onClick={handleSave} disabled={isSaving} className="gap-1.5">
                         {isSaving ? (
                           <>
                             <Loader2 className="h-4 w-4 animate-spin" />
@@ -551,7 +682,7 @@ export function CustomFurnitureWorkspace({
                         ) : (
                           <>
                             <Check className="h-4 w-4" />
-                            Save to Library
+                            Save
                           </>
                         )}
                       </Button>
@@ -575,11 +706,13 @@ export function CustomFurnitureWorkspace({
                       <p className="text-lg text-muted-foreground">Creating your furniture...</p>
                     </div>
                   ) : generatedImage ? (
-                    <img 
-                      src={generatedImage} 
-                      alt="Generated Furniture" 
-                      className="w-full h-full object-contain"
-                    />
+                    <div className="relative w-full h-full">
+                      <img 
+                        src={generatedImage} 
+                        alt="Generated Furniture" 
+                        className="w-full h-full object-contain"
+                      />
+                    </div>
                   ) : (
                     <div className="w-full h-full flex flex-col items-center justify-center text-muted-foreground">
                       <ImageIcon className="h-24 w-24 mb-4 opacity-30" />
@@ -588,6 +721,37 @@ export function CustomFurnitureWorkspace({
                     </div>
                   )}
                 </div>
+                
+                {/* Refinement Input */}
+                {generatedImage && (
+                  <div className="mt-4 w-full max-w-md">
+                    <div className="flex gap-2">
+                      <Input
+                        value={refinementPrompt}
+                        onChange={(e) => setRefinementPrompt(e.target.value)}
+                        placeholder="Refine: e.g., 'make legs thinner' or 'add brass accents'"
+                        className="flex-1"
+                        disabled={isRefining}
+                        onKeyDown={(e) => e.key === 'Enter' && handleRefinement()}
+                      />
+                      <Button 
+                        onClick={handleRefinement} 
+                        disabled={isRefining || !refinementPrompt.trim()}
+                        className="gap-2"
+                      >
+                        {isRefining ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <Edit3 className="h-4 w-4" />
+                        )}
+                        Refine
+                      </Button>
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-1 text-center">
+                      Edit the generated furniture with text prompts
+                    </p>
+                  </div>
+                )}
               </div>
             </div>
 

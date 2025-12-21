@@ -1,11 +1,12 @@
 import { useState, useEffect } from 'react';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 import { 
   FileText, Download, Loader2, RefreshCw, Package, 
-  Ruler, Palette, Wrench, IndianRupee, AlertCircle
+  Ruler, Palette, Wrench, IndianRupee, AlertCircle, Plus, Trash2, Save
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
@@ -43,6 +44,9 @@ export function BOMAnalysisPanel({ item, onClose }: BOMAnalysisPanelProps) {
   const [loading, setLoading] = useState(false);
   const [bomData, setBomData] = useState<BOMData | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editedComponents, setEditedComponents] = useState<BOMItem[]>([]);
+  const [editedLaborCost, setEditedLaborCost] = useState(0);
 
   useEffect(() => {
     if (item) {
@@ -50,14 +54,23 @@ export function BOMAnalysisPanel({ item, onClose }: BOMAnalysisPanelProps) {
     } else {
       setBomData(null);
       setError(null);
+      setIsEditing(false);
     }
   }, [item]);
+
+  useEffect(() => {
+    if (bomData) {
+      setEditedComponents([...bomData.components]);
+      setEditedLaborCost(bomData.laborCost);
+    }
+  }, [bomData]);
 
   const analyzeBOM = async () => {
     if (!item) return;
     
     setLoading(true);
     setError(null);
+    setIsEditing(false);
 
     try {
       const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/analyze-furniture-bom`, {
@@ -88,18 +101,57 @@ export function BOMAnalysisPanel({ item, onClose }: BOMAnalysisPanelProps) {
     }
   };
 
+  const calculateTotal = () => {
+    const componentsCost = editedComponents.reduce((sum, c) => sum + c.estimatedCost, 0);
+    return componentsCost + editedLaborCost;
+  };
+
+  const handleComponentChange = (index: number, field: keyof BOMItem, value: string | number) => {
+    const newComponents = [...editedComponents];
+    if (field === 'estimatedCost') {
+      newComponents[index] = { ...newComponents[index], [field]: Number(value) || 0 };
+    } else {
+      newComponents[index] = { ...newComponents[index], [field]: value };
+    }
+    setEditedComponents(newComponents);
+  };
+
+  const addComponent = () => {
+    setEditedComponents([
+      ...editedComponents,
+      { component: 'New Component', material: '', quantity: '1', estimatedCost: 0 }
+    ]);
+  };
+
+  const removeComponent = (index: number) => {
+    setEditedComponents(editedComponents.filter((_, i) => i !== index));
+  };
+
+  const saveChanges = () => {
+    if (bomData) {
+      setBomData({
+        ...bomData,
+        components: editedComponents,
+        laborCost: editedLaborCost,
+        totalEstimate: calculateTotal(),
+      });
+    }
+    setIsEditing(false);
+    toast({ title: 'BOM Updated', description: 'Changes saved successfully.' });
+  };
+
   const exportAsPDF = () => {
-    // For now, just show a toast - full PDF export could be implemented with jsPDF
     toast({ title: 'Export', description: 'BOM export feature coming soon!' });
   };
 
   const exportAsCSV = () => {
-    if (!bomData || !item) return;
+    const dataToExport = isEditing ? { components: editedComponents, laborCost: editedLaborCost } : bomData;
+    if (!dataToExport || !item) return;
 
     const headers = ['Component', 'Material', 'Quantity', 'Estimated Cost (₹)'];
-    const rows = bomData.components.map(c => [c.component, c.material, c.quantity, c.estimatedCost]);
-    rows.push(['', '', 'Labor Cost', bomData.laborCost]);
-    rows.push(['', '', 'Total Estimate', bomData.totalEstimate]);
+    const rows = dataToExport.components.map(c => [c.component, c.material, c.quantity, c.estimatedCost]);
+    rows.push(['', '', 'Labor Cost', dataToExport.laborCost]);
+    rows.push(['', '', 'Total Estimate', calculateTotal()]);
 
     const csvContent = [headers, ...rows].map(row => row.join(',')).join('\n');
     const blob = new Blob([csvContent], { type: 'text/csv' });
@@ -115,7 +167,7 @@ export function BOMAnalysisPanel({ item, onClose }: BOMAnalysisPanelProps) {
 
   return (
     <Sheet open={!!item} onOpenChange={(open) => !open && onClose()}>
-      <SheetContent className="w-[500px] sm:max-w-[500px]">
+      <SheetContent className="w-[550px] sm:max-w-[550px]">
         <SheetHeader>
           <SheetTitle className="flex items-center gap-2">
             <FileText className="h-5 w-5 text-primary" />
@@ -175,10 +227,27 @@ export function BOMAnalysisPanel({ item, onClose }: BOMAnalysisPanelProps) {
             <ScrollArea className="h-[calc(100vh-350px)]">
               {/* Components Table */}
               <div className="space-y-4">
-                <h4 className="font-medium flex items-center gap-2">
-                  <Wrench className="h-4 w-4" />
-                  Material Breakdown
-                </h4>
+                <div className="flex items-center justify-between">
+                  <h4 className="font-medium flex items-center gap-2">
+                    <Wrench className="h-4 w-4" />
+                    Material Breakdown
+                  </h4>
+                  <Button
+                    variant={isEditing ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => isEditing ? saveChanges() : setIsEditing(true)}
+                    className="gap-1.5"
+                  >
+                    {isEditing ? (
+                      <>
+                        <Save className="h-3.5 w-3.5" />
+                        Save
+                      </>
+                    ) : (
+                      'Edit BOM'
+                    )}
+                  </Button>
+                </div>
 
                 <div className="border border-border rounded-lg overflow-hidden">
                   <table className="w-full text-sm">
@@ -188,29 +257,107 @@ export function BOMAnalysisPanel({ item, onClose }: BOMAnalysisPanelProps) {
                         <th className="text-left p-3 font-medium">Material</th>
                         <th className="text-left p-3 font-medium">Qty</th>
                         <th className="text-right p-3 font-medium">Cost (₹)</th>
+                        {isEditing && <th className="w-10"></th>}
                       </tr>
                     </thead>
                     <tbody>
-                      {bomData.components.map((component, index) => (
+                      {(isEditing ? editedComponents : bomData.components).map((component, index) => (
                         <tr key={index} className="border-t border-border">
-                          <td className="p-3">{component.component}</td>
-                          <td className="p-3 text-muted-foreground">{component.material}</td>
-                          <td className="p-3">{component.quantity}</td>
-                          <td className="p-3 text-right">
-                            {component.estimatedCost.toLocaleString('en-IN')}
+                          <td className="p-2">
+                            {isEditing ? (
+                              <Input
+                                value={component.component}
+                                onChange={(e) => handleComponentChange(index, 'component', e.target.value)}
+                                className="h-8 text-sm"
+                              />
+                            ) : (
+                              <span className="px-1">{component.component}</span>
+                            )}
                           </td>
+                          <td className="p-2">
+                            {isEditing ? (
+                              <Input
+                                value={component.material}
+                                onChange={(e) => handleComponentChange(index, 'material', e.target.value)}
+                                className="h-8 text-sm"
+                              />
+                            ) : (
+                              <span className="px-1 text-muted-foreground">{component.material}</span>
+                            )}
+                          </td>
+                          <td className="p-2">
+                            {isEditing ? (
+                              <Input
+                                value={component.quantity}
+                                onChange={(e) => handleComponentChange(index, 'quantity', e.target.value)}
+                                className="h-8 text-sm w-16"
+                              />
+                            ) : (
+                              <span className="px-1">{component.quantity}</span>
+                            )}
+                          </td>
+                          <td className="p-2 text-right">
+                            {isEditing ? (
+                              <Input
+                                type="number"
+                                value={component.estimatedCost}
+                                onChange={(e) => handleComponentChange(index, 'estimatedCost', e.target.value)}
+                                className="h-8 text-sm w-24 ml-auto text-right"
+                              />
+                            ) : (
+                              <span className="px-1">{component.estimatedCost.toLocaleString('en-IN')}</span>
+                            )}
+                          </td>
+                          {isEditing && (
+                            <td className="p-2">
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-7 w-7 text-destructive hover:text-destructive"
+                                onClick={() => removeComponent(index)}
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </Button>
+                            </td>
+                          )}
                         </tr>
                       ))}
+                      
+                      {isEditing && (
+                        <tr className="border-t border-border">
+                          <td colSpan={5} className="p-2">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={addComponent}
+                              className="w-full gap-1.5 text-muted-foreground"
+                            >
+                              <Plus className="h-3.5 w-3.5" />
+                              Add Component
+                            </Button>
+                          </td>
+                        </tr>
+                      )}
+                      
                       <tr className="border-t border-border bg-muted/30">
                         <td colSpan={3} className="p-3 font-medium">Labor Cost</td>
-                        <td className="p-3 text-right">
-                          {bomData.laborCost.toLocaleString('en-IN')}
+                        <td className="p-3 text-right" colSpan={isEditing ? 2 : 1}>
+                          {isEditing ? (
+                            <Input
+                              type="number"
+                              value={editedLaborCost}
+                              onChange={(e) => setEditedLaborCost(Number(e.target.value) || 0)}
+                              className="h-8 text-sm w-24 ml-auto text-right"
+                            />
+                          ) : (
+                            bomData.laborCost.toLocaleString('en-IN')
+                          )}
                         </td>
                       </tr>
                       <tr className="border-t-2 border-border bg-primary/5">
                         <td colSpan={3} className="p-3 font-semibold">Total Estimate</td>
-                        <td className="p-3 text-right font-semibold text-primary">
-                          ₹{bomData.totalEstimate.toLocaleString('en-IN')}
+                        <td className="p-3 text-right font-semibold text-primary" colSpan={isEditing ? 2 : 1}>
+                          ₹{(isEditing ? calculateTotal() : bomData.totalEstimate).toLocaleString('en-IN')}
                         </td>
                       </tr>
                     </tbody>

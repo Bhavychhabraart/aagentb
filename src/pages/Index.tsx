@@ -430,25 +430,9 @@ const Index = () => {
     };
   };
 
-  const handleNewProject = async () => {
-    if (!user) return;
-
-    const { data, error } = await supabase
-      .from('projects')
-      .insert({ user_id: user.id, name: 'Untitled Project' })
-      .select('id')
-      .single();
-
-    if (error) {
-      toast({ variant: 'destructive', title: 'Error', description: 'Failed to create project.' });
-    } else {
-      setCurrentProjectId(data.id);
-      setMessages([]);
-      setCurrentRenderUrl(null);
-      setCurrentRenderId(null);
-      setCurrentUpload(null);
-      toast({ title: 'Project created', description: 'New project ready.' });
-    }
+  const handleNewProject = () => {
+    // Navigate to Landing page to start fresh project creation flow
+    navigate('/');
   };
 
   const handleProjectSelect = (projectId: string) => {
