@@ -162,24 +162,25 @@ export function RenderViewer({
         <div className="absolute top-[10%] right-4 z-20 flex items-center gap-2">
           <div className="flex items-center gap-1 bg-black/70 backdrop-blur-md rounded-lg border border-border/50 p-1">
             {/* Selection tool button */}
-            {canSelectArea && (
+            {onSelectiveEdit && (
               <>
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <Button
                       variant="ghost"
                       size="icon"
-                      onClick={toggleSelectionMode}
+                      onClick={canSelectArea ? toggleSelectionMode : undefined}
+                      disabled={!canSelectArea}
                       className={cn(
                         "h-8 w-8",
-                        selectionMode ? "bg-amber-500/30 text-amber-400" : "hover:bg-primary/20"
+                        selectionMode ? "bg-amber-500/30 text-amber-400" : canSelectArea ? "hover:bg-primary/20" : "opacity-50 cursor-not-allowed"
                       )}
                     >
                       <Crop className="h-4 w-4" />
                     </Button>
                   </TooltipTrigger>
                   <TooltipContent>
-                    <p>{selectionMode ? 'Exit selection mode' : 'Select area to edit'}</p>
+                    <p>{!imageUrl ? 'Generate a render first to use selection tool' : selectionMode ? 'Exit selection mode' : 'Select area to edit'}</p>
                   </TooltipContent>
                 </Tooltip>
                 <div className="w-px h-4 bg-border/50 mx-1" />
@@ -548,6 +549,9 @@ export function RenderViewer({
                     <p className="text-sm text-muted-foreground leading-relaxed">
                       Upload a room image or describe what you want to create. 
                       Your cinematic 16:9 render will appear here.
+                    </p>
+                    <p className="text-xs text-muted-foreground/70 mt-4">
+                      Editing tools like Selection, AI Director, and Multicam will be available once a render is generated.
                     </p>
                   </div>
                 </div>

@@ -1338,7 +1338,18 @@ Ready to generate a render! Describe your vision.`;
 
   // Handle layout upload from chat
   const handleLayoutUploadFromChat = useCallback(async (item: { file?: File; preview: string; name: string }) => {
-    if (!user || !currentProjectId || !item.file) return;
+    if (!user) {
+      toast({ variant: 'destructive', title: 'Error', description: 'You must be logged in to upload' });
+      return;
+    }
+    if (!currentProjectId) {
+      toast({ variant: 'destructive', title: 'Error', description: 'No project selected' });
+      return;
+    }
+    if (!item.file) {
+      toast({ variant: 'destructive', title: 'Error', description: 'No file selected' });
+      return;
+    }
     
     try {
       const fileName = `${user.id}/${currentProjectId}/${Date.now()}-${item.name}`;
@@ -1367,13 +1378,24 @@ Ready to generate a render! Describe your vision.`;
       setShowLayoutModal(false);
     } catch (error) {
       console.error('Layout upload failed:', error);
-      toast({ variant: 'destructive', title: 'Upload failed' });
+      toast({ variant: 'destructive', title: 'Upload failed', description: 'Please try again' });
     }
   }, [user, currentProjectId, addMessage, toast]);
 
   // Handle room photo upload from chat
   const handleRoomPhotoFromChat = useCallback(async (item: { file?: File; preview: string; name: string }) => {
-    if (!user || !currentProjectId || !item.file) return;
+    if (!user) {
+      toast({ variant: 'destructive', title: 'Error', description: 'You must be logged in to upload' });
+      return;
+    }
+    if (!currentProjectId) {
+      toast({ variant: 'destructive', title: 'Error', description: 'No project selected' });
+      return;
+    }
+    if (!item.file) {
+      toast({ variant: 'destructive', title: 'Error', description: 'No file selected' });
+      return;
+    }
     
     try {
       const fileName = `${user.id}/${currentProjectId}/${Date.now()}-${item.name}`;
@@ -1406,13 +1428,24 @@ Ready to generate a render! Describe your vision.`;
       }
     } catch (error) {
       console.error('Room photo upload failed:', error);
-      toast({ variant: 'destructive', title: 'Upload failed' });
+      toast({ variant: 'destructive', title: 'Upload failed', description: 'Please try again' });
     }
   }, [user, currentProjectId, addMessage, toast]);
 
   // Handle style references from chat
   const handleStyleRefsFromChat = useCallback(async (items: Array<{ file?: File; preview: string; name: string }>) => {
-    if (!user || !currentProjectId) return;
+    if (!user) {
+      toast({ variant: 'destructive', title: 'Error', description: 'You must be logged in to upload' });
+      return;
+    }
+    if (!currentProjectId) {
+      toast({ variant: 'destructive', title: 'Error', description: 'No project selected' });
+      return;
+    }
+    if (!items.length || items.every(i => !i.file)) {
+      toast({ variant: 'destructive', title: 'Error', description: 'No files selected' });
+      return;
+    }
     
     try {
       const uploadedUrls: string[] = [];
@@ -1442,18 +1475,29 @@ Ready to generate a render! Describe your vision.`;
       }
       
       setStyleRefUrls(prev => [...prev, ...uploadedUrls]);
-      await addMessage('user', `Added ${items.length} style reference${items.length > 1 ? 's' : ''}`, { type: 'upload' });
+      await addMessage('user', `Added ${uploadedUrls.length} style reference${uploadedUrls.length > 1 ? 's' : ''}`, { type: 'upload' });
       toast({ title: 'Style references added' });
       setShowStyleRefModal(false);
     } catch (error) {
       console.error('Style refs upload failed:', error);
-      toast({ variant: 'destructive', title: 'Upload failed' });
+      toast({ variant: 'destructive', title: 'Upload failed', description: 'Please try again' });
     }
   }, [user, currentProjectId, addMessage, toast]);
 
   // Handle products from chat
   const handleProductsFromChat = useCallback(async (products: ProductItem[], asCollage: boolean) => {
-    if (!user || !currentProjectId) return;
+    if (!user) {
+      toast({ variant: 'destructive', title: 'Error', description: 'You must be logged in' });
+      return;
+    }
+    if (!currentProjectId) {
+      toast({ variant: 'destructive', title: 'Error', description: 'No project selected' });
+      return;
+    }
+    if (!products.length) {
+      toast({ variant: 'destructive', title: 'Error', description: 'No products selected' });
+      return;
+    }
     
     try {
       for (const product of products) {
@@ -1473,7 +1517,7 @@ Ready to generate a render! Describe your vision.`;
       setShowProductsModal(false);
     } catch (error) {
       console.error('Products save failed:', error);
-      toast({ variant: 'destructive', title: 'Failed to save products' });
+      toast({ variant: 'destructive', title: 'Failed to save products', description: 'Please try again' });
     }
   }, [user, currentProjectId, addMessage, toast]);
 
