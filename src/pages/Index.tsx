@@ -1230,8 +1230,8 @@ Ready to generate a render! Describe your vision.`;
           'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
         },
         body: JSON.stringify({
-          originalImageUrl: currentRenderUrl,
-          prompt: prompt,
+          currentRenderUrl: currentRenderUrl,
+          userPrompt: prompt,
           // No region = global edit
         }),
       });
