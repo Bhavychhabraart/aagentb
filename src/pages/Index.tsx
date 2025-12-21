@@ -1293,8 +1293,8 @@ Ready to generate a render! Describe your vision.`;
           'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
         },
         body: JSON.stringify({
-          originalImageUrl: currentRenderUrl,
-          prompt: view === 'custom' && customPrompt ? customPrompt : viewPrompts[view],
+          currentRenderUrl: currentRenderUrl,
+          userPrompt: view === 'custom' && customPrompt ? customPrompt : viewPrompts[view],
         }),
       });
 
