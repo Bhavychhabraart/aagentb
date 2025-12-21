@@ -10,7 +10,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
 import { 
   Palette, Upload, Loader2, RefreshCw, Check, IndianRupee, ImageIcon, 
-  ZoomIn, ZoomOut, X, History, ArrowLeft, Sparkles, FileText, Package
+  ZoomIn, ZoomOut, X, History, ArrowLeft, Sparkles, FileText, Package, Ruler
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
@@ -19,6 +19,7 @@ import { cn } from '@/lib/utils';
 import { BOMAnalysisPanel } from '@/components/creation/BOMAnalysisPanel';
 import { CatalogPickerSection } from '@/components/creation/CatalogPickerSection';
 import { CatalogFurnitureItem } from '@/services/catalogService';
+import { TechnicalDrawingPanel } from '@/components/creation/TechnicalDrawingPanel';
 
 const CATEGORIES = ['Seating', 'Tables', 'Storage', 'Lighting', 'Beds', 'Decor', 'Outdoor', 'Office'];
 const MATERIALS = ['Wood', 'Metal', 'Fabric', 'Leather', 'Glass', 'Marble', 'Rattan', 'Velvet'];
@@ -681,17 +682,21 @@ export default function CreateCustomFurniture() {
           </div>
         </div>
 
-        {/* Right Panel - History & BOM */}
+        {/* Right Panel - History, BOM & Technical Drawings */}
         <div className="w-80 border-l border-border flex flex-col bg-card/50">
           <Tabs value={activeRightTab} onValueChange={setActiveRightTab} className="flex flex-col h-full">
-            <TabsList className="grid grid-cols-2 m-4">
-              <TabsTrigger value="preview" className="gap-1">
-                <History className="h-4 w-4" />
+            <TabsList className="grid grid-cols-3 m-4">
+              <TabsTrigger value="preview" className="gap-1 text-xs px-2">
+                <History className="h-3 w-3" />
                 History
               </TabsTrigger>
-              <TabsTrigger value="bom" className="gap-1">
-                <FileText className="h-4 w-4" />
+              <TabsTrigger value="bom" className="gap-1 text-xs px-2">
+                <FileText className="h-3 w-3" />
                 BOM
+              </TabsTrigger>
+              <TabsTrigger value="drawings" className="gap-1 text-xs px-2">
+                <Ruler className="h-3 w-3" />
+                Drawings
               </TabsTrigger>
             </TabsList>
 
@@ -752,6 +757,22 @@ export default function CreateCustomFurniture() {
                 <div className="flex flex-col items-center justify-center h-full p-6 text-center text-muted-foreground">
                   <FileText className="h-12 w-12 mb-4 opacity-50" />
                   <p className="text-sm">Generate furniture to see BOM analysis</p>
+                </div>
+              )}
+            </TabsContent>
+
+            <TabsContent value="drawings" className="flex-1 m-0 overflow-hidden">
+              {generatedImage ? (
+                <TechnicalDrawingPanel
+                  furnitureImage={generatedImage}
+                  furnitureName={name || prompt.slice(0, 30) || 'Custom Furniture'}
+                  dimensions={dimensions}
+                  materials={selectedMaterials}
+                />
+              ) : (
+                <div className="flex flex-col items-center justify-center h-full p-6 text-center text-muted-foreground">
+                  <Ruler className="h-12 w-12 mb-4 opacity-50" />
+                  <p className="text-sm">Generate furniture to create technical drawings</p>
                 </div>
               )}
             </TabsContent>
