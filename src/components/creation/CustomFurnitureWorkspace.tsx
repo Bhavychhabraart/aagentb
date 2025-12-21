@@ -10,12 +10,13 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
 import { 
   Palette, Upload, Loader2, RefreshCw, Check, IndianRupee, ImageIcon, 
-  ZoomIn, ZoomOut, X, History, Trash2, Maximize2, Share2, Download, Edit3
+  ZoomIn, ZoomOut, X, History, Trash2, Maximize2, Share2, Download, Edit3, Ruler
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
+import { TechnicalDrawingPanel } from './TechnicalDrawingPanel';
 
 interface CustomFurnitureItem {
   id: string;
@@ -755,51 +756,71 @@ export function CustomFurnitureWorkspace({
               </div>
             </div>
 
-            {/* Right Panel - History */}
+            {/* Right Panel - History & Drawings Tabs */}
             <div className="w-72 border-l border-border flex flex-col">
-              <div className="px-4 py-3 border-b border-border">
-                <h3 className="font-medium flex items-center gap-2">
-                  <History className="h-4 w-4" />
-                  Generation History
-                </h3>
-              </div>
-              <ScrollArea className="flex-1">
-                {generationHistory.length === 0 ? (
-                  <div className="p-4 text-center text-muted-foreground">
-                    <History className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                    <p className="text-sm">No generations yet</p>
-                  </div>
-                ) : (
-                  <div className="p-2 space-y-2">
-                    {generationHistory.map(item => (
-                      <button
-                        key={item.id}
-                        onClick={() => selectFromHistory(item)}
-                        className={cn(
-                          'w-full rounded-lg overflow-hidden border-2 transition-colors',
-                          generatedImage === item.imageUrl 
-                            ? 'border-primary' 
-                            : 'border-border hover:border-primary/50'
-                        )}
-                      >
-                        <img 
-                          src={item.imageUrl} 
-                          alt="Generation" 
-                          className="w-full aspect-square object-cover"
-                        />
-                        <div className="p-2 text-left bg-card">
-                          <p className="text-xs text-muted-foreground line-clamp-1">
-                            {item.prompt}
-                          </p>
-                          <p className="text-[10px] text-muted-foreground/70 mt-1">
-                            {item.timestamp.toLocaleTimeString()}
-                          </p>
-                        </div>
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </ScrollArea>
+              <Tabs defaultValue="history" className="flex flex-col h-full">
+                <div className="px-4 py-2 border-b border-border">
+                  <TabsList className="grid w-full grid-cols-2">
+                    <TabsTrigger value="history" className="text-xs gap-1.5">
+                      <History className="h-3.5 w-3.5" />
+                      History
+                    </TabsTrigger>
+                    <TabsTrigger value="drawings" className="text-xs gap-1.5">
+                      <Ruler className="h-3.5 w-3.5" />
+                      Drawings
+                    </TabsTrigger>
+                  </TabsList>
+                </div>
+                
+                <TabsContent value="history" className="flex-1 m-0 overflow-hidden">
+                  <ScrollArea className="h-full">
+                    {generationHistory.length === 0 ? (
+                      <div className="p-4 text-center text-muted-foreground">
+                        <History className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                        <p className="text-sm">No generations yet</p>
+                      </div>
+                    ) : (
+                      <div className="p-2 space-y-2">
+                        {generationHistory.map(item => (
+                          <button
+                            key={item.id}
+                            onClick={() => selectFromHistory(item)}
+                            className={cn(
+                              'w-full rounded-lg overflow-hidden border-2 transition-colors',
+                              generatedImage === item.imageUrl 
+                                ? 'border-primary' 
+                                : 'border-border hover:border-primary/50'
+                            )}
+                          >
+                            <img 
+                              src={item.imageUrl} 
+                              alt="Generation" 
+                              className="w-full aspect-square object-cover"
+                            />
+                            <div className="p-2 text-left bg-card">
+                              <p className="text-xs text-muted-foreground line-clamp-1">
+                                {item.prompt}
+                              </p>
+                              <p className="text-[10px] text-muted-foreground/70 mt-1">
+                                {item.timestamp.toLocaleTimeString()}
+                              </p>
+                            </div>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </ScrollArea>
+                </TabsContent>
+                
+                <TabsContent value="drawings" className="flex-1 m-0 overflow-hidden">
+                  <TechnicalDrawingPanel
+                    furnitureImage={generatedImage}
+                    furnitureName={name || 'Custom Furniture'}
+                    dimensions={dimensions}
+                    materials={selectedMaterials}
+                  />
+                </TabsContent>
+              </Tabs>
             </div>
           </div>
         </div>
