@@ -246,11 +246,20 @@ export function CustomFurnitureWorkspace({
     );
   };
 
+  // Get material names from selected IDs for prompt building
+  const getSelectedMaterialNames = () => {
+    return selectedMaterials.map(id => {
+      const material = MATERIALS_LIBRARY.find(m => m.id === id);
+      return material?.name || id;
+    });
+  };
+
   const buildPrompt = () => {
     let fullPrompt = prompt;
     
-    if (selectedMaterials.length > 0) {
-      fullPrompt += ` Materials: ${selectedMaterials.join(', ')}.`;
+    const materialNames = getSelectedMaterialNames();
+    if (materialNames.length > 0) {
+      fullPrompt += ` Materials: ${materialNames.join(', ')}.`;
     }
     if (selectedStyles.length > 0) {
       fullPrompt += ` Style: ${selectedStyles.join(', ')}.`;
@@ -477,44 +486,12 @@ export function CustomFurnitureWorkspace({
 
                   {/* Materials */}
                   <div className="space-y-2">
-                    <Label>Materials</Label>
-                    <ScrollArea className="h-24">
-                      <div className="flex flex-wrap gap-1.5">
-                        {MATERIALS.map(material => (
-                          <Badge
-                            key={material}
-                            variant={selectedMaterials.includes(material) ? 'default' : 'outline'}
-                            className="cursor-pointer text-xs"
-                            onClick={() => toggleMaterial(material)}
-                          >
-                            {material}
-                          </Badge>
-                        ))}
-                      </div>
-                    </ScrollArea>
-                    {/* Custom material input */}
-                    <div className="flex gap-2 mt-2">
-                      <Input
-                        value={customMaterial}
-                        onChange={(e) => setCustomMaterial(e.target.value)}
-                        placeholder="Other material..."
-                        className="bg-muted/50 text-xs h-8"
-                        onKeyDown={(e) => e.key === 'Enter' && addCustomMaterial()}
-                      />
-                      <Button size="sm" variant="outline" onClick={addCustomMaterial} className="h-8">
-                        Add
-                      </Button>
-                    </div>
-                    {/* Show selected custom materials */}
-                    {selectedMaterials.filter(m => !MATERIALS.includes(m)).length > 0 && (
-                      <div className="flex flex-wrap gap-1 mt-1">
-                        {selectedMaterials.filter(m => !MATERIALS.includes(m)).map(m => (
-                          <Badge key={m} variant="default" className="cursor-pointer text-xs" onClick={() => toggleMaterial(m)}>
-                            {m} ×
-                          </Badge>
-                        ))}
-                      </div>
-                    )}
+                    <Label>Materials (100+ options)</Label>
+                    <MaterialsPicker
+                      selectedMaterials={selectedMaterials}
+                      onSelectionChange={setSelectedMaterials}
+                      maxHeight="250px"
+                    />
                   </div>
 
                   {/* Styles */}
