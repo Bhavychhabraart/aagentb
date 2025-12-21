@@ -33,7 +33,8 @@ interface PhotoStudioProps {
   vendorId: string;
 }
 
-const SOLO_TEMPLATES = [
+// Classic Solo Templates
+const SOLO_CLASSIC_TEMPLATES = [
   { id: "white-studio", name: "White Studio", description: "Pure white seamless background, soft shadows", preview: "bg-white" },
   { id: "black-studio", name: "Black Studio", description: "Dramatic black backdrop, rim lighting", preview: "bg-black" },
   { id: "gradient-gray", name: "Gradient Gray", description: "Subtle gray gradient, professional catalog style", preview: "bg-gradient-to-b from-gray-200 to-gray-400" },
@@ -48,7 +49,27 @@ const SOLO_TEMPLATES = [
   { id: "detail-focus", name: "Detail Focus", description: "Extreme close-up on textures", preview: "bg-gradient-to-br from-neutral-100 to-neutral-300" },
 ];
 
-const MODEL_TEMPLATES = [
+// Artistic Warm Tone Templates
+const SOLO_ARTISTIC_TEMPLATES = [
+  { id: "terracotta-studio", name: "Terracotta Studio", description: "Rich terracotta/burnt orange, warm dramatic lighting", preview: "bg-gradient-to-br from-orange-600 to-amber-700" },
+  { id: "chocolate-moody", name: "Chocolate Moody", description: "Deep chocolate brown, sculptural shadows", preview: "bg-gradient-to-br from-amber-900 to-stone-800" },
+  { id: "amber-glow", name: "Amber Glow", description: "Golden amber gradient, warm sculptural lighting", preview: "bg-gradient-to-br from-amber-500 to-orange-600" },
+  { id: "ochre-earth", name: "Ochre Earth", description: "Earthy ochre/mustard tones, natural warmth", preview: "bg-gradient-to-br from-yellow-600 to-amber-600" },
+  { id: "raw-wood-surface", name: "Raw Wood Surface", description: "Live-edge wood slab, organic styling", preview: "bg-gradient-to-br from-amber-800 to-yellow-900" },
+  { id: "sculptural-shadow", name: "Sculptural Shadow", description: "Dramatic side lighting, deep shadows", preview: "bg-gradient-to-br from-stone-600 to-stone-800" },
+  { id: "artisan-detail", name: "Artisan Detail", description: "Macro on wood grain, craftsmanship focus", preview: "bg-gradient-to-br from-amber-700 to-orange-800" },
+  { id: "resin-art-surface", name: "Resin Art Surface", description: "Epoxy resin with natural wood patterns", preview: "bg-gradient-to-br from-amber-400 to-teal-600" },
+  { id: "leather-backdrop", name: "Leather Backdrop", description: "Rich cognac leather texture background", preview: "bg-gradient-to-br from-orange-800 to-amber-900" },
+  { id: "desert-warmth", name: "Desert Warmth", description: "Sand/terracotta gradient, minimalist", preview: "bg-gradient-to-br from-orange-200 to-amber-400" },
+  { id: "museum-display", name: "Museum Display", description: "Gallery-style pedestal presentation", preview: "bg-gradient-to-br from-stone-100 to-stone-300" },
+  { id: "organic-forms", name: "Organic Forms", description: "Curved surfaces, flowing shapes emphasized", preview: "bg-gradient-to-br from-stone-400 to-amber-500" },
+];
+
+// All Solo Templates Combined
+const SOLO_TEMPLATES = [...SOLO_CLASSIC_TEMPLATES, ...SOLO_ARTISTIC_TEMPLATES];
+
+// Classic Model/Lifestyle Templates
+const MODEL_CLASSIC_TEMPLATES = [
   { id: "modern-living-room", name: "Modern Living Room", description: "Model interacting in contemporary living space", preview: "bg-gradient-to-br from-slate-200 to-slate-400" },
   { id: "cozy-bedroom", name: "Cozy Bedroom", description: "Warm, inviting bedroom setting", preview: "bg-gradient-to-br from-amber-100 to-orange-200" },
   { id: "home-office", name: "Home Office", description: "Professional work-from-home environment", preview: "bg-gradient-to-br from-blue-100 to-indigo-200" },
@@ -63,6 +84,25 @@ const MODEL_TEMPLATES = [
   { id: "coastal-home", name: "Coastal Home", description: "Beach house, natural light", preview: "bg-gradient-to-br from-cyan-100 to-blue-200" },
   { id: "traditional-indian", name: "Traditional Indian", description: "Indian home interior styling", preview: "bg-gradient-to-br from-orange-300 to-amber-400" },
 ];
+
+// Editorial Warm Tone Templates with Models
+const MODEL_EDITORIAL_TEMPLATES = [
+  { id: "warm-editorial", name: "Warm Editorial", description: "Model seated, warm brown studio, editorial pose", preview: "bg-gradient-to-br from-orange-700 to-amber-800" },
+  { id: "sculptural-interaction", name: "Sculptural Interaction", description: "Model touching furniture as art piece", preview: "bg-gradient-to-br from-amber-800 to-stone-700" },
+  { id: "intimate-moment", name: "Intimate Moment", description: "Casual seated pose, warm intimate lighting", preview: "bg-gradient-to-br from-orange-600 to-rose-700" },
+  { id: "fashion-forward", name: "Fashion Forward", description: "Designer outfit with furniture as prop", preview: "bg-gradient-to-br from-stone-700 to-amber-700" },
+  { id: "contemplative-pose", name: "Contemplative Pose", description: "Thoughtful position, sculptural composition", preview: "bg-gradient-to-br from-amber-600 to-orange-700" },
+  { id: "artisan-workshop", name: "Artisan Workshop", description: "Model examining craftsmanship details", preview: "bg-gradient-to-br from-yellow-800 to-amber-900" },
+  { id: "books-and-style", name: "Books & Style", description: "Model with books/accessories on furniture", preview: "bg-gradient-to-br from-stone-600 to-amber-700" },
+  { id: "warm-earth-tones", name: "Warm Earth Tones", description: "Terracotta setting, lifestyle editorial", preview: "bg-gradient-to-br from-orange-500 to-red-600" },
+  { id: "tropical-accent", name: "Tropical Accent", description: "Furniture with plant accents, model in scene", preview: "bg-gradient-to-br from-green-600 to-amber-600" },
+  { id: "heritage-craftsmanship", name: "Heritage Craft", description: "Indian artisan aesthetic, traditional meets modern", preview: "bg-gradient-to-br from-amber-600 to-orange-700" },
+  { id: "fabric-draped", name: "Fabric Draped", description: "Luxurious throw on furniture with model", preview: "bg-gradient-to-br from-rose-600 to-amber-600" },
+  { id: "golden-hour-interior", name: "Golden Hour Interior", description: "Warm sunset light flooding interior", preview: "bg-gradient-to-br from-yellow-500 to-orange-500" },
+];
+
+// All Model Templates Combined
+const MODEL_TEMPLATES = [...MODEL_CLASSIC_TEMPLATES, ...MODEL_EDITORIAL_TEMPLATES];
 
 export function PhotoStudio({ products, vendorId }: PhotoStudioProps) {
   const [selectedProduct, setSelectedProduct] = useState<VendorProduct | null>(null);
@@ -279,7 +319,7 @@ export function PhotoStudio({ products, vendorId }: PhotoStudioProps) {
               <p className="text-sm text-muted-foreground">
                 Clean studio backgrounds, professional product photography
               </p>
-              <Badge variant="secondary" className="mt-3">12 templates</Badge>
+              <Badge variant="secondary" className="mt-3">24 templates</Badge>
             </div>
             <div
               onClick={() => {
@@ -298,7 +338,7 @@ export function PhotoStudio({ products, vendorId }: PhotoStudioProps) {
               <p className="text-sm text-muted-foreground">
                 Lifestyle photography with models in real settings
               </p>
-              <Badge variant="secondary" className="mt-3">13 templates</Badge>
+              <Badge variant="secondary" className="mt-3">25 templates</Badge>
             </div>
           </div>
         </CardContent>
