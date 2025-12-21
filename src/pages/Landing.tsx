@@ -433,6 +433,7 @@ export default function Landing() {
           setActiveModal(null);
         }}
         currentProducts={session.products}
+        userId={user?.id}
       />
     </div>
   );
