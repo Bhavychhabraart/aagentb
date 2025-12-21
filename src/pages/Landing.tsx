@@ -442,8 +442,9 @@ export default function Landing() {
       <ProductPickerModal
         open={activeModal === "products"}
         onOpenChange={(open) => !open && setActiveModal(null)}
-        onSave={(products) => {
+        onSave={(products, asCollage) => {
           setSession((prev) => ({ ...prev, products }));
+          // TODO: Handle asCollage flag for generation
           setActiveModal(null);
         }}
         currentProducts={session.products}

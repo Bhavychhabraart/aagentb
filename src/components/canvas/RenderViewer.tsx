@@ -318,6 +318,30 @@ export function RenderViewer({
                 </Tooltip>
               </>
             )}
+            {/* AI Director button */}
+            {canUseDirector && (
+              <>
+                <div className="w-px h-4 bg-border/50 mx-1" />
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => setShowAIDirector(!showAIDirector)}
+                      className={cn(
+                        "h-8 w-8",
+                        showAIDirector ? "bg-primary/30 text-primary" : "hover:bg-primary/20 text-primary"
+                      )}
+                    >
+                      <Wand2 className="h-4 w-4" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>{showAIDirector ? 'Close AI Director' : 'AI Director - Quick global changes'}</p>
+                  </TooltipContent>
+                </Tooltip>
+              </>
+            )}
             <Button
               variant="ghost"
               size="icon"
@@ -512,8 +536,20 @@ export function RenderViewer({
           </div>
         )}
 
+        {/* AI Director Panel */}
+        {showAIDirector && onAIDirectorChange && !selectionMode && (
+          <AIDirectorPanel
+            onApplyChange={(prompt) => {
+              onAIDirectorChange(prompt);
+              setShowAIDirector(false);
+            }}
+            onClose={() => setShowAIDirector(false)}
+            isProcessing={isSelectiveEditing || isGenerating}
+          />
+        )}
+
         {/* Render History Carousel */}
-        {allRenders.length > 1 && onRenderHistorySelect && !showComparison && !selectionMode && !isGenerating && !isSelectiveEditing && (
+        {allRenders.length > 1 && onRenderHistorySelect && !showComparison && !selectionMode && !isGenerating && !isSelectiveEditing && !showAIDirector && (
           <RenderHistoryCarousel
             renders={allRenders}
             currentRenderId={currentRenderId || null}
