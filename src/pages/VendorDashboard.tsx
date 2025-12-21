@@ -2,15 +2,16 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Package, ShoppingCart, BarChart3, Plus, ArrowLeft, IndianRupee, Camera } from 'lucide-react';
+import { Package, ShoppingCart, BarChart3, Plus, IndianRupee } from 'lucide-react';
 import { AddProductModal } from '@/components/vendor/AddProductModal';
 import { ProductCard } from '@/components/vendor/ProductCard';
 import { VendorOrdersTable } from '@/components/vendor/VendorOrdersTable';
 import { VendorAnalytics } from '@/components/vendor/VendorAnalytics';
 import { PhotoStudio } from '@/components/vendor/PhotoStudio';
+import { VendorSidebar } from '@/components/vendor/VendorSidebar';
 
 interface VendorProduct {
   id: string;
@@ -24,6 +25,15 @@ interface VendorProduct {
   created_at: string;
 }
 
+type VendorSection = 'products' | 'studio' | 'orders' | 'analytics';
+
+const sectionTitles: Record<VendorSection, { title: string; description: string }> = {
+  products: { title: 'Products', description: 'Manage your product catalog' },
+  studio: { title: 'Photo Studio', description: 'Create AI-powered product photos' },
+  orders: { title: 'Orders', description: 'Track and manage customer orders' },
+  analytics: { title: 'Analytics', description: 'View your sales performance' },
+};
+
 export default function VendorDashboard() {
   const { user, loading: authLoading, userRole } = useAuth();
   const navigate = useNavigate();
@@ -31,6 +41,7 @@ export default function VendorDashboard() {
   const [loading, setLoading] = useState(true);
   const [showAddModal, setShowAddModal] = useState(false);
   const [editingProduct, setEditingProduct] = useState<VendorProduct | null>(null);
+  const [activeSection, setActiveSection] = useState<VendorSection>('products');
 
   // Stats
   const [stats, setStats] = useState({
@@ -151,132 +162,113 @@ export default function VendorDashboard() {
     );
   }
 
+  const currentSection = sectionTitles[activeSection];
+
   return (
-    <div className="min-h-screen bg-background">
-      {/* Header */}
-      <header className="border-b border-border bg-card/50 backdrop-blur-sm sticky top-0 z-10">
-        <div className="container mx-auto px-4 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <Button variant="ghost" size="icon" onClick={() => navigate('/')}>
-              <ArrowLeft className="h-5 w-5" />
-            </Button>
-            <div>
-              <h1 className="text-xl font-semibold">Vendor Dashboard</h1>
-              <p className="text-sm text-muted-foreground">Manage your products and orders</p>
-            </div>
-          </div>
-          <Button onClick={() => setShowAddModal(true)} className="gap-2">
-            <Plus className="h-4 w-4" />
-            Add Product
-          </Button>
-        </div>
-      </header>
+    <SidebarProvider>
+      <div className="min-h-screen flex w-full bg-background">
+        <VendorSidebar
+          activeSection={activeSection}
+          onSectionChange={setActiveSection}
+          onAddProduct={() => setShowAddModal(true)}
+        />
 
-      <main className="container mx-auto px-4 py-6">
-        {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-          <Card>
-            <CardHeader className="pb-2">
-              <CardDescription>Total Products</CardDescription>
-              <CardTitle className="text-2xl flex items-center gap-2">
-                <Package className="h-5 w-5 text-primary" />
-                {stats.totalProducts}
-              </CardTitle>
-            </CardHeader>
-          </Card>
-          <Card>
-            <CardHeader className="pb-2">
-              <CardDescription>Active Products</CardDescription>
-              <CardTitle className="text-2xl flex items-center gap-2">
-                <Package className="h-5 w-5 text-green-500" />
-                {stats.activeProducts}
-              </CardTitle>
-            </CardHeader>
-          </Card>
-          <Card>
-            <CardHeader className="pb-2">
-              <CardDescription>Orders</CardDescription>
-              <CardTitle className="text-2xl flex items-center gap-2">
-                <ShoppingCart className="h-5 w-5 text-blue-500" />
-                {stats.totalOrders}
-              </CardTitle>
-            </CardHeader>
-          </Card>
-          <Card>
-            <CardHeader className="pb-2">
-              <CardDescription>Revenue</CardDescription>
-              <CardTitle className="text-2xl flex items-center gap-2">
-                <IndianRupee className="h-5 w-5 text-yellow-500" />
-                {stats.totalRevenue.toLocaleString('en-IN')}
-              </CardTitle>
-            </CardHeader>
-          </Card>
-        </div>
-
-        {/* Tabs */}
-        <Tabs defaultValue="products" className="space-y-4">
-          <TabsList>
-            <TabsTrigger value="products" className="gap-2">
-              <Package className="h-4 w-4" />
-              Products
-            </TabsTrigger>
-            <TabsTrigger value="studio" className="gap-2">
-              <Camera className="h-4 w-4" />
-              Photo Studio
-            </TabsTrigger>
-            <TabsTrigger value="orders" className="gap-2">
-              <ShoppingCart className="h-4 w-4" />
-              Orders
-            </TabsTrigger>
-            <TabsTrigger value="analytics" className="gap-2">
-              <BarChart3 className="h-4 w-4" />
-              Analytics
-            </TabsTrigger>
-          </TabsList>
-
-          <TabsContent value="products">
-            {products.length === 0 ? (
-              <Card>
-                <CardContent className="py-12 text-center">
-                  <Package className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-                  <h3 className="text-lg font-medium mb-2">No products yet</h3>
-                  <p className="text-muted-foreground mb-4">
-                    Add your first product to start selling in the marketplace.
-                  </p>
-                  <Button onClick={() => setShowAddModal(true)} className="gap-2">
-                    <Plus className="h-4 w-4" />
-                    Add Product
-                  </Button>
-                </CardContent>
-              </Card>
-            ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                {products.map(product => (
-                  <ProductCard
-                    key={product.id}
-                    product={product}
-                    onEdit={() => handleEditProduct(product)}
-                    onDelete={() => handleDeleteProduct(product.id)}
-                    onToggleActive={isActive => handleToggleActive(product.id, isActive)}
-                  />
-                ))}
+        <div className="flex-1 flex flex-col min-w-0">
+          {/* Header */}
+          <header className="border-b border-border bg-card/50 backdrop-blur-sm sticky top-0 z-10">
+            <div className="px-4 py-4 flex items-center gap-4">
+              <SidebarTrigger />
+              <div>
+                <h1 className="text-xl font-semibold">{currentSection.title}</h1>
+                <p className="text-sm text-muted-foreground">{currentSection.description}</p>
               </div>
+            </div>
+          </header>
+
+          <main className="flex-1 p-6 overflow-auto">
+            {/* Stats Cards */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardDescription>Total Products</CardDescription>
+                  <CardTitle className="text-2xl flex items-center gap-2">
+                    <Package className="h-5 w-5 text-primary" />
+                    {stats.totalProducts}
+                  </CardTitle>
+                </CardHeader>
+              </Card>
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardDescription>Active Products</CardDescription>
+                  <CardTitle className="text-2xl flex items-center gap-2">
+                    <Package className="h-5 w-5 text-green-500" />
+                    {stats.activeProducts}
+                  </CardTitle>
+                </CardHeader>
+              </Card>
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardDescription>Orders</CardDescription>
+                  <CardTitle className="text-2xl flex items-center gap-2">
+                    <ShoppingCart className="h-5 w-5 text-blue-500" />
+                    {stats.totalOrders}
+                  </CardTitle>
+                </CardHeader>
+              </Card>
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardDescription>Revenue</CardDescription>
+                  <CardTitle className="text-2xl flex items-center gap-2">
+                    <IndianRupee className="h-5 w-5 text-yellow-500" />
+                    {stats.totalRevenue.toLocaleString('en-IN')}
+                  </CardTitle>
+                </CardHeader>
+              </Card>
+            </div>
+
+            {/* Section Content */}
+            {activeSection === 'products' && (
+              <>
+                {products.length === 0 ? (
+                  <Card>
+                    <CardContent className="py-12 text-center">
+                      <Package className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+                      <h3 className="text-lg font-medium mb-2">No products yet</h3>
+                      <p className="text-muted-foreground mb-4">
+                        Add your first product to start selling in the marketplace.
+                      </p>
+                      <Button onClick={() => setShowAddModal(true)} className="gap-2">
+                        <Plus className="h-4 w-4" />
+                        Add Product
+                      </Button>
+                    </CardContent>
+                  </Card>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                    {products.map(product => (
+                      <ProductCard
+                        key={product.id}
+                        product={product}
+                        onEdit={() => handleEditProduct(product)}
+                        onDelete={() => handleDeleteProduct(product.id)}
+                        onToggleActive={isActive => handleToggleActive(product.id, isActive)}
+                      />
+                    ))}
+                  </div>
+                )}
+              </>
             )}
-          </TabsContent>
 
-          <TabsContent value="studio">
-            <PhotoStudio products={products} vendorId={user?.id || ''} />
-          </TabsContent>
+            {activeSection === 'studio' && (
+              <PhotoStudio products={products} vendorId={user?.id || ''} />
+            )}
 
-          <TabsContent value="orders">
-            <VendorOrdersTable />
-          </TabsContent>
+            {activeSection === 'orders' && <VendorOrdersTable />}
 
-          <TabsContent value="analytics">
-            <VendorAnalytics stats={stats} />
-          </TabsContent>
-        </Tabs>
-      </main>
+            {activeSection === 'analytics' && <VendorAnalytics stats={stats} />}
+          </main>
+        </div>
+      </div>
 
       {/* Add/Edit Product Modal */}
       <AddProductModal
@@ -288,6 +280,6 @@ export default function VendorDashboard() {
         onSuccess={handleProductAdded}
         editingProduct={editingProduct}
       />
-    </div>
+    </SidebarProvider>
   );
 }
