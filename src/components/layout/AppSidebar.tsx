@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Plus, FolderOpen, LogOut, User, MoreHorizontal, Pencil, Trash2, Check, X, LayoutDashboard, Store, Palette, Grid3X3 } from 'lucide-react';
+import { Plus, FolderOpen, LogOut, User, MoreHorizontal, Pencil, Trash2, Check, X, LayoutDashboard, Store, Palette, Grid3X3, ChevronDown, ChevronRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -22,10 +22,16 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from '@/components/ui/collapsible';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
+import { RoomListPanel } from './RoomListPanel';
 
 interface Project {
   id: string;
@@ -35,11 +41,13 @@ interface Project {
 
 interface AppSidebarProps {
   currentProjectId: string | null;
+  currentRoomId: string | null;
   onProjectSelect: (projectId: string) => void;
+  onRoomSelect: (roomId: string) => void;
   onNewProject: () => void;
 }
 
-export function AppSidebar({ currentProjectId, onProjectSelect, onNewProject }: AppSidebarProps) {
+export function AppSidebar({ currentProjectId, currentRoomId, onProjectSelect, onRoomSelect, onNewProject }: AppSidebarProps) {
   const { user, userRole, signOut } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -49,6 +57,14 @@ export function AppSidebar({ currentProjectId, onProjectSelect, onNewProject }: 
   const [editingName, setEditingName] = useState('');
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [projectToDelete, setProjectToDelete] = useState<Project | null>(null);
+  const [expandedProjects, setExpandedProjects] = useState<Set<string>>(new Set());
+
+  // Auto-expand current project
+  useEffect(() => {
+    if (currentProjectId) {
+      setExpandedProjects(prev => new Set([...prev, currentProjectId]));
+    }
+  }, [currentProjectId]);
 
   useEffect(() => {
     if (user) {
@@ -74,6 +90,18 @@ export function AppSidebar({ currentProjectId, onProjectSelect, onNewProject }: 
       setProjects(data || []);
     }
     setLoading(false);
+  };
+
+  const toggleProjectExpanded = (projectId: string) => {
+    setExpandedProjects(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(projectId)) {
+        newSet.delete(projectId);
+      } else {
+        newSet.add(projectId);
+      }
+      return newSet;
+    });
   };
 
   const handleSignOut = async () => {
@@ -231,87 +259,115 @@ export function AppSidebar({ currentProjectId, onProjectSelect, onNewProject }: 
             ) : (
               <div className="space-y-1 p-1">
                 {projects.map((project) => (
-                  <div
+                  <Collapsible
                     key={project.id}
-                    className={cn(
-                      'group flex items-center gap-1 rounded-md transition-colors',
-                      currentProjectId === project.id
-                        ? 'bg-sidebar-accent'
-                        : 'hover:bg-sidebar-accent/50'
-                    )}
+                    open={expandedProjects.has(project.id)}
+                    onOpenChange={() => toggleProjectExpanded(project.id)}
                   >
-                    {editingId === project.id ? (
-                      <div className="flex-1 flex items-center gap-1 p-1">
-                        <Input
-                          value={editingName}
-                          onChange={(e) => setEditingName(e.target.value)}
-                          onKeyDown={handleKeyDown}
-                          onBlur={saveProjectName}
-                          autoFocus
-                          className="h-8 text-sm"
-                        />
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-7 w-7 shrink-0"
-                          onClick={saveProjectName}
-                        >
-                          <Check className="h-3.5 w-3.5 text-success" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-7 w-7 shrink-0"
-                          onClick={cancelEditing}
-                        >
-                          <X className="h-3.5 w-3.5" />
-                        </Button>
-                      </div>
-                    ) : (
-                      <>
-                        <button
-                          onClick={() => onProjectSelect(project.id)}
-                          className={cn(
-                            'flex-1 text-left px-3 py-2 text-sm transition-colors',
-                            currentProjectId === project.id
-                              ? 'text-sidebar-accent-foreground'
-                              : 'text-sidebar-foreground'
-                          )}
-                        >
-                          <span className="block truncate">{project.name}</span>
-                        </button>
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className={cn(
-                                'h-7 w-7 shrink-0 mr-1',
-                                'opacity-0 group-hover:opacity-100 transition-opacity',
-                                currentProjectId === project.id && 'opacity-100'
+                    <div
+                      className={cn(
+                        'group flex items-center gap-1 rounded-md transition-colors',
+                        currentProjectId === project.id
+                          ? 'bg-sidebar-accent'
+                          : 'hover:bg-sidebar-accent/50'
+                      )}
+                    >
+                      {editingId === project.id ? (
+                        <div className="flex-1 flex items-center gap-1 p-1">
+                          <Input
+                            value={editingName}
+                            onChange={(e) => setEditingName(e.target.value)}
+                            onKeyDown={handleKeyDown}
+                            onBlur={saveProjectName}
+                            autoFocus
+                            className="h-8 text-sm"
+                          />
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7 shrink-0"
+                            onClick={saveProjectName}
+                          >
+                            <Check className="h-3.5 w-3.5 text-success" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7 shrink-0"
+                            onClick={cancelEditing}
+                          >
+                            <X className="h-3.5 w-3.5" />
+                          </Button>
+                        </div>
+                      ) : (
+                        <>
+                          <CollapsibleTrigger asChild>
+                            <button className="p-1.5 hover:bg-sidebar-accent/50 rounded">
+                              {expandedProjects.has(project.id) ? (
+                                <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
+                              ) : (
+                                <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />
                               )}
-                            >
-                              <MoreHorizontal className="h-4 w-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end" className="w-40">
-                            <DropdownMenuItem onClick={() => startEditing(project)}>
-                              <Pencil className="h-4 w-4 mr-2" />
-                              Rename
-                            </DropdownMenuItem>
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem 
-                              onClick={() => confirmDelete(project)}
-                              className="text-destructive focus:text-destructive"
-                            >
-                              <Trash2 className="h-4 w-4 mr-2" />
-                              Delete
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </>
-                    )}
-                  </div>
+                            </button>
+                          </CollapsibleTrigger>
+                          <button
+                            onClick={() => onProjectSelect(project.id)}
+                            className={cn(
+                              'flex-1 text-left py-2 text-sm transition-colors',
+                              currentProjectId === project.id
+                                ? 'text-sidebar-accent-foreground'
+                                : 'text-sidebar-foreground'
+                            )}
+                          >
+                            <span className="block truncate">{project.name}</span>
+                          </button>
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className={cn(
+                                  'h-7 w-7 shrink-0 mr-1',
+                                  'opacity-0 group-hover:opacity-100 transition-opacity',
+                                  currentProjectId === project.id && 'opacity-100'
+                                )}
+                              >
+                                <MoreHorizontal className="h-4 w-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end" className="w-40">
+                              <DropdownMenuItem onClick={() => startEditing(project)}>
+                                <Pencil className="h-4 w-4 mr-2" />
+                                Rename
+                              </DropdownMenuItem>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem 
+                                onClick={() => confirmDelete(project)}
+                                className="text-destructive focus:text-destructive"
+                              >
+                                <Trash2 className="h-4 w-4 mr-2" />
+                                Delete
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </>
+                      )}
+                    </div>
+                    
+                    {/* Rooms under project */}
+                    <CollapsibleContent>
+                      <RoomListPanel
+                        projectId={project.id}
+                        currentRoomId={currentProjectId === project.id ? currentRoomId : null}
+                        onRoomSelect={(roomId) => {
+                          if (currentProjectId !== project.id) {
+                            onProjectSelect(project.id);
+                          }
+                          onRoomSelect(roomId);
+                        }}
+                      />
+                    </CollapsibleContent>
+                  </Collapsible>
                 ))}
               </div>
             )}

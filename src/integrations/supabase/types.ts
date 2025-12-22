@@ -22,6 +22,7 @@ export type Database = {
           metadata: Json | null
           project_id: string
           role: string
+          room_id: string | null
           user_id: string
         }
         Insert: {
@@ -31,6 +32,7 @@ export type Database = {
           metadata?: Json | null
           project_id: string
           role: string
+          room_id?: string | null
           user_id: string
         }
         Update: {
@@ -40,6 +42,7 @@ export type Database = {
           metadata?: Json | null
           project_id?: string
           role?: string
+          room_id?: string | null
           user_id?: string
         }
         Relationships: [
@@ -48,6 +51,13 @@ export type Database = {
             columns: ["project_id"]
             isOneToOne: false
             referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "chat_messages_room_id_fkey"
+            columns: ["room_id"]
+            isOneToOne: false
+            referencedRelation: "rooms"
             referencedColumns: ["id"]
           },
         ]
@@ -337,6 +347,7 @@ export type Database = {
           project_id: string
           prompt: string
           render_url: string | null
+          room_id: string | null
           room_upload_id: string | null
           status: string
           user_id: string
@@ -348,6 +359,7 @@ export type Database = {
           project_id: string
           prompt: string
           render_url?: string | null
+          room_id?: string | null
           room_upload_id?: string | null
           status?: string
           user_id: string
@@ -359,6 +371,7 @@ export type Database = {
           project_id?: string
           prompt?: string
           render_url?: string | null
+          room_id?: string | null
           room_upload_id?: string | null
           status?: string
           user_id?: string
@@ -379,6 +392,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "renders_room_id_fkey"
+            columns: ["room_id"]
+            isOneToOne: false
+            referencedRelation: "rooms"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "renders_room_upload_id_fkey"
             columns: ["room_upload_id"]
             isOneToOne: false
@@ -396,6 +416,7 @@ export type Database = {
           file_url: string
           id: string
           project_id: string
+          room_id: string | null
           upload_type: string
           user_id: string
         }
@@ -407,6 +428,7 @@ export type Database = {
           file_url: string
           id?: string
           project_id: string
+          room_id?: string | null
           upload_type?: string
           user_id: string
         }
@@ -418,12 +440,58 @@ export type Database = {
           file_url?: string
           id?: string
           project_id?: string
+          room_id?: string | null
           upload_type?: string
           user_id?: string
         }
         Relationships: [
           {
             foreignKeyName: "room_uploads_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "room_uploads_room_id_fkey"
+            columns: ["room_id"]
+            isOneToOne: false
+            referencedRelation: "rooms"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      rooms: {
+        Row: {
+          created_at: string
+          id: string
+          name: string
+          project_id: string
+          thumbnail_url: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          name?: string
+          project_id: string
+          thumbnail_url?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          name?: string
+          project_id?: string
+          thumbnail_url?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "rooms_project_id_fkey"
             columns: ["project_id"]
             isOneToOne: false
             referencedRelation: "projects"
@@ -442,6 +510,7 @@ export type Database = {
           item_name: string
           item_price: number | null
           project_id: string
+          room_id: string | null
           user_id: string
         }
         Insert: {
@@ -454,6 +523,7 @@ export type Database = {
           item_name: string
           item_price?: number | null
           project_id: string
+          room_id?: string | null
           user_id: string
         }
         Update: {
@@ -466,6 +536,7 @@ export type Database = {
           item_name?: string
           item_price?: number | null
           project_id?: string
+          room_id?: string | null
           user_id?: string
         }
         Relationships: [
@@ -474,6 +545,13 @@ export type Database = {
             columns: ["project_id"]
             isOneToOne: false
             referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "staged_furniture_room_id_fkey"
+            columns: ["room_id"]
+            isOneToOne: false
+            referencedRelation: "rooms"
             referencedColumns: ["id"]
           },
         ]
