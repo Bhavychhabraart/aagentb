@@ -47,6 +47,8 @@ interface Project {
   thumbnail_url: string | null;
   created_at: string;
   updated_at: string;
+  latestRenderUrl?: string;
+  renderCount?: number;
 }
 
 interface Render {
@@ -189,7 +191,34 @@ export default function Dashboard() {
         .select('*')
         .order('updated_at', { ascending: false });
 
-      setProjects(projectsData || []);
+      // Fetch all completed renders to get latest per project and counts
+      const { data: allRenders } = await supabase
+        .from('renders')
+        .select('project_id, render_url, created_at')
+        .eq('status', 'completed')
+        .order('created_at', { ascending: false });
+
+      // Build maps for latest render URL and render count per project
+      const latestRenderByProject = new Map<string, string>();
+      const renderCountByProject = new Map<string, number>();
+      
+      allRenders?.forEach(r => {
+        // Track latest render URL
+        if (!latestRenderByProject.has(r.project_id) && r.render_url) {
+          latestRenderByProject.set(r.project_id, r.render_url);
+        }
+        // Track render count
+        renderCountByProject.set(r.project_id, (renderCountByProject.get(r.project_id) || 0) + 1);
+      });
+
+      // Merge render data into projects
+      const projectsWithRenders = (projectsData || []).map(p => ({
+        ...p,
+        latestRenderUrl: latestRenderByProject.get(p.id),
+        renderCount: renderCountByProject.get(p.id) || 0,
+      }));
+
+      setProjects(projectsWithRenders);
 
       // Fetch renders with project names
       const { data: rendersData } = await supabase
@@ -438,15 +467,21 @@ export default function Dashboard() {
                   </CardContent>
                 </Card>
               ) : (
-                projects.map((project) => (
+              projects.map((project) => (
                   <Card 
                     key={project.id} 
                     className="bg-card border-border hover:border-primary/50 transition-colors cursor-pointer group"
                     onClick={() => handleOpenProject(project.id)}
                   >
-                    <CardContent className="pt-6">
-                      <div className="aspect-video bg-muted rounded-lg mb-4 overflow-hidden">
-                        {project.thumbnail_url ? (
+                    <CardContent className="pt-6 relative">
+                      <div className="aspect-video bg-muted rounded-lg mb-4 overflow-hidden relative">
+                        {project.latestRenderUrl ? (
+                          <img 
+                            src={project.latestRenderUrl} 
+                            alt={project.name} 
+                            className="w-full h-full object-cover group-hover:scale-105 transition-transform"
+                          />
+                        ) : project.thumbnail_url ? (
                           <img 
                             src={project.thumbnail_url} 
                             alt={project.name} 
@@ -456,6 +491,15 @@ export default function Dashboard() {
                           <div className="w-full h-full flex items-center justify-center bg-gradient-brand">
                             <LayoutGrid className="h-8 w-8 text-primary/50" />
                           </div>
+                        )}
+                        {project.renderCount && project.renderCount > 0 && (
+                          <Badge 
+                            variant="secondary" 
+                            className="absolute top-2 right-2 bg-background/80 backdrop-blur-sm"
+                          >
+                            <Image className="h-3 w-3 mr-1" />
+                            {project.renderCount}
+                          </Badge>
                         )}
                       </div>
                       <h3 className="font-medium text-foreground truncate mb-1">{project.name}</h3>
