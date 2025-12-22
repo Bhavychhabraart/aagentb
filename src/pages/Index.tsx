@@ -16,7 +16,7 @@ import { FurniturePositioner, FurniturePlacement } from '@/components/canvas/Fur
 import { ProjectData } from '@/services/documentService';
 import { SelectionRegion } from '@/components/canvas/SelectionOverlay';
 import { RenderHistoryItem } from '@/components/canvas/RenderHistoryCarousel';
-import { CameraView } from '@/components/canvas/MulticamPanel';
+import { CameraView, ZoneRegion } from '@/components/canvas/MulticamPanel';
 import { LayoutUploadModal } from '@/components/creation/LayoutUploadModal';
 import { RoomPhotoModal } from '@/components/creation/RoomPhotoModal';
 import { StyleRefModal } from '@/components/creation/StyleRefModal';
@@ -1276,8 +1276,8 @@ Ready to generate a render! Describe your vision.`;
     }
   }, [user, currentProjectId, currentRenderUrl, currentRenderId, currentUpload, addMessage, toast]);
 
-  // Handle Multicam view generation
-  const handleMulticamGenerate = useCallback(async (view: CameraView, customPrompt?: string) => {
+  // Handle Multicam view generation (with optional zone focus)
+  const handleMulticamGenerate = useCallback(async (view: CameraView, customPrompt?: string, zone?: ZoneRegion) => {
     if (!user || !currentProjectId || !currentRenderUrl) return;
 
     setIsMulticamGenerating(true);
@@ -1290,8 +1290,16 @@ Ready to generate a render! Describe your vision.`;
       custom: customPrompt || 'Render this room from a custom camera angle',
     };
 
+    // Build zone-specific prompt if zone is provided
+    let prompt = view === 'custom' && customPrompt ? customPrompt : viewPrompts[view];
+    if (zone) {
+      const zoneDesc = `Focus specifically on the region from ${zone.x_start.toFixed(0)}% to ${zone.x_end.toFixed(0)}% horizontally and ${zone.y_start.toFixed(0)}% to ${zone.y_end.toFixed(0)}% vertically. Crop or zoom the view to focus on this specific area of the room. `;
+      prompt = zoneDesc + prompt;
+    }
+
     try {
-      await addMessage('user', `📷 Generating ${view} view...`, { type: 'text' });
+      const zoneLabel = zone ? ' (zone focus)' : '';
+      await addMessage('user', `📷 Generating ${view} view${zoneLabel}...`, { type: 'text' });
 
       const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/edit-render`, {
         method: 'POST',
@@ -1301,7 +1309,14 @@ Ready to generate a render! Describe your vision.`;
         },
         body: JSON.stringify({
           currentRenderUrl: currentRenderUrl,
-          userPrompt: view === 'custom' && customPrompt ? customPrompt : viewPrompts[view],
+          userPrompt: prompt,
+          // Pass zone as a crop/focus region if provided
+          focusRegion: zone ? {
+            x: zone.x_start,
+            y: zone.y_start,
+            width: zone.x_end - zone.x_start,
+            height: zone.y_end - zone.y_start,
+          } : undefined,
         }),
       });
 
@@ -1314,7 +1329,7 @@ Ready to generate a render! Describe your vision.`;
 
       setMulticamViews(prev => ({ ...prev, [view]: imageUrl }));
 
-      await addMessage('assistant', `${view.charAt(0).toUpperCase() + view.slice(1)} view generated!`, {
+      await addMessage('assistant', `${view.charAt(0).toUpperCase() + view.slice(1)} view${zoneLabel} generated!`, {
         type: 'render',
         imageUrl,
         status: 'ready',
@@ -1589,7 +1604,7 @@ Ready to generate a render! Describe your vision.`;
           isGenerating={isGenerating}
           layoutImageUrl={layoutImageUrl}
           roomPhotoUrl={roomPhotoUrl}
-          onPositionFurniture={stagedItems.length > 0 && currentRenderUrl ? () => setShowPositioner(true) : undefined}
+          onPositionFurniture={stagedItems.length > 0 && (currentRenderUrl || roomPhotoUrl) ? () => setShowPositioner(true) : undefined}
           onExport={() => setShowExportModal(true)}
           onStartOrder={stagedItems.length > 0 ? () => setShowOrderModal(true) : undefined}
           onSelectiveEdit={handleSelectiveEdit}
@@ -1599,6 +1614,7 @@ Ready to generate a render! Describe your vision.`;
           isMulticamGenerating={isMulticamGenerating}
           multicamViews={multicamViews}
           onSetMulticamAsMain={handleSetMulticamAsMain}
+          projectId={currentProjectId || undefined}
           allRenders={allRenders}
           currentRenderId={currentRenderId}
           onRenderHistorySelect={handleRenderHistorySelect}

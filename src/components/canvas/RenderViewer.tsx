@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { ZoomIn, ZoomOut, RotateCcw, Download, X, Maximize2, LayoutGrid, Image, Move, FileDown, ShoppingCart, Crop, Undo2, Wand2, Camera, Video } from 'lucide-react';
-import { MulticamPanel, CameraView } from './MulticamPanel';
+import { MulticamPanel, CameraView, ZoneRegion } from './MulticamPanel';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from '@/components/ui/tooltip';
@@ -21,7 +21,8 @@ interface RenderViewerProps {
   onStartOrder?: () => void;
   onSelectiveEdit?: (region: SelectionRegion, prompt: string, catalogItem?: CatalogFurnitureItem) => void;
   onAIDirectorChange?: (prompt: string) => void;
-  onMulticamGenerate?: (view: CameraView, customPrompt?: string) => void;
+  onMulticamGenerate?: (view: CameraView, customPrompt?: string, zone?: ZoneRegion) => void;
+  projectId?: string;
   isSelectiveEditing?: boolean;
   isMulticamGenerating?: boolean;
   multicamViews?: Record<CameraView, string | null>;
@@ -46,6 +47,7 @@ export function RenderViewer({
   onSelectiveEdit,
   onAIDirectorChange,
   onMulticamGenerate,
+  projectId,
   isSelectiveEditing = false,
   isMulticamGenerating = false,
   multicamViews = { perspective: null, front: null, side: null, top: null, custom: null },
@@ -603,6 +605,7 @@ export function RenderViewer({
             onSelectView={handleMulticamSelect}
             onClose={() => setShowMulticam(false)}
             onSetAsMain={onSetMulticamAsMain}
+            projectId={projectId}
           />
         )}
 
