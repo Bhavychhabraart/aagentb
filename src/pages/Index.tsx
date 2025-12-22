@@ -1608,7 +1608,13 @@ Ready to generate a render! Describe your vision.`;
               onClearStagedItems={handleClearStagedItems}
               isEditMode={isEditMode}
               currentRenderUrl={currentRenderUrl}
-              onRenderSelect={(url) => setCurrentRenderUrl(url)}
+              onRenderSelect={(url) => {
+                const matchingRender = allRenders.find(r => r.render_url === url);
+                setCurrentRenderUrl(url);
+                if (matchingRender) {
+                  setCurrentRenderId(matchingRender.id);
+                }
+              }}
             />
           </div>
           <AssetsPanel 
