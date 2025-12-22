@@ -10,9 +10,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Switch } from "@/components/ui/switch";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Package, X, Plus, Link2, Upload, Loader2, Image as ImageIcon, Library, Search, Check, Layers } from "lucide-react";
+import { Package, X, Plus, Link2, Upload, Loader2, Image as ImageIcon, Library, Search, Check, Layers, Grid3X3, ShoppingBag } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -32,6 +31,8 @@ interface ProductPickerModalProps {
   projectId?: string;
 }
 
+type MainTab = "moodboard" | "individual" | "catalogue";
+
 export function ProductPickerModal({
   open,
   onOpenChange,
@@ -47,16 +48,21 @@ export function ProductPickerModal({
   const [isUploading, setIsUploading] = useState(false);
   const [dragActive, setDragActive] = useState(false);
   const [uploadedImageUrl, setUploadedImageUrl] = useState<string | null>(null);
-  const [mainTab, setMainTab] = useState<"add" | "library">("add");
-  const [asCollage, setAsCollage] = useState(false);
+  const [mainTab, setMainTab] = useState<MainTab>("moodboard");
   
   // Library state
   const [libraryItems, setLibraryItems] = useState<ProductItem[]>([]);
   const [libraryLoading, setLibraryLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedLibraryIds, setSelectedLibraryIds] = useState<Set<string>>(new Set());
+  
+  // Catalogue state (vendor products)
+  const [catalogueItems, setCatalogueItems] = useState<ProductItem[]>([]);
+  const [catalogueLoading, setCatalogueLoading] = useState(false);
+  const [catalogueSearch, setCatalogueSearch] = useState("");
+  const [selectedCatalogueIds, setSelectedCatalogueIds] = useState<Set<string>>(new Set());
 
-  // Load library items
+  // Load library items (user's saved products)
   useEffect(() => {
     const loadLibrary = async () => {
       if (!userId) return;
@@ -87,9 +93,44 @@ export function ProductPickerModal({
     }
   }, [userId, open]);
 
+  // Load catalogue items (vendor products)
+  useEffect(() => {
+    const loadCatalogue = async () => {
+      setCatalogueLoading(true);
+      try {
+        const { data, error } = await supabase
+          .from('vendor_products')
+          .select('*')
+          .eq('is_active', true)
+          .order('created_at', { ascending: false })
+          .limit(50);
+        
+        if (error) throw error;
+        setCatalogueItems(data?.map(item => ({
+          id: item.id,
+          name: item.name,
+          imageUrl: item.image_url || undefined,
+        })) || []);
+      } catch (error) {
+        console.error('Failed to load catalogue:', error);
+      } finally {
+        setCatalogueLoading(false);
+      }
+    };
+    
+    if (open) {
+      loadCatalogue();
+    }
+  }, [open]);
+
   // Filter library items by search
   const filteredLibraryItems = libraryItems.filter(item =>
     !searchQuery || item.name.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
+  // Filter catalogue items by search
+  const filteredCatalogueItems = catalogueItems.filter(item =>
+    !catalogueSearch || item.name.toLowerCase().includes(catalogueSearch.toLowerCase())
   );
 
   const handleDrag = useCallback((e: React.DragEvent) => {
@@ -196,6 +237,16 @@ export function ProductPickerModal({
     setSelectedLibraryIds(newSelected);
   };
 
+  const toggleCatalogueItem = (item: ProductItem) => {
+    const newSelected = new Set(selectedCatalogueIds);
+    if (item.id && newSelected.has(item.id)) {
+      newSelected.delete(item.id);
+    } else if (item.id) {
+      newSelected.add(item.id);
+    }
+    setSelectedCatalogueIds(newSelected);
+  };
+
   const addSelectedFromLibrary = () => {
     const itemsToAdd = libraryItems.filter(item => item.id && selectedLibraryIds.has(item.id));
     setProducts([...products, ...itemsToAdd]);
@@ -203,7 +254,16 @@ export function ProductPickerModal({
     toast.success(`Added ${itemsToAdd.length} product(s)`);
   };
 
+  const addSelectedFromCatalogue = () => {
+    const itemsToAdd = catalogueItems.filter(item => item.id && selectedCatalogueIds.has(item.id));
+    setProducts([...products, ...itemsToAdd]);
+    setSelectedCatalogueIds(new Set());
+    toast.success(`Added ${itemsToAdd.length} product(s)`);
+  };
+
   const handleConfirm = () => {
+    // Moodboard tab implies collage mode
+    const asCollage = mainTab === "moodboard";
     onSave(products, asCollage);
     onOpenChange(false);
   };
@@ -215,6 +275,67 @@ export function ProductPickerModal({
 
   const canAddProduct = newProductName.trim() && (inputMode === "upload" ? uploadedImageUrl : newProductUrl.trim());
 
+  const renderProductGrid = (
+    items: ProductItem[],
+    selectedIds: Set<string>,
+    onToggle: (item: ProductItem) => void,
+    loading: boolean,
+    emptyMessage: string
+  ) => (
+    <ScrollArea className="h-[200px]">
+      {loading ? (
+        <div className="flex items-center justify-center h-full py-8">
+          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+        </div>
+      ) : items.length === 0 ? (
+        <div className="flex flex-col items-center justify-center h-full py-8 text-center">
+          <Package className="h-8 w-8 text-muted-foreground mb-2" />
+          <p className="text-sm text-muted-foreground">{emptyMessage}</p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-4 gap-2 pr-3">
+          {items.map((item) => (
+            <button
+              key={item.id}
+              onClick={() => onToggle(item)}
+              className={cn(
+                "relative aspect-square rounded-lg overflow-hidden border-2 transition-all",
+                "hover:ring-2 hover:ring-primary/50",
+                item.id && selectedIds.has(item.id)
+                  ? "border-primary ring-2 ring-primary/30"
+                  : "border-border/50"
+              )}
+            >
+              {item.imageUrl ? (
+                <img
+                  src={item.imageUrl}
+                  alt={item.name}
+                  className="w-full h-full object-cover"
+                />
+              ) : (
+                <div className="w-full h-full bg-muted flex items-center justify-center">
+                  <Package className="h-6 w-6 text-muted-foreground" />
+                </div>
+              )}
+              
+              {item.id && selectedIds.has(item.id) && (
+                <div className="absolute inset-0 bg-primary/20 flex items-center justify-center">
+                  <div className="h-6 w-6 rounded-full bg-primary flex items-center justify-center">
+                    <Check className="h-4 w-4 text-primary-foreground" />
+                  </div>
+                </div>
+              )}
+              
+              <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-1">
+                <p className="text-[10px] text-white truncate">{item.name}</p>
+              </div>
+            </button>
+          ))}
+        </div>
+      )}
+    </ScrollArea>
+  );
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
@@ -224,26 +345,105 @@ export function ProductPickerModal({
             Add Products
           </DialogTitle>
           <DialogDescription>
-            Upload product images or select from your library. Products will appear in the generated design.
+            Choose how you want to add products to your design.
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4">
-          {/* Main Tabs: Add New vs Library */}
-          <Tabs value={mainTab} onValueChange={(v) => setMainTab(v as "add" | "library")}>
-            <TabsList className="grid w-full grid-cols-2">
-              <TabsTrigger value="add" className="flex items-center gap-2">
-                <Plus className="h-4 w-4" />
-                Add New
+          {/* Main Tabs: Moodboard, Individual Items, Catalogue */}
+          <Tabs value={mainTab} onValueChange={(v) => setMainTab(v as MainTab)}>
+            <TabsList className="grid w-full grid-cols-3">
+              <TabsTrigger value="moodboard" className="flex items-center gap-1.5 text-xs">
+                <Layers className="h-3.5 w-3.5" />
+                Moodboard
               </TabsTrigger>
-              <TabsTrigger value="library" className="flex items-center gap-2">
-                <Library className="h-4 w-4" />
-                Library ({libraryItems.length})
+              <TabsTrigger value="individual" className="flex items-center gap-1.5 text-xs">
+                <Grid3X3 className="h-3.5 w-3.5" />
+                Individual
+              </TabsTrigger>
+              <TabsTrigger value="catalogue" className="flex items-center gap-1.5 text-xs">
+                <ShoppingBag className="h-3.5 w-3.5" />
+                Catalogue
               </TabsTrigger>
             </TabsList>
 
-            {/* Add New Tab */}
-            <TabsContent value="add" className="mt-4 space-y-4">
+            {/* Furniture Moodboard Tab */}
+            <TabsContent value="moodboard" className="mt-4 space-y-4">
+              <div className="text-sm text-muted-foreground bg-muted/50 rounded-lg p-3">
+                <p className="font-medium text-foreground mb-1">Furniture Moodboard</p>
+                <p>Upload multiple furniture images to create a cohesive moodboard. All items will be combined as a collage for design inspiration.</p>
+              </div>
+
+              {/* Search library */}
+              <div className="relative">
+                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Search your saved products..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-9"
+                />
+              </div>
+
+              {renderProductGrid(
+                filteredLibraryItems,
+                selectedLibraryIds,
+                toggleLibraryItem,
+                libraryLoading,
+                libraryItems.length === 0 ? "No products in library yet" : "No products match your search"
+              )}
+
+              {selectedLibraryIds.size > 0 && (
+                <Button onClick={addSelectedFromLibrary} className="w-full">
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add {selectedLibraryIds.size} to Moodboard
+                </Button>
+              )}
+
+              {/* Quick upload for moodboard */}
+              <div className="border-t pt-4">
+                <Label className="text-sm font-medium mb-2 block">Or upload new images</Label>
+                <div
+                  className={cn(
+                    "relative rounded-lg border-2 border-dashed p-4 transition-colors cursor-pointer",
+                    dragActive ? "border-primary bg-primary/5" : "border-muted-foreground/25 hover:border-primary/50",
+                    isUploading && "pointer-events-none opacity-60"
+                  )}
+                  onDragEnter={handleDrag}
+                  onDragLeave={handleDrag}
+                  onDragOver={handleDrag}
+                  onDrop={handleDrop}
+                  onClick={() => document.getElementById("moodboard-file-input")?.click()}
+                >
+                  <input
+                    id="moodboard-file-input"
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={handleFileSelect}
+                    disabled={isUploading}
+                  />
+                  <div className="flex items-center justify-center gap-2 text-center">
+                    {isUploading ? (
+                      <Loader2 className="h-5 w-5 text-primary animate-spin" />
+                    ) : (
+                      <Upload className="h-5 w-5 text-muted-foreground" />
+                    )}
+                    <p className="text-sm text-muted-foreground">
+                      {isUploading ? "Uploading..." : "Drop images or click to browse"}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </TabsContent>
+
+            {/* Individual Items Tab */}
+            <TabsContent value="individual" className="mt-4 space-y-4">
+              <div className="text-sm text-muted-foreground bg-muted/50 rounded-lg p-3">
+                <p className="font-medium text-foreground mb-1">Individual Items</p>
+                <p>Add products one by one with names. Each item will be placed separately in your design.</p>
+              </div>
+
               <div className="space-y-2">
                 <Label>Product Name</Label>
                 <Input
@@ -351,79 +551,36 @@ export function ProductPickerModal({
               </Button>
             </TabsContent>
 
-            {/* Library Tab */}
-            <TabsContent value="library" className="mt-4 space-y-3">
-              {/* Search */}
+            {/* Catalogue Tab */}
+            <TabsContent value="catalogue" className="mt-4 space-y-4">
+              <div className="text-sm text-muted-foreground bg-muted/50 rounded-lg p-3">
+                <p className="font-medium text-foreground mb-1">Select from Catalogue</p>
+                <p>Browse and select products from our curated vendor catalogue.</p>
+              </div>
+
+              {/* Search catalogue */}
               <div className="relative">
                 <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
-                  placeholder="Search your products..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Search catalogue products..."
+                  value={catalogueSearch}
+                  onChange={(e) => setCatalogueSearch(e.target.value)}
                   className="pl-9"
                 />
               </div>
 
-              {/* Library Grid */}
-              <ScrollArea className="h-[200px]">
-                {libraryLoading ? (
-                  <div className="flex items-center justify-center h-full py-8">
-                    <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-                  </div>
-                ) : filteredLibraryItems.length === 0 ? (
-                  <div className="flex flex-col items-center justify-center h-full py-8 text-center">
-                    <Library className="h-8 w-8 text-muted-foreground mb-2" />
-                    <p className="text-sm text-muted-foreground">
-                      {libraryItems.length === 0 ? "No products in library yet" : "No products match your search"}
-                    </p>
-                  </div>
-                ) : (
-                  <div className="grid grid-cols-4 gap-2 pr-3">
-                    {filteredLibraryItems.map((item) => (
-                      <button
-                        key={item.id}
-                        onClick={() => toggleLibraryItem(item)}
-                        className={cn(
-                          "relative aspect-square rounded-lg overflow-hidden border-2 transition-all",
-                          "hover:ring-2 hover:ring-primary/50",
-                          item.id && selectedLibraryIds.has(item.id)
-                            ? "border-primary ring-2 ring-primary/30"
-                            : "border-border/50"
-                        )}
-                      >
-                        {item.imageUrl ? (
-                          <img
-                            src={item.imageUrl}
-                            alt={item.name}
-                            className="w-full h-full object-cover"
-                          />
-                        ) : (
-                          <div className="w-full h-full bg-muted flex items-center justify-center">
-                            <Package className="h-6 w-6 text-muted-foreground" />
-                          </div>
-                        )}
-                        
-                        {item.id && selectedLibraryIds.has(item.id) && (
-                          <div className="absolute inset-0 bg-primary/20 flex items-center justify-center">
-                            <div className="h-6 w-6 rounded-full bg-primary flex items-center justify-center">
-                              <Check className="h-4 w-4 text-primary-foreground" />
-                            </div>
-                          </div>
-                        )}
-                        
-                        <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-1">
-                          <p className="text-[10px] text-white truncate">{item.name}</p>
-                        </div>
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </ScrollArea>
+              {renderProductGrid(
+                filteredCatalogueItems,
+                selectedCatalogueIds,
+                toggleCatalogueItem,
+                catalogueLoading,
+                catalogueItems.length === 0 ? "No catalogue products available" : "No products match your search"
+              )}
 
-              {selectedLibraryIds.size > 0 && (
-                <Button onClick={addSelectedFromLibrary} className="w-full">
+              {selectedCatalogueIds.size > 0 && (
+                <Button onClick={addSelectedFromCatalogue} className="w-full">
                   <Plus className="h-4 w-4 mr-2" />
-                  Add {selectedLibraryIds.size} Selected
+                  Add {selectedCatalogueIds.size} from Catalogue
                 </Button>
               )}
             </TabsContent>
@@ -431,7 +588,7 @@ export function ProductPickerModal({
 
           {/* Added Products */}
           {products.length > 0 && (
-            <div className="space-y-2">
+            <div className="space-y-2 border-t pt-4">
               <Label>Added Products ({products.length})</Label>
               <div className="grid grid-cols-4 gap-2">
                 {products.map((product, index) => (
@@ -460,39 +617,22 @@ export function ProductPickerModal({
                         <X className="h-4 w-4" />
                       </Button>
                     </div>
-                    <p className="text-[10px] text-center py-1 truncate px-1">{product.name}</p>
+                    <p className="text-[10px] text-center truncate px-1 py-0.5 bg-muted">
+                      {product.name}
+                    </p>
                   </div>
                 ))}
               </div>
             </div>
           )}
 
-          {/* Collage Toggle */}
-          {products.length > 1 && (
-            <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50 border">
-              <div className="flex items-center gap-2">
-                <Layers className="h-4 w-4 text-primary" />
-                <div>
-                  <p className="text-sm font-medium">Combine as Collage</p>
-                  <p className="text-xs text-muted-foreground">Merge all products into a single reference image</p>
-                </div>
-              </div>
-              <Switch checked={asCollage} onCheckedChange={setAsCollage} />
-            </div>
-          )}
-
-          {products.length === 0 && mainTab === "add" && (
-            <p className="text-sm text-muted-foreground text-center py-4">
-              No products added yet. Upload furniture, decor, or materials above.
-            </p>
-          )}
-
-          <div className="flex justify-end gap-2 pt-2">
+          {/* Footer */}
+          <div className="flex justify-end gap-2 pt-2 border-t">
             <Button variant="outline" onClick={() => onOpenChange(false)}>
               Cancel
             </Button>
-            <Button onClick={handleConfirm}>
-              {products.length > 0 ? `Save ${products.length} Product${products.length > 1 ? "s" : ""}` : "Save"}
+            <Button onClick={handleConfirm} disabled={products.length === 0}>
+              Save ({products.length})
             </Button>
           </div>
         </div>
