@@ -607,7 +607,7 @@ export function RenderViewer({
         )}
 
         {/* Render History Carousel */}
-        {allRenders.length > 1 && onRenderHistorySelect && !showComparison && !selectionMode && !isGenerating && !isSelectiveEditing && !showAIDirector && !showMulticam && (
+        {allRenders.length > 1 && onRenderHistorySelect && !showComparison && !selectionMode && !isSelectiveEditing && !showAIDirector && !showMulticam && (
           <RenderHistoryCarousel
             renders={allRenders}
             currentRenderId={currentRenderId || null}
@@ -618,7 +618,7 @@ export function RenderViewer({
         {/* Bottom info bar */}
         <div className={cn(
           "absolute left-1/2 -translate-x-1/2 z-20",
-          allRenders.length > 1 && onRenderHistorySelect && !showComparison && !selectionMode && !isGenerating && !isSelectiveEditing
+          allRenders.length > 1 && onRenderHistorySelect && !showComparison && !selectionMode && !isSelectiveEditing
             ? "bottom-[22%]"
             : "bottom-[10%]"
         )}>
