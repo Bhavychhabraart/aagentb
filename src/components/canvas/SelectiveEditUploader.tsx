@@ -1,8 +1,9 @@
 import { useState, useCallback } from 'react';
-import { Upload, X, Loader2, Image as ImageIcon } from 'lucide-react';
+import { X, Loader2, Image as ImageIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
+import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 
 interface SelectiveEditUploaderProps {
@@ -15,16 +16,34 @@ export function SelectiveEditUploader({
   onImageSelect 
 }: SelectiveEditUploaderProps) {
   const { user } = useAuth();
+  const { toast } = useToast();
   const [isUploading, setIsUploading] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
 
   const handleUpload = useCallback(async (file: File) => {
-    if (!user) return;
-    if (!file.type.startsWith('image/')) return;
+    if (!user) {
+      toast({
+        variant: 'destructive',
+        title: 'Not signed in',
+        description: 'Please sign in to upload images.',
+      });
+      return;
+    }
+    
+    if (!file.type.startsWith('image/')) {
+      toast({
+        variant: 'destructive',
+        title: 'Invalid file type',
+        description: 'Please upload an image file.',
+      });
+      return;
+    }
 
     setIsUploading(true);
     try {
-      const fileName = `${user.id}/selective-edit/${Date.now()}-${file.name}`;
+      // Sanitize filename - remove special characters
+      const safeName = file.name.replace(/[^a-zA-Z0-9.-]/g, '_');
+      const fileName = `${user.id}/selective-edit/${Date.now()}-${safeName}`;
       
       const { error: uploadError } = await supabase.storage
         .from('room-uploads')
@@ -37,12 +56,22 @@ export function SelectiveEditUploader({
         .getPublicUrl(fileName);
 
       onImageSelect(publicUrl);
-    } catch (error) {
+      
+      toast({
+        title: 'Image uploaded',
+        description: 'Your reference image is ready to use.',
+      });
+    } catch (error: any) {
       console.error('Upload failed:', error);
+      toast({
+        variant: 'destructive',
+        title: 'Upload failed',
+        description: error.message || 'Failed to upload image. Please try again.',
+      });
     } finally {
       setIsUploading(false);
     }
-  }, [user, onImageSelect]);
+  }, [user, onImageSelect, toast]);
 
   const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();
