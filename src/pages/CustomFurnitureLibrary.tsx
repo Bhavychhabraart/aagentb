@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
   ArrowLeft, Search, Filter, Plus, Eye, Edit, Trash2, 
-  FileText, Send, Loader2, Package, Grid3X3, List, X
+  FileText, Send, Loader2, Package, Grid3X3, List, X, Wand2
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -25,6 +25,7 @@ import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { BOMAnalysisPanel } from '@/components/creation/BOMAnalysisPanel';
 import { VendorRequestModal } from '@/components/creation/VendorRequestModal';
+import { ProductImageEditor } from '@/components/creation/ProductImageEditor';
 
 interface CustomFurnitureItem {
   id: string;
@@ -55,6 +56,7 @@ export default function CustomFurnitureLibrary() {
   const [vendorRequestItem, setVendorRequestItem] = useState<CustomFurnitureItem | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [itemToDelete, setItemToDelete] = useState<CustomFurnitureItem | null>(null);
+  const [editingImageItem, setEditingImageItem] = useState<CustomFurnitureItem | null>(null);
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -238,6 +240,7 @@ export default function CustomFurnitureLibrary() {
                 item={item}
                 onView={() => setViewingItem(item)}
                 onEdit={() => navigate(`/custom-furniture/create?edit=${item.id}`)}
+                onEditImage={() => setEditingImageItem(item)}
                 onDelete={() => { setItemToDelete(item); setDeleteDialogOpen(true); }}
                 onBOM={() => setBomItem(item)}
                 onVendorRequest={() => setVendorRequestItem(item)}
@@ -252,6 +255,7 @@ export default function CustomFurnitureLibrary() {
                 item={item}
                 onView={() => setViewingItem(item)}
                 onEdit={() => navigate(`/custom-furniture/create?edit=${item.id}`)}
+                onEditImage={() => setEditingImageItem(item)}
                 onDelete={() => { setItemToDelete(item); setDeleteDialogOpen(true); }}
                 onBOM={() => setBomItem(item)}
                 onVendorRequest={() => setVendorRequestItem(item)}
@@ -314,6 +318,37 @@ export default function CustomFurnitureLibrary() {
         onSuccess={() => { setVendorRequestItem(null); toast({ title: 'Request sent to vendors' }); }}
       />
 
+      {/* Product Image Editor */}
+      {editingImageItem && editingImageItem.item_image_url && (
+        <ProductImageEditor
+          open={!!editingImageItem}
+          onOpenChange={(open) => !open && setEditingImageItem(null)}
+          imageUrl={editingImageItem.item_image_url}
+          productName={editingImageItem.item_name}
+          productCategory={editingImageItem.item_category}
+          onSave={async (newImageUrl) => {
+            try {
+              const { error } = await supabase
+                .from('staged_furniture')
+                .update({ item_image_url: newImageUrl })
+                .eq('id', editingImageItem.id);
+              
+              if (error) throw error;
+              
+              setItems(prev => prev.map(item => 
+                item.id === editingImageItem.id 
+                  ? { ...item, item_image_url: newImageUrl }
+                  : item
+              ));
+              toast({ title: 'Image updated!' });
+            } catch (error) {
+              console.error('Failed to update image:', error);
+              toast({ variant: 'destructive', title: 'Error', description: 'Failed to save image.' });
+            }
+          }}
+        />
+      )}
+
       {/* Delete Dialog */}
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <AlertDialogContent>
@@ -339,12 +374,13 @@ interface FurnitureCardProps {
   item: CustomFurnitureItem;
   onView: () => void;
   onEdit: () => void;
+  onEditImage: () => void;
   onDelete: () => void;
   onBOM: () => void;
   onVendorRequest: () => void;
 }
 
-function FurnitureCard({ item, onView, onEdit, onDelete, onBOM, onVendorRequest }: FurnitureCardProps) {
+function FurnitureCard({ item, onView, onEdit, onEditImage, onDelete, onBOM, onVendorRequest }: FurnitureCardProps) {
   return (
     <Card className="group overflow-hidden hover:shadow-lg transition-all duration-200">
       <div className="relative aspect-square">
@@ -364,6 +400,9 @@ function FurnitureCard({ item, onView, onEdit, onDelete, onBOM, onVendorRequest 
         <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
           <Button size="icon" variant="secondary" onClick={onView} title="View">
             <Eye className="h-4 w-4" />
+          </Button>
+          <Button size="icon" variant="secondary" onClick={onEditImage} title="Edit Image">
+            <Wand2 className="h-4 w-4" />
           </Button>
           <Button size="icon" variant="secondary" onClick={onBOM} title="BOM Analysis">
             <FileText className="h-4 w-4" />
@@ -390,7 +429,7 @@ function FurnitureCard({ item, onView, onEdit, onDelete, onBOM, onVendorRequest 
   );
 }
 
-function FurnitureListItem({ item, onView, onEdit, onDelete, onBOM, onVendorRequest }: FurnitureCardProps) {
+function FurnitureListItem({ item, onView, onEdit, onEditImage, onDelete, onBOM, onVendorRequest }: FurnitureCardProps) {
   return (
     <Card className="hover:shadow-md transition-shadow">
       <CardContent className="p-4 flex items-center gap-4">
@@ -427,6 +466,10 @@ function FurnitureListItem({ item, onView, onEdit, onDelete, onBOM, onVendorRequ
           <Button size="sm" variant="ghost" onClick={onView} className="gap-1">
             <Eye className="h-4 w-4" />
             View
+          </Button>
+          <Button size="sm" variant="ghost" onClick={onEditImage} className="gap-1">
+            <Wand2 className="h-4 w-4" />
+            Edit
           </Button>
           <Button size="sm" variant="ghost" onClick={onBOM} className="gap-1">
             <FileText className="h-4 w-4" />

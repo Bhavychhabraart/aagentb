@@ -10,8 +10,9 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
 import { 
   Palette, Upload, Loader2, RefreshCw, Check, IndianRupee, ImageIcon, 
-  ZoomIn, ZoomOut, X, History, ArrowLeft, Sparkles, FileText, Package, Ruler
+  ZoomIn, ZoomOut, X, History, ArrowLeft, Sparkles, FileText, Package, Ruler, Wand2
 } from 'lucide-react';
+import { ProductImageEditor } from '@/components/creation/ProductImageEditor';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
@@ -69,6 +70,7 @@ export default function CreateCustomFurniture() {
   const [creationMode, setCreationMode] = useState<'scratch' | 'catalog'>('scratch');
   const [selectedCatalogItem, setSelectedCatalogItem] = useState<CatalogFurnitureItem | null>(null);
   const [isEditing, setIsEditing] = useState(false);
+  const [showImageEditor, setShowImageEditor] = useState(false);
 
   useEffect(() => {
     if (user) {
@@ -627,16 +629,28 @@ export default function CreateCustomFurniture() {
               </Button>
             </div>
             {generatedImage && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleGenerate}
-                disabled={isGenerating}
-                className="gap-2"
-              >
-                <RefreshCw className={cn("h-4 w-4", isGenerating && "animate-spin")} />
-                Regenerate
-              </Button>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowImageEditor(true)}
+                  disabled={isGenerating}
+                  className="gap-2"
+                >
+                  <Wand2 className="h-4 w-4" />
+                  Refine
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleGenerate}
+                  disabled={isGenerating}
+                  className="gap-2"
+                >
+                  <RefreshCw className={cn("h-4 w-4", isGenerating && "animate-spin")} />
+                  Regenerate
+                </Button>
+              </div>
             )}
           </div>
 
@@ -774,6 +788,27 @@ export default function CreateCustomFurniture() {
           </Tabs>
         </div>
       </div>
+
+      {/* Product Image Editor */}
+      {generatedImage && (
+        <ProductImageEditor
+          open={showImageEditor}
+          onOpenChange={setShowImageEditor}
+          imageUrl={generatedImage}
+          productName={name || prompt.slice(0, 30) || 'Custom Furniture'}
+          productCategory={category || 'Custom'}
+          onSave={(newImageUrl) => {
+            setGeneratedImage(newImageUrl);
+            // Add to history
+            setGenerationHistory(prev => [{
+              id: Date.now().toString(),
+              imageUrl: newImageUrl,
+              prompt: `Refined: ${prompt}`,
+              timestamp: new Date(),
+            }, ...prev].slice(0, 10));
+          }}
+        />
+      )}
     </div>
   );
 }
