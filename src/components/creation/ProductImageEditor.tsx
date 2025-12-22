@@ -89,11 +89,16 @@ export function ProductImageEditor({
   };
 
   const handleUndo = () => {
-    if (editHistory.length > 0) {
-      const [lastImage, ...rest] = editHistory;
-      setEditedImage(lastImage === imageUrl ? null : lastImage);
-      setEditHistory(rest);
+    if (editHistory.length === 0) {
+      toast({ title: 'Nothing to undo', description: 'No previous versions available.' });
+      return;
     }
+    
+    const [lastImage, ...rest] = editHistory;
+    setEditedImage(lastImage === imageUrl ? null : lastImage);
+    setEditHistory(rest);
+    
+    toast({ title: 'Undo successful', description: 'Reverted to previous version.' });
   };
 
   const handleAccept = () => {
