@@ -35,3 +35,6 @@ verify_jwt = false
 
 [functions.generate-technical-drawing]
 verify_jwt = false
+
+[functions.edit-furniture]
+verify_jwt = false
