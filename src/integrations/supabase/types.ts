@@ -556,6 +556,69 @@ export type Database = {
           },
         ]
       }
+      staging_zones: {
+        Row: {
+          camera_angle: number | null
+          camera_position: string | null
+          created_at: string
+          id: string
+          name: string
+          project_id: string
+          room_id: string | null
+          thumbnail_url: string | null
+          user_id: string
+          x_end: number
+          x_start: number
+          y_end: number
+          y_start: number
+        }
+        Insert: {
+          camera_angle?: number | null
+          camera_position?: string | null
+          created_at?: string
+          id?: string
+          name?: string
+          project_id: string
+          room_id?: string | null
+          thumbnail_url?: string | null
+          user_id: string
+          x_end: number
+          x_start: number
+          y_end: number
+          y_start: number
+        }
+        Update: {
+          camera_angle?: number | null
+          camera_position?: string | null
+          created_at?: string
+          id?: string
+          name?: string
+          project_id?: string
+          room_id?: string | null
+          thumbnail_url?: string | null
+          user_id?: string
+          x_end?: number
+          x_start?: number
+          y_end?: number
+          y_start?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "staging_zones_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "staging_zones_room_id_fkey"
+            columns: ["room_id"]
+            isOneToOne: false
+            referencedRelation: "rooms"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       style_uploads: {
         Row: {
           created_at: string

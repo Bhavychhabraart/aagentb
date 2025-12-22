@@ -1699,9 +1699,9 @@ Ready to generate a render! Describe your vision.`;
         }}
       />
 
-      {showPositioner && currentRenderUrl && (
+      {showPositioner && (currentRenderUrl || roomPhotoUrl) && (
         <FurniturePositioner
-          renderUrl={currentRenderUrl}
+          renderUrl={currentRenderUrl || roomPhotoUrl!}
           stagedItems={stagedItems}
           onConfirm={handleCompositeConfirm}
           onCancel={() => setShowPositioner(false)}

@@ -1,5 +1,5 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
-import { Move, ZoomIn, ZoomOut, Check, X, GripVertical, RotateCcw, Scan, Loader2 } from 'lucide-react';
+import { Move, ZoomIn, ZoomOut, Check, X, GripVertical, RotateCcw, Scan, Loader2, RotateCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
 import { cn } from '@/lib/utils';
@@ -12,6 +12,7 @@ export interface FurniturePlacement {
   item: CatalogFurnitureItem;
   position: { x: number; y: number }; // Percentage 0-100
   scale: number; // 0.3 to 2
+  rotation: number; // 0-360 degrees
   originalLabel?: string; // Label of detected item being replaced
 }
 
@@ -47,6 +48,7 @@ export function FurniturePositioner({
         y: 60 + (index * 10) % 20  // Place toward bottom of room
       },
       scale: 0.8,
+      rotation: 0,
     }))
   );
   const [selectedId, setSelectedId] = useState<string | null>(placements[0]?.id || null);
@@ -145,6 +147,23 @@ export function FurniturePositioner({
     ));
   };
 
+  const updateRotation = (id: string, rotation: number) => {
+    // Normalize rotation to 0-360
+    const normalized = ((rotation % 360) + 360) % 360;
+    setPlacements(prev => prev.map(p => 
+      p.id === id ? { ...p, rotation: normalized } : p
+    ));
+  };
+
+  const rotateBy90 = (id: string, clockwise: boolean) => {
+    setPlacements(prev => prev.map(p => {
+      if (p.id !== id) return p;
+      const delta = clockwise ? 90 : -90;
+      const newRotation = ((p.rotation + delta) % 360 + 360) % 360;
+      return { ...p, rotation: newRotation };
+    }));
+  };
+
   const resetPlacement = (id: string) => {
     const index = placements.findIndex(p => p.id === id);
     setPlacements(prev => prev.map((p, i) => 
@@ -153,6 +172,7 @@ export function FurniturePositioner({
             ...p, 
             position: { x: 30 + (index * 20) % 40, y: 60 + (index * 10) % 20 },
             scale: 0.8,
+            rotation: 0,
             originalLabel: undefined
           }
         : p
@@ -256,7 +276,7 @@ export function FurniturePositioner({
                 style={{
                   left: `${placement.position.x}%`,
                   top: `${placement.position.y}%`,
-                  transform: `translate(-50%, -50%) scale(${placement.scale})`,
+                  transform: `translate(-50%, -50%) scale(${placement.scale}) rotate(${placement.rotation}deg)`,
                   width: '120px',
                   height: '120px',
                 }}
@@ -274,6 +294,12 @@ export function FurniturePositioner({
                 <div className="absolute -top-2 -right-2 p-1 rounded-full bg-primary text-primary-foreground opacity-80">
                   <GripVertical className="h-3 w-3" />
                 </div>
+                {/* Rotation indicator */}
+                {placement.rotation !== 0 && (
+                  <div className="absolute -top-2 -left-2 p-1 rounded-full bg-cyan-500 text-white opacity-80">
+                    <RotateCw className="h-3 w-3" />
+                  </div>
+                )}
                 {/* Original label badge */}
                 {placement.originalLabel && (
                   <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 px-1.5 py-0.5 bg-amber-500/90 rounded text-[9px] text-white font-medium whitespace-nowrap">
@@ -286,7 +312,7 @@ export function FurniturePositioner({
             {/* Position indicator */}
             {selectedPlacement && (
               <div className="absolute bottom-2 left-2 px-2 py-1 bg-black/70 rounded text-xs text-white font-mono">
-                X: {selectedPlacement.position.x.toFixed(0)}% | Y: {selectedPlacement.position.y.toFixed(0)}% | Scale: {(selectedPlacement.scale * 100).toFixed(0)}%
+                X: {selectedPlacement.position.x.toFixed(0)}% | Y: {selectedPlacement.position.y.toFixed(0)}% | Scale: {(selectedPlacement.scale * 100).toFixed(0)}% | Rot: {selectedPlacement.rotation}°
                 {selectedPlacement.originalLabel && ` | Replacing: ${selectedPlacement.originalLabel}`}
               </div>
             )}
@@ -412,18 +438,79 @@ export function FurniturePositioner({
                   />
                 </div>
 
+                {/* Rotation control */}
+                <div className="space-y-2 mt-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs text-muted-foreground">Rotation</span>
+                    <div className="flex items-center gap-1">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-6 w-6"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          rotateBy90(placement.id, false);
+                        }}
+                        title="Rotate 90° counter-clockwise"
+                      >
+                        <RotateCcw className="h-3 w-3" />
+                      </Button>
+                      <span className="text-xs font-mono w-10 text-center">
+                        {placement.rotation}°
+                      </span>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-6 w-6"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          rotateBy90(placement.id, true);
+                        }}
+                        title="Rotate 90° clockwise"
+                      >
+                        <RotateCw className="h-3 w-3" />
+                      </Button>
+                    </div>
+                  </div>
+                  <Slider
+                    value={[placement.rotation]}
+                    min={0}
+                    max={360}
+                    step={15}
+                    onValueChange={([val]) => updateRotation(placement.id, val)}
+                    className="w-full"
+                  />
+                  {/* Quick rotation presets */}
+                  <div className="flex gap-1">
+                    {[0, 90, 180, 270].map((deg) => (
+                      <Button
+                        key={deg}
+                        variant={placement.rotation === deg ? "secondary" : "ghost"}
+                        size="sm"
+                        className="flex-1 h-6 text-[10px]"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          updateRotation(placement.id, deg);
+                        }}
+                      >
+                        {deg}°
+                      </Button>
+                    ))}
+                  </div>
+                </div>
+
                 {/* Reset button */}
                 <Button
                   variant="ghost"
                   size="sm"
-                  className="w-full mt-2 text-xs"
+                  className="w-full mt-3 text-xs"
                   onClick={(e) => {
                     e.stopPropagation();
                     resetPlacement(placement.id);
                   }}
                 >
                   <RotateCcw className="h-3 w-3 mr-1" />
-                  Reset Position
+                  Reset All
                 </Button>
               </div>
             ))}
@@ -436,7 +523,8 @@ export function FurniturePositioner({
               <li>• Click <strong>Detect Furniture</strong> to find existing items</li>
               <li>• Click amber markers to snap item to that position</li>
               <li>• Drag items to fine-tune placement</li>
-              <li>• Adjust scale to match room perspective</li>
+              <li>• Adjust <strong>scale</strong> to match room perspective</li>
+              <li>• Use <strong>rotation</strong> to orient products correctly</li>
               <li>• Items near bottom = closer to camera</li>
             </ul>
           </div>

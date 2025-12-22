@@ -11,6 +11,7 @@ interface FurniturePlacement {
   imageUrl: string;
   position: { x: number; y: number }; // Percentage position (0-100)
   scale: number; // Scale factor (0.5 = 50%, 1 = 100%, 2 = 200%)
+  rotation?: number; // Rotation in degrees (0-360)
 }
 
 serve(async (req) => {
@@ -127,22 +128,29 @@ For each furniture item below, you must:
 `;
 
     for (const { name, category, index, position, scale } of furnitureIndices) {
+      // Get the rotation for this item from placements
+      const placement = furniturePlacements.find(p => p.name === name);
+      const rotation = placement?.rotation || 0;
+      
       compositingPrompt += `
 IMAGE ${index}: "${name}" (${category})
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 POSITION: ${position.x}% from left, ${position.y}% from top
 SCALE: ${Math.round(scale * 100)}% of natural size relative to room
+ROTATION: ${rotation}° clockwise from original orientation
 
 ⚠️ ABSOLUTE REQUIREMENTS:
 • The product must be PIXEL-IDENTICAL to IMAGE ${index}
 • Copy the EXACT shape, color, texture, and all details
 • DO NOT regenerate or reinterpret - COPY EXACTLY
+• ${rotation !== 0 ? `ROTATE the product ${rotation}° clockwise before placing` : 'Keep original orientation'}
 • Apply realistic shadows matching room lighting direction
 • Perspective should match the room's camera angle
 
 🎯 POSITIONING:
 • Place furniture so its base/center is at ${position.x}% horizontal, ${position.y}% vertical
 • Scale: ${scale < 1 ? 'Make smaller than natural' : scale > 1 ? 'Make larger than natural' : 'Keep natural size'}
+• ${rotation !== 0 ? `Orientation: Rotate ${rotation}° from default position` : 'Orientation: Keep as shown in reference'}
 • Ensure realistic proportions relative to room size
 
 📋 VERIFICATION CHECKLIST:
@@ -151,6 +159,7 @@ SCALE: ${Math.round(scale * 100)}% of natural size relative to room
 □ All design details preserved (buttons, patterns, textures)
 □ Positioned at correct coordinates
 □ Scaled correctly
+□ ${rotation !== 0 ? `Rotated ${rotation}° correctly` : 'Original orientation maintained'}
 □ Shadows added matching room lighting
 
 `;
