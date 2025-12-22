@@ -44,6 +44,7 @@ const Index = () => {
   const { toast } = useToast();
 
   const [currentProjectId, setCurrentProjectId] = useState<string | null>(null);
+  const [currentRoomId, setCurrentRoomId] = useState<string | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [currentRenderUrl, setCurrentRenderUrl] = useState<string | null>(null);
   const [currentRenderId, setCurrentRenderId] = useState<string | null>(null);
@@ -473,6 +474,7 @@ const Index = () => {
     setIsStagingMode(false);
     setShowPositioner(false);
     setIsSelectiveEditing(false);
+    setCurrentRoomId(null); // Reset room when switching projects
     hasTriggeredGeneration.current = false;
     
     // Update URL with new project ID
@@ -480,6 +482,11 @@ const Index = () => {
     
     // Set new project ID (triggers data reload via useEffect)
     setCurrentProjectId(projectId);
+  };
+
+  const handleRoomSelect = (roomId: string) => {
+    // For now, just track the room - future: filter data by room
+    setCurrentRoomId(roomId);
   };
 
   const addMessage = useCallback(async (role: 'user' | 'assistant', content: string, metadata?: ChatMessage['metadata']) => {
@@ -1560,7 +1567,9 @@ Ready to generate a render! Describe your vision.`;
       <div className="flex h-screen w-full bg-background">
         <AppSidebar
           currentProjectId={currentProjectId}
+          currentRoomId={currentRoomId}
           onProjectSelect={handleProjectSelect}
+          onRoomSelect={handleRoomSelect}
           onNewProject={handleNewProject}
         />
         
