@@ -1,20 +1,31 @@
-import { useState } from 'react';
-import { Camera, Eye, ArrowUp, ArrowRight, Box, Loader2, X, Download, Presentation, Check, Edit2 } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Camera, Eye, ArrowUp, ArrowRight, Box, Loader2, X, Download, Presentation, Check, Edit2, Layers, Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 import pptxgen from 'pptxgenjs';
+import { supabase } from '@/integrations/supabase/client';
+import { Zone } from './ZoneSelector';
 
 export type CameraView = 'perspective' | 'front' | 'side' | 'top' | 'custom';
 
+export interface ZoneRegion {
+  x_start: number;
+  y_start: number;
+  x_end: number;
+  y_end: number;
+}
+
 interface MulticamPanelProps {
-  onGenerateView: (view: CameraView, customPrompt?: string) => void;
+  onGenerateView: (view: CameraView, customPrompt?: string, zone?: ZoneRegion) => void;
   isGenerating: boolean;
   generatedViews: Record<CameraView, string | null>;
   onSelectView: (view: CameraView, imageUrl: string) => void;
   onClose: () => void;
   onSetAsMain?: (imageUrl: string) => void;
+  projectId?: string;
+  onStartZoneDrawing?: () => void;
 }
 
 const VIEW_OPTIONS: { id: CameraView; label: string; icon: React.ReactNode; description: string }[] = [
@@ -56,17 +67,57 @@ export function MulticamPanel({
   generatedViews,
   onSelectView,
   onClose,
-  onSetAsMain 
+  onSetAsMain,
+  projectId,
+  onStartZoneDrawing,
 }: MulticamPanelProps) {
   const { toast } = useToast();
   const [generatingView, setGeneratingView] = useState<CameraView | null>(null);
   const [customAngle, setCustomAngle] = useState('');
   const [showCustomInput, setShowCustomInput] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
+  const [zones, setZones] = useState<Zone[]>([]);
+  const [selectedZone, setSelectedZone] = useState<Zone | null>(null);
+  const [showZones, setShowZones] = useState(false);
+
+  // Load zones when projectId changes
+  useEffect(() => {
+    if (projectId) {
+      loadZones();
+    }
+  }, [projectId]);
+
+  const loadZones = async () => {
+    if (!projectId) return;
+    
+    const { data, error } = await supabase
+      .from('staging_zones')
+      .select('*')
+      .eq('project_id', projectId)
+      .order('created_at', { ascending: true });
+
+    if (!error && data) {
+      setZones(data.map(z => ({
+        id: z.id,
+        name: z.name,
+        x_start: Number(z.x_start),
+        y_start: Number(z.y_start),
+        x_end: Number(z.x_end),
+        y_end: Number(z.y_end),
+        camera_position: z.camera_position || undefined,
+      })));
+    }
+  };
 
   const handleGenerate = (view: CameraView, customPrompt?: string) => {
     setGeneratingView(view);
-    onGenerateView(view, customPrompt);
+    const zone = selectedZone ? {
+      x_start: selectedZone.x_start,
+      y_start: selectedZone.y_start,
+      x_end: selectedZone.x_end,
+      y_end: selectedZone.y_end,
+    } : undefined;
+    onGenerateView(view, customPrompt, zone);
   };
 
   const handleCustomGenerate = () => {
@@ -172,11 +223,63 @@ export function MulticamPanel({
         <div className="flex items-center gap-2">
           <Camera className="h-4 w-4 text-primary" />
           <span className="text-sm font-medium">Multicam Views</span>
+          {selectedZone && (
+            <span className="text-[10px] px-1.5 py-0.5 bg-amber-500/20 text-amber-400 rounded">
+              {selectedZone.name}
+            </span>
+          )}
         </div>
         <Button variant="ghost" size="icon" className="h-6 w-6" onClick={onClose}>
           <X className="h-3 w-3" />
         </Button>
       </div>
+
+      {/* Zone selector */}
+      {zones.length > 0 && (
+        <div className="px-3 py-2 border-b border-border/30">
+          <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center gap-1.5">
+              <Layers className="h-3 w-3 text-muted-foreground" />
+              <span className="text-[10px] text-muted-foreground uppercase tracking-wider">Focus Zone</span>
+            </div>
+            {onStartZoneDrawing && (
+              <Button variant="ghost" size="sm" className="h-5 text-[10px]" onClick={onStartZoneDrawing}>
+                <Plus className="h-3 w-3 mr-1" />
+                Add
+              </Button>
+            )}
+          </div>
+          <div className="flex flex-wrap gap-1">
+            <Button
+              variant={selectedZone === null ? "secondary" : "ghost"}
+              size="sm"
+              className="h-6 text-[10px]"
+              onClick={() => setSelectedZone(null)}
+            >
+              Full Room
+            </Button>
+            {zones.map((zone) => (
+              <Button
+                key={zone.id}
+                variant={selectedZone?.id === zone.id ? "secondary" : "ghost"}
+                size="sm"
+                className={cn(
+                  "h-6 text-[10px]",
+                  selectedZone?.id === zone.id && "bg-amber-500/20 text-amber-400"
+                )}
+                onClick={() => setSelectedZone(zone)}
+              >
+                {zone.name}
+              </Button>
+            ))}
+          </div>
+          {selectedZone && (
+            <p className="text-[10px] text-amber-400/80 mt-1.5">
+              Generating views focused on "{selectedZone.name}" region only
+            </p>
+          )}
+        </div>
+      )}
 
       {/* View Grid */}
       <div className="p-3 grid grid-cols-3 gap-2">
