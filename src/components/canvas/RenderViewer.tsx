@@ -565,9 +565,10 @@ export function RenderViewer({
         </div>
 
         {/* Selective edit panel */}
-        {currentSelection && selectionMode && !isSelectiveEditing && (
+        {currentSelection && selectionMode && !isSelectiveEditing && displayUrl && (
           <SelectiveEditPanel
             selection={currentSelection}
+            renderUrl={displayUrl}
             onSubmit={handleSelectiveEditSubmit}
             onCancel={handleSelectiveEditCancel}
             isProcessing={isSelectiveEditing}

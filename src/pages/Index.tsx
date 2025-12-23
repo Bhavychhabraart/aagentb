@@ -15,6 +15,7 @@ import { CatalogFurnitureItem } from '@/services/catalogService';
 import { FurniturePositioner, FurniturePlacement } from '@/components/canvas/FurniturePositioner';
 import { ProjectData } from '@/services/documentService';
 import { SelectionRegion } from '@/components/canvas/SelectionOverlay';
+import { generateSelectionMask } from '@/utils/generateSelectionMask';
 import { RenderHistoryItem } from '@/components/canvas/RenderHistoryCarousel';
 import { CameraView, ZoneRegion } from '@/components/canvas/MulticamPanel';
 import { LayoutUploadModal } from '@/components/creation/LayoutUploadModal';
@@ -1079,13 +1080,17 @@ Ready to generate a render! Describe your vision.`;
   }, [user, currentProjectId, currentRenderUrl, currentRenderId, currentUpload, addMessage, toast]);
 
   // Handle selective area edit
-  const handleSelectiveEdit = useCallback(async (region: SelectionRegion, prompt: string, catalogItem?: CatalogFurnitureItem) => {
+  const handleSelectiveEdit = useCallback(async (region: SelectionRegion, prompt: string, catalogItem?: CatalogFurnitureItem, referenceImageUrl?: string) => {
     if (!user || !currentProjectId || !currentRenderUrl) return;
 
     setIsSelectiveEditing(true);
 
     try {
       const references = await fetchProjectReferences(currentProjectId);
+
+      // Generate mask image from selection region
+      const maskImageBase64 = await generateSelectionMask(region);
+      console.log('Generated mask for region:', region);
 
       const promptText = catalogItem 
         ? `[Catalog item: ${catalogItem.name}] ${prompt}`
@@ -1131,12 +1136,14 @@ Ready to generate a render! Describe your vision.`;
           currentRenderUrl,
           userPrompt: prompt,
           maskRegion: region,
+          maskImageBase64, // NEW: Pass the generated mask image
           catalogItem: catalogItem ? {
             name: catalogItem.name,
             category: catalogItem.category,
             description: catalogItem.description,
             imageUrl: catalogItem.imageUrl,
           } : undefined,
+          referenceImageUrl, // NEW: Pass reference image for upload mode
           layoutImageUrl: references.layoutUrl,
           styleRefUrls: references.styleRefUrls,
         }),
