@@ -240,9 +240,14 @@ export default function CreateCustomFurniture() {
       return;
     }
 
+    if (!name.trim()) {
+      toast({ variant: 'destructive', title: 'Error', description: 'Please enter a product name.' });
+      return;
+    }
+
     setIsSaving(true);
     try {
-      const itemName = name.trim() || prompt.slice(0, 50).trim() || 'Custom Furniture';
+      const itemName = name.trim();
       const price = parseFloat(estimatedPrice) || 0;
 
       if (isEditing && editId) {
@@ -422,12 +427,13 @@ export default function CreateCustomFurniture() {
 
               {/* Name */}
               <div className="space-y-2">
-                <Label>Name (Optional)</Label>
+                <Label>Product Name *</Label>
                 <Input
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   placeholder="e.g., Modern Oak Dining Table"
                   className="bg-muted/50"
+                  required
                 />
               </div>
 
@@ -598,7 +604,7 @@ export default function CreateCustomFurniture() {
               ) : (
                 <>
                   <Palette className="h-5 w-5" />
-                  Generate Furniture
+                  Generate Product
                 </>
               )}
             </Button>
