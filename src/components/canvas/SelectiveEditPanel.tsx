@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Send, X, Loader2, Crop, Type, Package, Paintbrush, Upload } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Send, X, Loader2, Crop, Type, Package, Paintbrush, Upload, Eye } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { SelectionRegion } from './SelectionOverlay';
@@ -9,9 +9,11 @@ import { SelectiveEditUploader } from './SelectiveEditUploader';
 import { CatalogFurnitureItem } from '@/services/catalogService';
 import { FinishItem } from '@/services/finishesLibrary';
 import { cn } from '@/lib/utils';
+import { generateSelectionPreview } from '@/utils/generateSelectionMask';
 
 interface SelectiveEditPanelProps {
   selection: SelectionRegion;
+  renderUrl: string; // Current render URL for preview generation
   onSubmit: (prompt: string, catalogItem?: CatalogFurnitureItem, referenceImageUrl?: string) => void;
   onCancel: () => void;
   isProcessing: boolean;
@@ -21,6 +23,7 @@ type EditMode = 'prompt' | 'catalog' | 'finish' | 'upload';
 
 export function SelectiveEditPanel({ 
   selection, 
+  renderUrl,
   onSubmit, 
   onCancel, 
   isProcessing 
@@ -31,6 +34,16 @@ export function SelectiveEditPanel({
   const [selectedFinish, setSelectedFinish] = useState<FinishItem | null>(null);
   const [additionalInstructions, setAdditionalInstructions] = useState('');
   const [uploadedImageUrl, setUploadedImageUrl] = useState<string | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+
+  // Generate selection preview when component mounts or selection changes
+  useEffect(() => {
+    if (renderUrl && selection) {
+      generateSelectionPreview(renderUrl, selection, 160)
+        .then(setPreviewUrl)
+        .catch(err => console.error('Failed to generate preview:', err));
+    }
+  }, [renderUrl, selection]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -64,13 +77,18 @@ export function SelectiveEditPanel({
     }
   };
 
+  // Only allow Enter key to submit in prompt mode (text input)
+  // For other modes, require explicit button click to prevent accidental submission
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      handleSubmit(e);
-    }
     if (e.key === 'Escape') {
       onCancel();
+      return;
+    }
+    
+    // Only auto-submit on Enter in prompt mode
+    if (e.key === 'Enter' && !e.shiftKey && editMode === 'prompt') {
+      e.preventDefault();
+      handleSubmit(e);
     }
   };
 
@@ -85,16 +103,32 @@ export function SelectiveEditPanel({
   return (
     <div className="absolute bottom-[12%] left-1/2 -translate-x-1/2 z-30 w-full max-w-lg px-4">
       <div className="bg-card/95 backdrop-blur-md rounded-xl border border-border shadow-2xl overflow-hidden">
-        {/* Header */}
-        <div className="px-4 py-3 border-b border-border flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center">
+        {/* Header with Selection Preview */}
+        <div className="px-4 py-3 border-b border-border flex items-center justify-between gap-3">
+          {/* Selection Preview Thumbnail */}
+          {previewUrl && (
+            <div className="relative shrink-0">
+              <div className="w-14 h-10 rounded-md overflow-hidden border border-border bg-muted">
+                <img 
+                  src={previewUrl} 
+                  alt="Selection preview" 
+                  className="w-full h-full object-cover"
+                />
+              </div>
+              <div className="absolute -top-1 -right-1 h-4 w-4 rounded-full bg-primary flex items-center justify-center">
+                <Eye className="h-2.5 w-2.5 text-primary-foreground" />
+              </div>
+            </div>
+          )}
+          
+          <div className="flex items-center gap-2 flex-1 min-w-0">
+            <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
               <Crop className="h-4 w-4 text-primary" />
             </div>
-            <div>
+            <div className="min-w-0">
               <h3 className="text-sm font-medium text-foreground">Selective Edit</h3>
-              <p className="text-xs text-muted-foreground">
-                Region: {Math.round(selection.x)}%, {Math.round(selection.y)}% → {Math.round(selection.width)}% × {Math.round(selection.height)}%
+              <p className="text-xs text-muted-foreground truncate">
+                {Math.round(selection.width)}% × {Math.round(selection.height)}% area selected
               </p>
             </div>
           </div>
@@ -102,7 +136,7 @@ export function SelectiveEditPanel({
             variant="ghost"
             size="icon"
             onClick={onCancel}
-            className="h-8 w-8"
+            className="h-8 w-8 shrink-0"
           >
             <X className="h-4 w-4" />
           </Button>
@@ -187,7 +221,6 @@ export function SelectiveEditPanel({
                 <Textarea
                   value={additionalInstructions}
                   onChange={(e) => setAdditionalInstructions(e.target.value)}
-                  onKeyDown={handleKeyDown}
                   placeholder="Optional: Additional instructions (e.g., 'Make it slightly larger' or 'Face towards the left')"
                   disabled={isProcessing}
                   className="min-h-[50px] resize-none text-xs"
@@ -208,7 +241,6 @@ export function SelectiveEditPanel({
                 <Textarea
                   value={additionalInstructions}
                   onChange={(e) => setAdditionalInstructions(e.target.value)}
-                  onKeyDown={handleKeyDown}
                   placeholder="Optional: Additional instructions (e.g., 'Add slight texture' or 'Matte finish')"
                   disabled={isProcessing}
                   className="min-h-[50px] resize-none text-xs"
@@ -229,7 +261,6 @@ export function SelectiveEditPanel({
                 <Textarea
                   value={additionalInstructions}
                   onChange={(e) => setAdditionalInstructions(e.target.value)}
-                  onKeyDown={handleKeyDown}
                   placeholder="Describe how to apply this image (e.g., 'Use as fabric texture' or 'Replace with this chair')"
                   disabled={isProcessing}
                   className="min-h-[50px] resize-none text-xs"
@@ -245,14 +276,14 @@ export function SelectiveEditPanel({
                 : editMode === 'catalog'
                   ? selectedCatalogItem 
                     ? `Selected: ${selectedCatalogItem.name}`
-                    : 'Select a product from the catalog'
+                    : 'Select a product, then click Apply Edit'
                   : editMode === 'finish'
                     ? selectedFinish
                       ? `Selected: ${selectedFinish.name}`
-                      : 'Select a finish from the library'
+                      : 'Select a finish, then click Apply Edit'
                     : uploadedImageUrl
-                      ? 'Image uploaded - add instructions'
-                      : 'Upload a reference image'}
+                      ? 'Image ready - click Apply Edit'
+                      : 'Upload an image, then click Apply Edit'}
             </p>
             <div className="flex gap-2">
               <Button

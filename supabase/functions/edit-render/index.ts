@@ -96,7 +96,9 @@ serve(async (req) => {
       layoutAnalysis,
       compositeMode = false,
       maskRegion, // For selective area editing { x, y, width, height } as percentages
+      maskImageBase64, // NEW: Base64 encoded mask image (white area = edit, black = preserve)
       catalogItem, // For catalog-based selective edit { name, category, description, imageUrl }
+      referenceImageUrl, // NEW: Reference image for uploads mode
       textOnlyEdit = false // NEW: For text-only edits without furniture
     } = await req.json();
     
@@ -118,7 +120,9 @@ serve(async (req) => {
     console.log('Composite mode:', compositeMode);
     console.log('Text-only edit:', textOnlyEdit);
     console.log('Mask region:', maskRegion ? `${maskRegion.x}%,${maskRegion.y}% (${maskRegion.width}%×${maskRegion.height}%)` : 'none');
+    console.log('Mask image:', maskImageBase64 ? 'provided (base64)' : 'none');
     console.log('Catalog item:', catalogItem ? catalogItem.name : 'none');
+    console.log('Reference image:', referenceImageUrl ? 'provided' : 'none');
 
     // Handle TEXT-ONLY EDIT mode (no furniture items, just a prompt)
     if (textOnlyEdit && userPrompt && (!furnitureItems || furnitureItems.length === 0)) {
@@ -197,67 +201,124 @@ Output: The edited room image with the requested changes applied.`;
     }
 
     // Handle SELECTIVE AREA EDIT mode
-    if (maskRegion && (userPrompt || catalogItem)) {
-      console.log('Using SELECTIVE AREA EDIT mode' + (catalogItem ? ' with catalog item' : ''));
+    if (maskRegion && (userPrompt || catalogItem || referenceImageUrl)) {
+      console.log('Using SELECTIVE AREA EDIT mode' + (catalogItem ? ' with catalog item' : referenceImageUrl ? ' with reference image' : ''));
       
       const content: Array<{ type: string; text?: string; image_url?: { url: string } }> = [];
+      let imageIndex = 1;
       
-      // IMAGE 1: Current render
+      // IMAGE 1: Current render (the room to edit)
       content.push({ type: 'image_url', image_url: { url: currentRenderUrl } });
+      const renderIndex = imageIndex++;
       
-      // IMAGE 2: Catalog item reference (if provided)
+      // IMAGE 2: Mask image (if provided) - WHITE = area to edit, BLACK = preserve
+      let maskIndex: number | null = null;
+      if (maskImageBase64) {
+        content.push({ type: 'image_url', image_url: { url: maskImageBase64 } });
+        maskIndex = imageIndex++;
+        console.log('Added mask image as IMAGE', maskIndex);
+      }
+      
+      // IMAGE 3: Catalog item reference OR reference image (if provided)
+      let refIndex: number | null = null;
       if (catalogItem?.imageUrl) {
         content.push({ type: 'image_url', image_url: { url: catalogItem.imageUrl } });
+        refIndex = imageIndex++;
+      } else if (referenceImageUrl) {
+        content.push({ type: 'image_url', image_url: { url: referenceImageUrl } });
+        refIndex = imageIndex++;
       }
       
       let selectivePrompt: string;
       
+      // Build the mask instruction
+      const maskInstruction = maskIndex 
+        ? `
+
+MASK IMAGE (IMAGE ${maskIndex}):
+The WHITE area in this mask shows EXACTLY where to apply edits.
+The BLACK area MUST remain completely unchanged - pixel perfect preservation.
+Use this mask as a precise boundary for your edits.`
+        : '';
+      
       if (catalogItem) {
         // Catalog-based selective edit with product reference
-        selectivePrompt = `You are a precision furniture staging specialist. Replace content in the specified region with the EXACT product shown in the reference image.
+        selectivePrompt = `You are a precision furniture staging specialist performing INPAINTING. Replace content in the masked region with the EXACT product shown in the reference image.
+
+IMAGES PROVIDED:
+- IMAGE ${renderIndex}: The room to edit
+${maskIndex ? `- IMAGE ${maskIndex}: BLACK & WHITE MASK (WHITE = edit zone, BLACK = preserve unchanged)` : ''}
+- IMAGE ${refIndex}: The product to place (COPY THIS EXACTLY)
 
 REGION TO EDIT:
 - Position: ${Math.round(maskRegion.x)}% from left, ${Math.round(maskRegion.y)}% from top
 - Size: ${Math.round(maskRegion.width)}% width × ${Math.round(maskRegion.height)}% height
+${maskInstruction}
 
 PRODUCT TO PLACE:
 - Name: ${catalogItem.name}
 - Category: ${catalogItem.category}
 - Description: ${catalogItem.description || 'Premium furniture piece'}
-- Visual Reference: IMAGE 2 (COPY THIS EXACTLY)
 
-CRITICAL REQUIREMENTS:
-1. REPLACE the content in the specified region with the EXACT product from IMAGE 2
-2. The placed furniture must be a PIXEL-PERFECT copy of the reference image
-3. Copy the EXACT shape, color, material texture, and proportions from IMAGE 2
-4. Keep EVERYTHING outside this region EXACTLY unchanged - pixel perfect
-5. Maintain consistent lighting and shadows with the surrounding room
-6. Adjust scale to fit naturally within the region while preserving aspect ratio
-7. Apply realistic shadows that match the room's lighting direction
+CRITICAL INPAINTING RULES:
+1. ${maskIndex ? 'ONLY edit pixels where the mask is WHITE - leave BLACK areas completely unchanged' : 'ONLY edit content within the specified region percentage coordinates'}
+2. The placed furniture must be a PIXEL-PERFECT copy of IMAGE ${refIndex}
+3. Copy the EXACT shape, color, material texture, and proportions from the reference
+4. Blend edges seamlessly with surrounding room elements
+5. Maintain consistent lighting and shadows with the room
+6. Apply realistic shadows matching the room's lighting direction
 
 ${userPrompt ? `ADDITIONAL INSTRUCTIONS: ${userPrompt}` : ''}
 
-QUALITY CHECK: The placed furniture will be compared side-by-side with IMAGE 2. ANY deviation in shape, color, or details is a failure.
+QUALITY CHECK: Areas outside the ${maskIndex ? 'white mask region' : 'specified region'} must be IDENTICAL to IMAGE ${renderIndex}. Any changes outside the edit zone is a failure.
 
-Output: The room image with ONLY the specified region modified, containing the exact product from IMAGE 2.`;
-      } else {
-        // Text-based selective edit (original behavior)
-        selectivePrompt = `You are a precise image editor. Edit ONLY the specified region of this room image.
+Output: The room image with ONLY the masked/specified region modified.`;
+      } else if (referenceImageUrl) {
+        // Upload-based selective edit with reference image
+        selectivePrompt = `You are a precise image editor performing INPAINTING. Apply the reference image to the masked region.
+
+IMAGES PROVIDED:
+- IMAGE ${renderIndex}: The room to edit
+${maskIndex ? `- IMAGE ${maskIndex}: BLACK & WHITE MASK (WHITE = edit zone, BLACK = preserve unchanged)` : ''}
+- IMAGE ${refIndex}: Reference image to apply
 
 REGION TO EDIT:
 - Position: ${Math.round(maskRegion.x)}% from left, ${Math.round(maskRegion.y)}% from top
 - Size: ${Math.round(maskRegion.width)}% width × ${Math.round(maskRegion.height)}% height
+${maskInstruction}
+
+CRITICAL INPAINTING RULES:
+1. ${maskIndex ? 'ONLY edit pixels where the mask is WHITE - leave BLACK areas completely unchanged' : 'ONLY edit content within the specified region percentage coordinates'}
+2. Apply the reference image naturally to the edit zone
+3. Blend edges seamlessly with surrounding elements
+4. Maintain consistent lighting and perspective
+
+${userPrompt ? `INSTRUCTIONS: ${userPrompt}` : 'Apply the reference image to this area naturally.'}
+
+Output: The room with ONLY the masked/specified region modified using the reference.`;
+      } else {
+        // Text-based selective edit
+        selectivePrompt = `You are a precise image editor performing INPAINTING. Edit ONLY the masked region of this room image.
+
+IMAGES PROVIDED:
+- IMAGE ${renderIndex}: The room to edit
+${maskIndex ? `- IMAGE ${maskIndex}: BLACK & WHITE MASK (WHITE = edit zone, BLACK = preserve unchanged)` : ''}
+
+REGION TO EDIT:
+- Position: ${Math.round(maskRegion.x)}% from left, ${Math.round(maskRegion.y)}% from top
+- Size: ${Math.round(maskRegion.width)}% width × ${Math.round(maskRegion.height)}% height
+${maskInstruction}
 
 EDIT INSTRUCTION: ${userPrompt}
 
-CRITICAL RULES:
-1. ONLY modify content within the specified region
-2. Keep EVERYTHING outside this region EXACTLY unchanged - pixel perfect
+CRITICAL INPAINTING RULES:
+1. ${maskIndex ? 'ONLY edit pixels where the mask is WHITE - leave BLACK areas completely unchanged' : 'ONLY edit content within the specified region percentage coordinates'}
+2. Keep EVERYTHING outside the edit zone EXACTLY unchanged - pixel perfect
 3. Maintain consistent lighting, shadows, and perspective with surrounding areas
 4. The edit should blend seamlessly with the rest of the image
 5. Preserve the same camera angle and image quality
 
-Output: The edited image with ONLY the specified region modified.`;
+Output: The edited image with ONLY the masked/specified region modified.`;
       }
 
       content.push({ type: 'text', text: selectivePrompt });
@@ -298,8 +359,9 @@ Output: The edited image with ONLY the specified region modified.`;
         throw new Error('No image generated from selective edit request');
       }
 
-      console.log('Selective area edit completed successfully' + (catalogItem ? ` with ${catalogItem.name}` : ''));
-      return new Response(JSON.stringify({ imageUrl, mode: catalogItem ? 'selective-catalog' : 'selective-edit' }), {
+      const mode = catalogItem ? 'selective-catalog' : referenceImageUrl ? 'selective-upload' : 'selective-edit';
+      console.log('Selective area edit completed successfully:', mode);
+      return new Response(JSON.stringify({ imageUrl, mode }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
