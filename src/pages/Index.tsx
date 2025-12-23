@@ -660,7 +660,7 @@ Ready to generate a render! Describe your vision.`;
     }
   };
 
-  // Edit existing render with staged furniture
+  // Edit existing render - works with or without staged furniture
   const editRender = useCallback(async (content: string, furnitureItems: CatalogFurnitureItem[]) => {
     if (!user || !currentProjectId || !currentRenderUrl) return;
 
@@ -686,8 +686,14 @@ Ready to generate a render! Describe your vision.`;
 
       if (renderError) throw renderError;
 
+      // Different message depending on whether we have furniture items
+      const hasFurniture = furnitureItems.length > 0;
       const furnitureNames = furnitureItems.map(i => i.name).join(', ');
-      await addMessage('assistant', `Editing render: replacing furniture with ${furnitureNames}...`, 
+      
+      await addMessage('assistant', 
+        hasFurniture 
+          ? `Editing render: replacing furniture with ${furnitureNames}...`
+          : `Editing render: "${content}"...`, 
         { type: 'text', status: 'pending' }
       );
 
@@ -700,15 +706,18 @@ Ready to generate a render! Describe your vision.`;
         body: JSON.stringify({
           currentRenderUrl,
           userPrompt: content,
-          furnitureItems: furnitureItems.map(item => ({
+          // Only pass furniture items if we have them
+          furnitureItems: hasFurniture ? furnitureItems.map(item => ({
             name: item.name,
             category: item.category,
             description: item.description,
             imageUrl: item.imageUrl,
-          })),
+          })) : [],
           // Pass layout and style references for consistency
           layoutImageUrl: references.layoutUrl,
           styleRefUrls: references.styleRefUrls,
+          // NEW: Signal text-only edit mode when no furniture
+          textOnlyEdit: !hasFurniture,
         }),
       });
 
@@ -728,13 +737,18 @@ Ready to generate a render! Describe your vision.`;
       setCurrentRenderUrl(imageUrl);
       setCurrentRenderId(renderRecord.id);
 
-      await addMessage('assistant', 'Render updated with your furniture! The staged items have been placed in the room.', {
-        type: 'render',
-        imageUrl,
-        status: 'ready',
-      });
+      await addMessage('assistant', 
+        hasFurniture 
+          ? 'Render updated with your furniture! The staged items have been placed in the room.'
+          : 'Render updated with your changes!', 
+        {
+          type: 'render',
+          imageUrl,
+          status: 'ready',
+        }
+      );
 
-      toast({ title: 'Render updated', description: 'Furniture replaced successfully.' });
+      toast({ title: 'Render updated', description: hasFurniture ? 'Furniture replaced successfully.' : 'Changes applied.' });
 
     } catch (error) {
       console.error('Render edit failed:', error);
@@ -869,8 +883,10 @@ Ready to generate a render! Describe your vision.`;
   const handleSendMessage = useCallback(async (content: string) => {
     if (!user || !currentProjectId) return;
 
-    // Determine if we should edit or generate
-    const shouldEdit = currentRenderUrl && stagedItems.length > 0;
+    // KEY FIX: If a render already exists, ALWAYS use edit mode (not regenerate)
+    // - First message (no render): Generate new render
+    // - Subsequent messages (render exists): Edit existing render
+    const shouldEdit = currentRenderUrl !== null;
 
     // Build message content with staged items info
     const messageContent = stagedItems.length > 0
@@ -883,12 +899,12 @@ Ready to generate a render! Describe your vision.`;
       stagedFurniture: stagedItems.length > 0 ? stagedItems.map(i => ({ id: i.id, name: i.name })) : undefined,
     } as ChatMessage['metadata']);
 
-    // Choose edit or generate based on context
+    // Choose edit or generate based on whether a render exists
     if (shouldEdit) {
-      // Edit existing render with staged furniture
+      // Edit existing render (with or without staged furniture)
       editRender(content, stagedItems);
     } else {
-      // Generate new render
+      // Generate first render
       triggerGeneration(content, stagedItems);
     }
     
@@ -972,8 +988,8 @@ Ready to generate a render! Describe your vision.`;
     setStagedItems(items);
   };
 
-  // Determine if in edit mode
-  const isEditMode = currentRenderUrl !== null && stagedItems.length > 0;
+  // Determine if in edit mode - any render exists means we're in edit mode
+  const isEditMode = currentRenderUrl !== null;
 
   // Handle composite mode with positioned furniture - MUST be before early returns
   const handleCompositeConfirm = useCallback(async (placements: FurniturePlacement[]) => {

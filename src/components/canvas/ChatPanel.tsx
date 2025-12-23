@@ -101,11 +101,16 @@ export function ChatPanel({
             {messages.length}
           </span>
         </div>
-        {/* Edit Mode Indicator */}
-        {isEditMode && (
+        {/* Mode Indicator */}
+        {isEditMode ? (
           <div className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-amber-500/10 border border-amber-500/30">
             <Edit3 className="h-3 w-3 text-amber-500" />
             <span className="text-xs font-medium text-amber-500">Edit Mode</span>
+          </div>
+        ) : (
+          <div className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-primary/10 border border-primary/30">
+            <Sparkles className="h-3 w-3 text-primary" />
+            <span className="text-xs font-medium text-primary">Generate</span>
           </div>
         )}
       </div>
@@ -340,7 +345,9 @@ export function ChatPanel({
               onKeyDown={handleKeyDown}
               placeholder={
                 isEditMode 
-                  ? "Describe changes to make (staged items will replace furniture)..." 
+                  ? stagedItems.length > 0 
+                    ? "Describe changes (staged items will replace furniture)..." 
+                    : "Describe what to change (e.g., 'make walls blue', 'add plants')..."
                   : stagedItems.length > 0 
                     ? "Describe your design with staged furniture..." 
                     : "Describe your vision..."
