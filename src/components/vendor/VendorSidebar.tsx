@@ -1,4 +1,4 @@
-import { Package, Camera, ShoppingCart, BarChart3, Plus, ArrowLeft, Settings, LogOut } from 'lucide-react';
+import { Package, Camera, ShoppingCart, BarChart3, Plus, ArrowLeft, Settings, LogOut, Palette, PenTool, HelpCircle } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import {
@@ -12,12 +12,11 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
-  SidebarTrigger,
-  useSidebar,
 } from '@/components/ui/sidebar';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Separator } from '@/components/ui/separator';
+import { useSidebar } from '@/components/ui/sidebar';
 
 type VendorSection = 'products' | 'studio' | 'orders' | 'analytics';
 
@@ -27,11 +26,17 @@ interface VendorSidebarProps {
   onAddProduct: () => void;
 }
 
-const navItems = [
+const mainNavItems = [
   { id: 'products' as VendorSection, title: 'Products', icon: Package },
   { id: 'studio' as VendorSection, title: 'Photo Studio', icon: Camera },
   { id: 'orders' as VendorSection, title: 'Orders', icon: ShoppingCart },
   { id: 'analytics' as VendorSection, title: 'Analytics', icon: BarChart3 },
+];
+
+const workspaceItems = [
+  { id: 'workspace', title: 'Back to Workspace', icon: ArrowLeft, path: '/' },
+  { id: 'custom-library', title: 'Custom Library', icon: Palette, path: '/custom-furniture' },
+  { id: 'layout-creator', title: 'Layout Creator', icon: PenTool, path: '/layout-creator' },
 ];
 
 export function VendorSidebar({ activeSection, onSectionChange, onAddProduct }: VendorSidebarProps) {
@@ -82,10 +87,10 @@ export function VendorSidebar({ activeSection, onSectionChange, onAddProduct }: 
 
         {/* Main Navigation */}
         <SidebarGroup>
-          <SidebarGroupLabel className={isCollapsed ? 'sr-only' : ''}>Navigation</SidebarGroupLabel>
+          <SidebarGroupLabel className={isCollapsed ? 'sr-only' : ''}>Main Menu</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {navItems.map((item) => (
+              {mainNavItems.map((item) => (
                 <SidebarMenuItem key={item.id}>
                   <SidebarMenuButton
                     onClick={() => onSectionChange(item.id)}
@@ -102,19 +107,48 @@ export function VendorSidebar({ activeSection, onSectionChange, onAddProduct }: 
           </SidebarGroupContent>
         </SidebarGroup>
 
-        {/* Secondary Actions */}
+        {/* Workspace Navigation */}
         <SidebarGroup>
-          <SidebarGroupLabel className={isCollapsed ? 'sr-only' : ''}>Quick Actions</SidebarGroupLabel>
+          <SidebarGroupLabel className={isCollapsed ? 'sr-only' : ''}>Workspace</SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              {workspaceItems.map((item) => (
+                <SidebarMenuItem key={item.id}>
+                  <SidebarMenuButton
+                    onClick={() => navigate(item.path)}
+                    tooltip={item.title}
+                    className="gap-3"
+                  >
+                    <item.icon className="h-4 w-4 flex-shrink-0" />
+                    {!isCollapsed && <span>{item.title}</span>}
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              ))}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+
+        {/* Settings & Help */}
+        <SidebarGroup>
+          <SidebarGroupLabel className={isCollapsed ? 'sr-only' : ''}>Support</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
               <SidebarMenuItem>
                 <SidebarMenuButton
-                  onClick={() => navigate('/')}
-                  tooltip="Back to App"
+                  tooltip="Settings"
                   className="gap-3"
                 >
-                  <ArrowLeft className="h-4 w-4 flex-shrink-0" />
-                  {!isCollapsed && <span>Back to App</span>}
+                  <Settings className="h-4 w-4 flex-shrink-0" />
+                  {!isCollapsed && <span>Settings</span>}
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+              <SidebarMenuItem>
+                <SidebarMenuButton
+                  tooltip="Help & Support"
+                  className="gap-3"
+                >
+                  <HelpCircle className="h-4 w-4 flex-shrink-0" />
+                  {!isCollapsed && <span>Help & Support</span>}
                 </SidebarMenuButton>
               </SidebarMenuItem>
             </SidebarMenu>
