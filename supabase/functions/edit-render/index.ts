@@ -96,7 +96,8 @@ serve(async (req) => {
       layoutAnalysis,
       compositeMode = false,
       maskRegion, // For selective area editing { x, y, width, height } as percentages
-      catalogItem // NEW: For catalog-based selective edit { name, category, description, imageUrl }
+      catalogItem, // For catalog-based selective edit { name, category, description, imageUrl }
+      textOnlyEdit = false // NEW: For text-only edits without furniture
     } = await req.json();
     
     const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
@@ -115,8 +116,85 @@ serve(async (req) => {
     console.log('Layout analysis:', layoutAnalysis ? 'provided (111% accuracy mode)' : 'none');
     console.log('Style references:', styleRefUrls?.length || 0);
     console.log('Composite mode:', compositeMode);
+    console.log('Text-only edit:', textOnlyEdit);
     console.log('Mask region:', maskRegion ? `${maskRegion.x}%,${maskRegion.y}% (${maskRegion.width}%×${maskRegion.height}%)` : 'none');
     console.log('Catalog item:', catalogItem ? catalogItem.name : 'none');
+
+    // Handle TEXT-ONLY EDIT mode (no furniture items, just a prompt)
+    if (textOnlyEdit && userPrompt && (!furnitureItems || furnitureItems.length === 0)) {
+      console.log('Using TEXT-ONLY EDIT mode');
+      
+      const content: Array<{ type: string; text?: string; image_url?: { url: string } }> = [];
+      
+      // IMAGE 1: Current render
+      content.push({ type: 'image_url', image_url: { url: currentRenderUrl } });
+      
+      // Add style references if available
+      if (styleRefUrls && styleRefUrls.length > 0) {
+        for (const styleUrl of styleRefUrls) {
+          content.push({ type: 'image_url', image_url: { url: styleUrl } });
+        }
+      }
+      
+      const textEditPrompt = `You are a precise room image editor. Edit the room image (IMAGE 1) according to the user's instruction.
+
+USER INSTRUCTION: ${userPrompt}
+
+CRITICAL RULES:
+1. Apply the requested changes while preserving the overall room structure
+2. Keep architectural elements (walls, windows, doors, floor) in their exact positions
+3. Maintain the same camera angle and perspective
+4. Preserve furniture that is NOT mentioned in the instruction
+5. Apply changes naturally with consistent lighting and shadows
+6. The result should look photorealistic
+${styleRefUrls?.length ? '\n7. Match the aesthetic style from the provided style reference images' : ''}
+
+Output: The edited room image with the requested changes applied.`;
+
+      content.push({ type: 'text', text: textEditPrompt });
+
+      const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${LOVABLE_API_KEY}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: 'google/gemini-3-pro-image-preview',
+          messages: [{ role: 'user', content }],
+          modalities: ['image', 'text'],
+          generationConfig: { aspectRatio: "16:9" }
+        }),
+      });
+
+      if (!response.ok) {
+        if (response.status === 429) {
+          return new Response(JSON.stringify({ error: 'Rate limit exceeded. Please try again later.' }), {
+            status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+        if (response.status === 402) {
+          return new Response(JSON.stringify({ error: 'Usage limit reached. Please add credits.' }), {
+            status: 402, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+        const errorText = await response.text();
+        console.error('AI gateway error:', response.status, errorText);
+        throw new Error(`AI gateway error: ${errorText}`);
+      }
+
+      const data = await response.json();
+      const imageUrl = data.choices?.[0]?.message?.images?.[0]?.image_url?.url;
+
+      if (!imageUrl) {
+        throw new Error('No image generated from text-only edit request');
+      }
+
+      console.log('Text-only edit completed successfully');
+      return new Response(JSON.stringify({ imageUrl, mode: 'text-only-edit' }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
 
     // Handle SELECTIVE AREA EDIT mode
     if (maskRegion && (userPrompt || catalogItem)) {
