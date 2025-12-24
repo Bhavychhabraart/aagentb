@@ -1,1 +1,4 @@
 project_id = "rdbpwexwuzakmrutcrfg"
+
+[functions.agent-b-analyze]
+verify_jwt = false
