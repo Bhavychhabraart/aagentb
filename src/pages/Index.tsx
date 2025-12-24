@@ -6,6 +6,8 @@ import { useToast } from '@/hooks/use-toast';
 import { AppSidebar } from '@/components/layout/AppSidebar';
 import { ChatPanel, ChatMessage, ChatInputType } from '@/components/canvas/ChatPanel';
 import { RenderViewer } from '@/components/canvas/RenderViewer';
+import { SplitWorkspace } from '@/components/canvas/SplitWorkspace';
+import { CameraData } from '@/components/canvas/CameraPlacement';
 import { UploadDialog } from '@/components/canvas/UploadDialog';
 import { AssetsPanel } from '@/components/canvas/AssetsPanel';
 import { ExportModal } from '@/components/canvas/ExportModal';
@@ -76,6 +78,12 @@ const Index = () => {
     top: null,
     custom: null,
   });
+  
+  // Camera placement state
+  const [cameras, setCameras] = useState<CameraData[]>([]);
+  const [selectedCameraId, setSelectedCameraId] = useState<string | null>(null);
+  const [isRoomLocked, setIsRoomLocked] = useState(false);
+  const [useSplitWorkspace, setUseSplitWorkspace] = useState(true); // New dual-pane mode
   
   // Chat input modals
   const [showLayoutModal, setShowLayoutModal] = useState(false);

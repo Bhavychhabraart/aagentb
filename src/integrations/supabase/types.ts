@@ -14,6 +14,69 @@ export type Database = {
   }
   public: {
     Tables: {
+      cameras: {
+        Row: {
+          capture_height: number
+          capture_width: number
+          created_at: string
+          fov_angle: number
+          id: string
+          name: string
+          project_id: string
+          room_id: string | null
+          rotation: number
+          updated_at: string
+          user_id: string
+          x_position: number
+          y_position: number
+        }
+        Insert: {
+          capture_height?: number
+          capture_width?: number
+          created_at?: string
+          fov_angle?: number
+          id?: string
+          name?: string
+          project_id: string
+          room_id?: string | null
+          rotation?: number
+          updated_at?: string
+          user_id: string
+          x_position?: number
+          y_position?: number
+        }
+        Update: {
+          capture_height?: number
+          capture_width?: number
+          created_at?: string
+          fov_angle?: number
+          id?: string
+          name?: string
+          project_id?: string
+          room_id?: string | null
+          rotation?: number
+          updated_at?: string
+          user_id?: string
+          x_position?: number
+          y_position?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cameras_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cameras_room_id_fkey"
+            columns: ["room_id"]
+            isOneToOne: false
+            referencedRelation: "rooms"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       chat_messages: {
         Row: {
           content: string
@@ -465,6 +528,9 @@ export type Database = {
         Row: {
           created_at: string
           id: string
+          is_locked: boolean
+          locked_at: string | null
+          locked_render_url: string | null
           name: string
           project_id: string
           thumbnail_url: string | null
@@ -474,6 +540,9 @@ export type Database = {
         Insert: {
           created_at?: string
           id?: string
+          is_locked?: boolean
+          locked_at?: string | null
+          locked_render_url?: string | null
           name?: string
           project_id: string
           thumbnail_url?: string | null
@@ -483,6 +552,9 @@ export type Database = {
         Update: {
           created_at?: string
           id?: string
+          is_locked?: boolean
+          locked_at?: string | null
+          locked_render_url?: string | null
           name?: string
           project_id?: string
           thumbnail_url?: string | null
