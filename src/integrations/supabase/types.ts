@@ -575,7 +575,6 @@ export type Database = {
         Row: {
           catalog_item_id: string
           created_at: string
-          height_percent: number | null
           id: string
           item_category: string
           item_description: string | null
@@ -585,14 +584,10 @@ export type Database = {
           project_id: string
           room_id: string | null
           user_id: string
-          width_percent: number | null
-          x_position: number | null
-          y_position: number | null
         }
         Insert: {
           catalog_item_id: string
           created_at?: string
-          height_percent?: number | null
           id?: string
           item_category: string
           item_description?: string | null
@@ -602,14 +597,10 @@ export type Database = {
           project_id: string
           room_id?: string | null
           user_id: string
-          width_percent?: number | null
-          x_position?: number | null
-          y_position?: number | null
         }
         Update: {
           catalog_item_id?: string
           created_at?: string
-          height_percent?: number | null
           id?: string
           item_category?: string
           item_description?: string | null
@@ -619,9 +610,6 @@ export type Database = {
           project_id?: string
           room_id?: string | null
           user_id?: string
-          width_percent?: number | null
-          x_position?: number | null
-          y_position?: number | null
         }
         Relationships: [
           {

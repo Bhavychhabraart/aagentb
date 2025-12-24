@@ -1,12 +1,11 @@
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from '@/components/ui/resizable';
-import { LayoutGrid, Eye, Maximize2, Minimize2, Camera as CameraIcon, Plus, Lock, Unlock, MousePointer } from 'lucide-react';
+import { LayoutGrid, Eye, Move, Maximize2, Minimize2, Camera as CameraIcon, Plus, Lock, Unlock } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from '@/components/ui/tooltip';
 import { CameraPlacement, CameraData } from './CameraPlacement';
 import { CameraPropertiesPanel } from './CameraPropertiesPanel';
-import { FurnitureOverlay, StagedFurnitureItem } from './FurnitureOverlay';
 
 interface SplitWorkspaceProps {
   layoutImageUrl: string | null;
@@ -15,15 +14,12 @@ interface SplitWorkspaceProps {
   cameras: CameraData[];
   selectedCameraId: string | null;
   isRoomLocked: boolean;
-  stagedFurniture: StagedFurnitureItem[];
-  selectedFurnitureId: string | null;
   onCameraAdd: () => void;
   onCameraSelect: (cameraId: string | null) => void;
   onCameraUpdate: (camera: CameraData) => void;
   onCameraDelete: (cameraId: string) => void;
   onGenerateFromCamera: (cameraId: string, prompt: string) => void;
   onToggleRoomLock: () => void;
-  onFurnitureClick: (furniture: StagedFurnitureItem) => void;
 }
 
 export function SplitWorkspace({
@@ -33,15 +29,12 @@ export function SplitWorkspace({
   cameras,
   selectedCameraId,
   isRoomLocked,
-  stagedFurniture,
-  selectedFurnitureId,
   onCameraAdd,
   onCameraSelect,
   onCameraUpdate,
   onCameraDelete,
   onGenerateFromCamera,
   onToggleRoomLock,
-  onFurnitureClick,
 }: SplitWorkspaceProps) {
   const [isLayoutExpanded, setIsLayoutExpanded] = useState(false);
   const selectedCamera = cameras.find(c => c.id === selectedCameraId);
@@ -102,7 +95,7 @@ export function SplitWorkspace({
                 </Tooltip>
               </div>
 
-              {/* Layout Image with Furniture Overlay */}
+              {/* Layout Image */}
               <div className="flex-1 p-3 flex items-center justify-center overflow-hidden">
                 {layoutImageUrl ? (
                   <div className="relative w-full h-full rounded-lg overflow-hidden border border-border/50 bg-black/20">
@@ -112,27 +105,10 @@ export function SplitWorkspace({
                       className="absolute inset-0 w-full h-full object-contain"
                       draggable={false}
                     />
-                    
-                    {/* Furniture Overlay - clickable zones */}
-                    <FurnitureOverlay
-                      stagedFurniture={stagedFurniture}
-                      onFurnitureClick={onFurnitureClick}
-                      selectedFurnitureId={selectedFurnitureId}
-                      disabled={isRoomLocked}
-                    />
-                    
                     {/* Corner label */}
-                    <div className="absolute top-2 left-2 px-2 py-1 bg-primary/20 backdrop-blur-sm rounded text-xs font-mono text-primary border border-primary/30 z-20">
+                    <div className="absolute top-2 left-2 px-2 py-1 bg-primary/20 backdrop-blur-sm rounded text-xs font-mono text-primary border border-primary/30">
                       LAYOUT
                     </div>
-                    
-                    {/* Furniture count badge */}
-                    {stagedFurniture.length > 0 && (
-                      <div className="absolute top-2 right-2 px-2 py-1 bg-black/60 backdrop-blur-sm rounded text-xs text-white flex items-center gap-1.5 z-20">
-                        <MousePointer className="h-3 w-3" />
-                        {stagedFurniture.length} item{stagedFurniture.length !== 1 ? 's' : ''}
-                      </div>
-                    )}
                   </div>
                 ) : (
                   <div className="flex flex-col items-center justify-center gap-3 text-center p-6">

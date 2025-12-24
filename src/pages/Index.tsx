@@ -24,8 +24,6 @@ import { LayoutUploadModal } from '@/components/creation/LayoutUploadModal';
 import { RoomPhotoModal } from '@/components/creation/RoomPhotoModal';
 import { StyleRefModal } from '@/components/creation/StyleRefModal';
 import { ProductPickerModal, ProductItem } from '@/components/creation/ProductPickerModal';
-import { FurnitureReplacementModal } from '@/components/canvas/FurnitureReplacementModal';
-import { StagedFurnitureItem } from '@/components/canvas/FurnitureOverlay';
 
 interface RoomUpload {
   id: string;
@@ -87,13 +85,6 @@ const Index = () => {
   const [isRoomLocked, setIsRoomLocked] = useState(false);
   const [useSplitWorkspace, setUseSplitWorkspace] = useState(true); // New dual-pane mode
   
-  // Furniture replacement state
-  const [stagedFurnitureWithPositions, setStagedFurnitureWithPositions] = useState<StagedFurnitureItem[]>([]);
-  const [selectedFurnitureId, setSelectedFurnitureId] = useState<string | null>(null);
-  const [furnitureToReplace, setFurnitureToReplace] = useState<StagedFurnitureItem | null>(null);
-  const [showReplacementModal, setShowReplacementModal] = useState(false);
-  const [isReplacingFurniture, setIsReplacingFurniture] = useState(false);
-  
   // Chat input modals
   const [showLayoutModal, setShowLayoutModal] = useState(false);
   const [showRoomPhotoModal, setShowRoomPhotoModal] = useState(false);
@@ -129,7 +120,6 @@ const Index = () => {
             loadLatestUpload(),
             loadLatestRender(),
             loadStagedFurniture(),
-            loadStagedFurnitureWithPositions(),
             loadLayoutImage(),
             loadRoomPhoto(),
             loadProjectDetails(),
@@ -1006,157 +996,6 @@ Ready to generate a render! Describe your vision.`;
 
     setStagedItems(items);
   };
-
-  // Load staged furniture with position data for 2D overlay
-  const loadStagedFurnitureWithPositions = async () => {
-    if (!currentProjectId) return;
-
-    const { data, error } = await supabase
-      .from('staged_furniture')
-      .select('*')
-      .eq('project_id', currentProjectId)
-      .order('created_at', { ascending: true });
-
-    if (error) {
-      console.error('Failed to load staged furniture with positions:', error);
-      return;
-    }
-
-    const items: StagedFurnitureItem[] = (data || []).map(row => ({
-      id: row.id,
-      catalog_item_id: row.catalog_item_id,
-      item_name: row.item_name,
-      item_category: row.item_category,
-      item_description: row.item_description,
-      item_image_url: row.item_image_url,
-      item_price: row.item_price,
-      x_position: Number(row.x_position) || 50,
-      y_position: Number(row.y_position) || 50,
-      width_percent: Number(row.width_percent) || 20,
-      height_percent: Number(row.height_percent) || 20,
-    }));
-
-    setStagedFurnitureWithPositions(items);
-  };
-
-  // Handle furniture click on 2D layout
-  const handleFurnitureClick = useCallback((furniture: StagedFurnitureItem) => {
-    setSelectedFurnitureId(furniture.id);
-    setFurnitureToReplace(furniture);
-    setShowReplacementModal(true);
-  }, []);
-
-  // Handle furniture replacement
-  const handleFurnitureReplace = useCallback(async (
-    originalFurniture: StagedFurnitureItem, 
-    newProduct: CatalogFurnitureItem
-  ) => {
-    if (!user || !currentProjectId || !currentRenderUrl) return;
-
-    setIsReplacingFurniture(true);
-
-    try {
-      // Build mask region from furniture position
-      const maskRegion = {
-        x: (originalFurniture.x_position - originalFurniture.width_percent / 2) / 100,
-        y: (originalFurniture.y_position - originalFurniture.height_percent / 2) / 100,
-        width: originalFurniture.width_percent / 100,
-        height: originalFurniture.height_percent / 100,
-      };
-
-      // Create render record
-      const { data: renderRecord, error: renderError } = await supabase
-        .from('renders')
-        .insert({
-          project_id: currentProjectId,
-          user_id: user.id,
-          prompt: `Replace ${originalFurniture.item_name} with ${newProduct.name}`,
-          status: 'generating',
-          parent_render_id: currentRenderId,
-        })
-        .select()
-        .single();
-
-      if (renderError) throw renderError;
-
-      await addMessage('user', `🔄 Replacing ${originalFurniture.item_name} with ${newProduct.name}`, { type: 'text' });
-      await addMessage('assistant', 'Regenerating the selected area with new furniture...', { type: 'text', status: 'pending' });
-
-      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/edit-render`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
-        },
-        body: JSON.stringify({
-          currentRenderUrl,
-          userPrompt: `Replace the ${originalFurniture.item_name} with a ${newProduct.name}. Keep everything else exactly the same.`,
-          furnitureItems: [{
-            name: newProduct.name,
-            category: newProduct.category,
-            description: newProduct.description,
-            imageUrl: newProduct.imageUrl,
-          }],
-          maskRegion,
-          inpaintMode: true,
-        }),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.error || 'Furniture replacement failed');
-      }
-
-      const { imageUrl } = await response.json();
-
-      // Update render record
-      await supabase
-        .from('renders')
-        .update({ render_url: imageUrl, status: 'completed' })
-        .eq('id', renderRecord.id);
-
-      // Update staged furniture in database
-      await supabase
-        .from('staged_furniture')
-        .update({
-          catalog_item_id: newProduct.id,
-          item_name: newProduct.name,
-          item_category: newProduct.category,
-          item_description: newProduct.description || null,
-          item_image_url: newProduct.imageUrl || null,
-          item_price: newProduct.price || null,
-        })
-        .eq('id', originalFurniture.id);
-
-      setCurrentRenderUrl(imageUrl);
-      setCurrentRenderId(renderRecord.id);
-
-      await addMessage('assistant', `✅ Replaced ${originalFurniture.item_name} with ${newProduct.name}!`, {
-        type: 'render',
-        imageUrl,
-        status: 'ready',
-      });
-
-      toast({ title: 'Furniture replaced', description: `${newProduct.name} now in place` });
-
-      // Reload data
-      loadStagedFurniture();
-      loadStagedFurnitureWithPositions();
-      loadAllRenders();
-
-      setShowReplacementModal(false);
-      setFurnitureToReplace(null);
-      setSelectedFurnitureId(null);
-
-    } catch (error) {
-      console.error('Furniture replacement failed:', error);
-      const message = error instanceof Error ? error.message : 'Unknown error';
-      await addMessage('assistant', `Failed to replace furniture: ${message}`, { type: 'text', status: 'failed' });
-      toast({ variant: 'destructive', title: 'Replacement failed', description: message });
-    } finally {
-      setIsReplacingFurniture(false);
-    }
-  }, [user, currentProjectId, currentRenderUrl, currentRenderId, addMessage, toast]);
 
   // Determine if in edit mode - any render exists means we're in edit mode
   const isEditMode = currentRenderUrl !== null;
@@ -2054,19 +1893,16 @@ Ready to generate a render! Describe your vision.`;
           <SplitWorkspace
             layoutImageUrl={layoutImageUrl}
             birdEyeRenderUrl={currentRenderUrl || roomPhotoUrl}
-            isGenerating={isGenerating || isReplacingFurniture}
+            isGenerating={isGenerating}
             cameras={cameras}
             selectedCameraId={selectedCameraId}
             isRoomLocked={isRoomLocked}
-            stagedFurniture={stagedFurnitureWithPositions}
-            selectedFurnitureId={selectedFurnitureId}
             onCameraAdd={handleCameraAdd}
             onCameraSelect={setSelectedCameraId}
             onCameraUpdate={handleCameraUpdate}
             onCameraDelete={handleCameraDelete}
             onGenerateFromCamera={handleGenerateFromCamera}
             onToggleRoomLock={handleToggleRoomLock}
-            onFurnitureClick={handleFurnitureClick}
           />
         ) : (
           <RenderViewer
@@ -2223,14 +2059,6 @@ Ready to generate a render! Describe your vision.`;
         currentProducts={[]}
         userId={user?.id}
         projectId={currentProjectId || undefined}
-      />
-      
-      <FurnitureReplacementModal
-        open={showReplacementModal}
-        onOpenChange={setShowReplacementModal}
-        furniture={furnitureToReplace}
-        onReplace={handleFurnitureReplace}
-        isProcessing={isReplacingFurniture}
       />
     </div>
   </SidebarProvider>
