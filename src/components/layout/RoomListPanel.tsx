@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Plus, MoreHorizontal, Pencil, Trash2, Check, X, Home } from 'lucide-react';
+import { Plus, MoreHorizontal, Pencil, Trash2, Check, X, Home, Lock, Unlock } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -31,6 +31,9 @@ interface Room {
   project_id: string;
   thumbnail_url: string | null;
   created_at: string;
+  is_locked: boolean;
+  locked_at: string | null;
+  locked_render_url: string | null;
 }
 
 interface RoomListPanelProps {
@@ -164,6 +167,34 @@ export function RoomListPanel({
     }
   };
 
+  const toggleRoomLock = async (room: Room) => {
+    const newLockedState = !room.is_locked;
+    
+    const { error } = await supabase
+      .from('rooms')
+      .update({ 
+        is_locked: newLockedState,
+        locked_at: newLockedState ? new Date().toISOString() : null,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', room.id);
+
+    if (error) {
+      toast({
+        variant: 'destructive',
+        title: 'Error',
+        description: `Failed to ${newLockedState ? 'lock' : 'unlock'} room.`,
+      });
+    } else {
+      const updatedRooms = rooms.map(r => 
+        r.id === room.id ? { ...r, is_locked: newLockedState, locked_at: newLockedState ? new Date().toISOString() : null } : r
+      );
+      setRooms(updatedRooms);
+      onRoomsChange?.(updatedRooms);
+      toast({ title: newLockedState ? 'Room locked' : 'Room unlocked' });
+    }
+  };
+
   const confirmDelete = (room: Room) => {
     setRoomToDelete(room);
     setDeleteDialogOpen(true);
@@ -259,8 +290,15 @@ export function RoomListPanel({
                       : 'text-sidebar-foreground/80'
                   )}
                 >
-                  <Home className="h-3 w-3" />
+                  {room.is_locked ? (
+                    <Lock className="h-3 w-3 text-warning" />
+                  ) : (
+                    <Home className="h-3 w-3" />
+                  )}
                   <span className="block truncate">{room.name}</span>
+                  {room.is_locked && (
+                    <span className="ml-auto text-[10px] text-warning/80 uppercase tracking-wider">Locked</span>
+                  )}
                 </button>
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
@@ -276,7 +314,21 @@ export function RoomListPanel({
                       <MoreHorizontal className="h-3 w-3" />
                     </Button>
                   </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end" className="w-32">
+                  <DropdownMenuContent align="end" className="w-36">
+                    <DropdownMenuItem onClick={() => toggleRoomLock(room)}>
+                      {room.is_locked ? (
+                        <>
+                          <Unlock className="h-3 w-3 mr-2" />
+                          Unlock
+                        </>
+                      ) : (
+                        <>
+                          <Lock className="h-3 w-3 mr-2" />
+                          Lock
+                        </>
+                      )}
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
                     <DropdownMenuItem onClick={() => startEditing(room)}>
                       <Pencil className="h-3 w-3 mr-2" />
                       Rename
