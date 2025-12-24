@@ -1,4 +1,5 @@
 import { Toaster } from "@/components/ui/toaster";
+import DrawingToolWorkspace from "./pages/DrawingToolWorkspace";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -40,6 +41,7 @@ const App = () => (
               <Route path="/custom-furniture/create" element={<CreateCustomFurniture />} />
               <Route path="/furniture-library" element={<CustomFurnitureLibrary />} />
               <Route path="/custom-furniture" element={<CustomFurnitureLibrary />} />
+              <Route path="/tools/:toolType" element={<DrawingToolWorkspace />} />
               <Route path="*" element={<NotFound />} />
             </Routes>
           </BrowserRouter>
