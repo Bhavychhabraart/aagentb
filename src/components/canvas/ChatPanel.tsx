@@ -92,9 +92,9 @@ export function ChatPanel({
   };
 
   return (
-    <div className="flex flex-col h-full bg-card border-l border-border">
+    <div className="flex flex-col h-full glass-premium border-l border-border/30">
       {/* Header */}
-      <div className="px-4 py-3 border-b border-border flex items-center justify-between">
+      <div className="px-4 py-3 border-b border-border/30 flex items-center justify-between bg-background/30">
         <div className="flex items-center gap-2">
           <h2 className="text-sm font-medium text-foreground">Command History</h2>
           <span className="text-xs text-muted-foreground bg-muted px-1.5 py-0.5 rounded">
@@ -237,8 +237,8 @@ export function ChatPanel({
         )}
       </ScrollArea>
 
-      {/* Input */}
-      <div className="p-4 border-t border-border">
+      {/* Input - Glass UI */}
+      <div className="p-4 border-t border-border/30 bg-background/20">
         {/* Staged items display */}
         {stagedItems.length > 0 && (
           <div className={cn(
@@ -314,7 +314,7 @@ export function ChatPanel({
                   variant="secondary"
                   size="icon"
                   disabled={isLoading}
-                  className="shrink-0"
+                  className="shrink-0 btn-glass border-border/50 hover:border-primary/40"
                 >
                   <Plus className="h-4 w-4" />
                 </Button>
@@ -353,7 +353,7 @@ export function ChatPanel({
                     : "Describe your vision..."
               }
               disabled={isLoading}
-              className="min-h-[44px] max-h-[120px] resize-none"
+              className="min-h-[44px] max-h-[120px] resize-none glass-input rounded-xl"
               rows={1}
             />
             <Button
@@ -361,7 +361,7 @@ export function ChatPanel({
               size="icon"
               disabled={!input.trim() || isLoading}
               className={cn(
-                "shrink-0",
+                "shrink-0 btn-glow",
                 isEditMode && "bg-amber-500 hover:bg-amber-600"
               )}
             >
