@@ -1903,6 +1903,25 @@ Ready to generate a render! Describe your vision.`;
             onCameraDelete={handleCameraDelete}
             onGenerateFromCamera={handleGenerateFromCamera}
             onToggleRoomLock={handleToggleRoomLock}
+            // Toolbar actions
+            onSelectiveEdit={handleSelectiveEdit}
+            onAIDirectorChange={handleAIDirectorChange}
+            onMulticamGenerate={handleMulticamGenerate}
+            onPositionFurniture={stagedItems.length > 0 && (currentRenderUrl || roomPhotoUrl) ? () => setShowPositioner(true) : undefined}
+            onExport={() => setShowExportModal(true)}
+            onStartOrder={stagedItems.length > 0 ? () => setShowOrderModal(true) : undefined}
+            onUndo={handleUndo}
+            canUndo={canUndo}
+            isSelectiveEditing={isSelectiveEditing}
+            isMulticamGenerating={isMulticamGenerating}
+            multicamViews={multicamViews}
+            onSetMulticamAsMain={handleSetMulticamAsMain}
+            // Render history
+            allRenders={allRenders}
+            currentRenderId={currentRenderId}
+            onRenderHistorySelect={handleRenderHistorySelect}
+            stagedItems={stagedItems}
+            projectId={currentProjectId || undefined}
           />
         ) : (
           <RenderViewer
