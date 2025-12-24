@@ -110,6 +110,7 @@ const Index = () => {
   const [agentBProgress, setAgentBProgress] = useState(0);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [agentBUserPrompt, setAgentBUserPrompt] = useState('');
+  const [wantsNewRender, setWantsNewRender] = useState(true); // Controls whether to use Agent B flow for new generation
 
   // Design Memory state
   const [memoryEnabled, setMemoryEnabledState] = useState(true);
@@ -1230,13 +1231,13 @@ Ready to generate a render! Describe your vision.`;
   const handleSendMessageWithAgentB = useCallback(async (content: string) => {
     if (!user || !currentProjectId) return;
 
-    // If Agent B is enabled and no render exists, start Agent B flow
-    if (agentBEnabled && !currentRenderUrl) {
+    // If Agent B is enabled and user wants a new render (not editing), start Agent B flow
+    if (agentBEnabled && wantsNewRender) {
       handleAgentBAnalysis(content);
       return;
     }
 
-    // Otherwise, use normal flow
+    // Otherwise, use normal flow (edit mode or Agent B disabled)
     const shouldEdit = currentRenderUrl !== null;
 
     const messageContent = stagedItems.length > 0
@@ -1261,7 +1262,16 @@ Ready to generate a render! Describe your vision.`;
         .eq('project_id', currentProjectId);
     }
     setStagedItems([]);
-  }, [user, currentProjectId, agentBEnabled, currentRenderUrl, stagedItems, addMessage, editRender, triggerGeneration, handleAgentBAnalysis]);
+  }, [user, currentProjectId, agentBEnabled, wantsNewRender, currentRenderUrl, stagedItems, addMessage, editRender, triggerGeneration, handleAgentBAnalysis]);
+  
+  // Toggle between new render mode and edit mode
+  const handleToggleNewRenderMode = useCallback((wantsNew: boolean) => {
+    setWantsNewRender(wantsNew);
+    // Reset Agent B state when switching modes
+    if (wantsNew) {
+      setAgentBState('idle');
+    }
+  }, []);
 
   const handleCatalogItemSelect = useCallback(async (item: CatalogFurnitureItem) => {
     if (!user || !currentProjectId) return;
@@ -2322,6 +2332,9 @@ Ready to generate a render! Describe your vision.`;
               onAgentBEditQuestions={handleAgentBEditQuestions}
               currentQuestionIndex={currentQuestionIndex}
               userPrompt={agentBUserPrompt}
+              // New render mode
+              wantsNewRender={wantsNewRender}
+              onToggleNewRenderMode={handleToggleNewRenderMode}
             />
           </div>
           <AssetsPanel 

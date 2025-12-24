@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { Send, Loader2, Image as ImageIcon, Sparkles, FileImage, Clock, Package, Edit3, Eye, Plus, Grid3X3, Camera, Palette, Box, Brain, ToggleLeft, ToggleRight } from 'lucide-react';
+import { Send, Loader2, Image as ImageIcon, Sparkles, FileImage, Clock, Package, Edit3, Eye, Plus, Grid3X3, Camera, Palette, Box, Brain, ToggleLeft, ToggleRight, Wand2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -64,6 +64,9 @@ interface ChatPanelProps {
   onAgentBEditQuestions?: () => void;
   currentQuestionIndex?: number;
   userPrompt?: string;
+  // New render mode props
+  wantsNewRender?: boolean;
+  onToggleNewRenderMode?: (wantsNew: boolean) => void;
 }
 
 function getMessageIcon(metadata?: ChatMessage['metadata']) {
@@ -111,6 +114,9 @@ export function ChatPanel({
   onAgentBEditQuestions,
   currentQuestionIndex = 0,
   userPrompt = '',
+  // New render mode
+  wantsNewRender = true,
+  onToggleNewRenderMode,
 }: ChatPanelProps) {
   const [input, setInput] = useState('');
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -152,7 +158,7 @@ export function ChatPanel({
         </div>
         <div className="flex items-center gap-2">
           {/* Agent B Toggle */}
-          {onAgentBToggle && !isEditMode && (
+          {onAgentBToggle && agentBState === 'idle' && (
             <button
               onClick={() => onAgentBToggle(!agentBEnabled)}
               className={cn(
@@ -171,17 +177,48 @@ export function ChatPanel({
               )}
             </button>
           )}
-          {/* Mode Indicator */}
-          {isEditMode ? (
-            <div className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-amber-500/10 border border-amber-500/30">
-              <Edit3 className="h-3 w-3 text-amber-500" />
-              <span className="text-xs font-medium text-amber-500">Edit Mode</span>
+          {/* Mode Selector - Only show when renders exist and Agent B is enabled */}
+          {currentRenderUrl && agentBEnabled && onToggleNewRenderMode && agentBState === 'idle' && (
+            <div className="flex items-center rounded-full bg-muted/50 border border-border/30 p-0.5">
+              <button
+                onClick={() => onToggleNewRenderMode(true)}
+                className={cn(
+                  "flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium transition-all duration-200",
+                  wantsNewRender
+                    ? "bg-gradient-to-r from-primary to-accent text-primary-foreground shadow-sm"
+                    : "text-muted-foreground hover:text-foreground"
+                )}
+              >
+                <Wand2 className="h-3 w-3" />
+                <span>New</span>
+              </button>
+              <button
+                onClick={() => onToggleNewRenderMode(false)}
+                className={cn(
+                  "flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium transition-all duration-200",
+                  !wantsNewRender
+                    ? "bg-amber-500 text-white shadow-sm"
+                    : "text-muted-foreground hover:text-foreground"
+                )}
+              >
+                <Edit3 className="h-3 w-3" />
+                <span>Edit</span>
+              </button>
             </div>
-          ) : !agentBEnabled && (
-            <div className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-primary/10 border border-primary/30">
-              <Sparkles className="h-3 w-3 text-primary" />
-              <span className="text-xs font-medium text-primary">Generate</span>
-            </div>
+          )}
+          {/* Mode Indicator - When Agent B is off or no render exists */}
+          {(!currentRenderUrl || !agentBEnabled) && (
+            isEditMode ? (
+              <div className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-amber-500/10 border border-amber-500/30">
+                <Edit3 className="h-3 w-3 text-amber-500" />
+                <span className="text-xs font-medium text-amber-500">Edit Mode</span>
+              </div>
+            ) : !agentBEnabled && (
+              <div className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-primary/10 border border-primary/30">
+                <Sparkles className="h-3 w-3 text-primary" />
+                <span className="text-xs font-medium text-primary">Generate</span>
+              </div>
+            )
           )}
         </div>
       </div>
