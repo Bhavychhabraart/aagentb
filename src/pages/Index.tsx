@@ -1043,6 +1043,9 @@ Ready to generate a render! Describe your vision.`;
             category: item.category,
             imageUrl: item.imageUrl,
           })),
+          // Pass memory context
+          userPreferences: memoryEnabled ? userPreferences : undefined,
+          memoryEnabled,
         }),
       });
 
@@ -1061,6 +1064,22 @@ Ready to generate a render! Describe your vision.`;
       setAgentBAnswers([]);
       setCurrentQuestionIndex(0);
       
+      // Pre-fill answers from preselected options if memory returned them
+      if (data.questions) {
+        const prefilledAnswers: AgentBAnswer[] = [];
+        for (const q of data.questions) {
+          if (q.preselected && q.preselected.length > 0) {
+            prefilledAnswers.push({
+              questionId: q.id,
+              selectedOptions: q.preselected,
+            });
+          }
+        }
+        if (prefilledAnswers.length > 0) {
+          setAgentBAnswers(prefilledAnswers);
+        }
+      }
+      
       // Transition to brief view
       setTimeout(() => {
         setAgentBState('brief');
@@ -1076,7 +1095,7 @@ Ready to generate a render! Describe your vision.`;
         description: error instanceof Error ? error.message : 'Analysis failed',
       });
     }
-  }, [currentProjectId, stagedItems, toast]);
+  }, [currentProjectId, stagedItems, toast, memoryEnabled, userPreferences]);
 
   // Handle Agent B brief confirmation
   const handleAgentBConfirmBrief = useCallback(() => {
@@ -1148,6 +1167,9 @@ Ready to generate a render! Describe your vision.`;
   const handleAgentBGenerate = useCallback(async () => {
     if (!user || !currentProjectId || !agentBUnderstanding) return;
 
+    // Learn from Agent B session before generating
+    await learnFromAgentBAnswers();
+
     setAgentBState('generating');
 
     // Build enhanced prompt from Agent B context
@@ -1202,7 +1224,7 @@ Ready to generate a render! Describe your vision.`;
         .eq('project_id', currentProjectId);
     }
     setStagedItems([]);
-  }, [user, currentProjectId, agentBUnderstanding, agentBUserPrompt, agentBAnswers, agentBQuestions, stagedItems, currentRenderUrl, addMessage, editRender, triggerGeneration]);
+  }, [user, currentProjectId, agentBUnderstanding, agentBUserPrompt, agentBAnswers, agentBQuestions, stagedItems, currentRenderUrl, addMessage, editRender, triggerGeneration, learnFromAgentBAnswers]);
 
   // Modified handleSendMessage to support Agent B
   const handleSendMessageWithAgentB = useCallback(async (content: string) => {
