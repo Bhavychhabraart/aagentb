@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
+import { motion, AnimatePresence } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -9,8 +10,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
 import { 
-  Palette, Upload, Loader2, RefreshCw, Check, IndianRupee, ImageIcon, 
-  ZoomIn, ZoomOut, X, History, ArrowLeft, Sparkles, FileText, Package, Ruler, Wand2
+  Palette, Upload, Loader2, IndianRupee, 
+  X, History, FileText, Ruler, FolderOpen, 
+  Layers, Tag, Maximize2, Box
 } from 'lucide-react';
 import { ProductImageEditor } from '@/components/creation/ProductImageEditor';
 import { supabase } from '@/integrations/supabase/client';
@@ -23,6 +25,10 @@ import { CatalogFurnitureItem } from '@/services/catalogService';
 import { TechnicalDrawingPanel } from '@/components/creation/TechnicalDrawingPanel';
 import { MaterialsPicker } from '@/components/creation/MaterialsPicker';
 import { MATERIALS_LIBRARY } from '@/services/materialsLibrary';
+import { WorkspaceHeader } from '@/components/creation/WorkspaceHeader';
+import { FormSection } from '@/components/creation/FormSection';
+import { PreviewCanvas } from '@/components/creation/PreviewCanvas';
+import { CreationModeToggle } from '@/components/creation/CreationModeToggle';
 
 const CATEGORIES = ['Seating', 'Tables', 'Storage', 'Lighting', 'Beds', 'Decor', 'Outdoor', 'Office'];
 const STYLES = ['Modern', 'Traditional', 'Minimalist', 'Industrial', 'Scandinavian', 'Bohemian', 'Art Deco', 'Mid-Century'];
@@ -33,6 +39,22 @@ interface GenerationHistoryItem {
   prompt: string;
   timestamp: Date;
 }
+
+// Animation variants
+const staggerContainer = {
+  hidden: { opacity: 0 },
+  show: {
+    opacity: 1,
+    transition: {
+      staggerChildren: 0.08,
+    },
+  },
+};
+
+const staggerItem = {
+  hidden: { opacity: 0, y: 10 },
+  show: { opacity: 1, y: 0 },
+};
 
 export default function CreateCustomFurniture() {
   const navigate = useNavigate();
@@ -66,7 +88,7 @@ export default function CreateCustomFurniture() {
   const [zoom, setZoom] = useState(100);
   const [projects, setProjects] = useState<{ id: string; name: string }[]>([]);
   const [selectedProjectId, setSelectedProjectId] = useState<string>(projectIdParam || '');
-  const [activeRightTab, setActiveRightTab] = useState('preview');
+  const [activeRightTab, setActiveRightTab] = useState('history');
   const [creationMode, setCreationMode] = useState<'scratch' | 'catalog'>('scratch');
   const [selectedCatalogItem, setSelectedCatalogItem] = useState<CatalogFurnitureItem | null>(null);
   const [isEditing, setIsEditing] = useState(false);
@@ -136,7 +158,6 @@ export default function CreateCustomFurniture() {
     );
   };
 
-  // Get material names from selected IDs for prompt building
   const getSelectedMaterialNames = () => {
     return selectedMaterials.map(id => {
       const material = MATERIALS_LIBRARY.find(m => m.id === id);
@@ -155,10 +176,16 @@ export default function CreateCustomFurniture() {
     setPrompt('');
   };
 
+  const handleModeChange = (mode: 'scratch' | 'catalog') => {
+    setCreationMode(mode);
+    if (mode === 'scratch') {
+      setSelectedCatalogItem(null);
+    }
+  };
+
   const buildPrompt = () => {
     let fullPrompt = prompt;
     
-    // Add context for catalog-based customization
     if (creationMode === 'catalog' && selectedCatalogItem) {
       fullPrompt = `Customize this ${selectedCatalogItem.category} item (${selectedCatalogItem.name}): ${prompt}`;
     }
@@ -213,7 +240,6 @@ export default function CreateCustomFurniture() {
       const { imageUrl } = await response.json();
       setGeneratedImage(imageUrl);
       
-      // Add to history
       setGenerationHistory(prev => [{
         id: Date.now().toString(),
         imageUrl,
@@ -251,7 +277,6 @@ export default function CreateCustomFurniture() {
       const price = parseFloat(estimatedPrice) || 0;
 
       if (isEditing && editId) {
-        // Update existing item
         const { error } = await supabase
           .from('staged_furniture')
           .update({
@@ -266,7 +291,6 @@ export default function CreateCustomFurniture() {
         if (error) throw error;
         toast({ title: 'Updated!', description: 'Custom furniture updated successfully.' });
       } else {
-        // Create new item
         const { error } = await supabase
           .from('staged_furniture')
           .insert({
@@ -297,6 +321,22 @@ export default function CreateCustomFurniture() {
     setGeneratedImage(item.imageUrl);
   };
 
+  const handleShare = () => {
+    if (generatedImage) {
+      navigator.clipboard.writeText(generatedImage);
+      toast({ title: 'Link copied!', description: 'Image URL copied to clipboard.' });
+    }
+  };
+
+  const handleDownload = () => {
+    if (generatedImage) {
+      const link = document.createElement('a');
+      link.href = generatedImage;
+      link.download = `${name || 'furniture'}-${Date.now()}.png`;
+      link.click();
+    }
+  };
+
   if (!user) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
@@ -306,451 +346,422 @@ export default function CreateCustomFurniture() {
   }
 
   return (
-    <div className="min-h-screen bg-background flex flex-col">
-      {/* Header */}
-      <header className="flex items-center justify-between px-6 py-4 border-b border-border bg-card">
-        <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon" onClick={() => navigate(-1)}>
-            <ArrowLeft className="h-5 w-5" />
-          </Button>
-          <div className="flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-primary/10">
-              <Sparkles className="h-6 w-6 text-primary" />
-            </div>
-            <div>
-              <h1 className="text-xl font-semibold">
-                {isEditing ? 'Edit Custom Furniture' : 'Create Custom Furniture'}
-              </h1>
-              <p className="text-sm text-muted-foreground">
-                Design your ideal furniture piece with AI
-              </p>
-            </div>
-          </div>
-        </div>
-        <div className="flex items-center gap-3">
-          <Button variant="outline" onClick={() => navigate('/custom-furniture')}>
-            Cancel
-          </Button>
-          <Button 
-            onClick={handleSave} 
-            disabled={isSaving || !generatedImage || !selectedProjectId}
-            className="gap-2"
-          >
-            {isSaving ? (
-              <>
-                <Loader2 className="h-4 w-4 animate-spin" />
-                Saving...
-              </>
-            ) : (
-              <>
-                <Check className="h-4 w-4" />
-                {isEditing ? 'Update' : 'Save to Library'}
-              </>
-            )}
-          </Button>
-        </div>
-      </header>
+    <div className="min-h-screen bg-gradient-subtle flex flex-col">
+      {/* Premium Header */}
+      <WorkspaceHeader
+        title={isEditing ? 'Edit Custom Furniture' : 'Create Custom Furniture'}
+        subtitle="Design your ideal furniture piece with AI"
+        isEditing={isEditing}
+        isSaving={isSaving}
+        canSave={!!generatedImage && !!selectedProjectId && !!name.trim()}
+        onBack={() => navigate(-1)}
+        onCancel={() => navigate('/custom-furniture')}
+        onSave={handleSave}
+      />
 
       {/* Main Content */}
       <div className="flex-1 flex overflow-hidden">
-        {/* Left Panel - Input Form */}
-        <div className="w-[400px] border-r border-border flex flex-col bg-card/50">
+        {/* Left Panel - Form with Collapsible Sections */}
+        <motion.div 
+          initial={{ opacity: 0, x: -20 }}
+          animate={{ opacity: 1, x: 0 }}
+          className="w-[380px] border-r border-border/50 flex flex-col bg-card/30"
+        >
           <ScrollArea className="flex-1">
-            <div className="p-6 space-y-6">
+            <motion.div 
+              className="p-4 space-y-3"
+              variants={staggerContainer}
+              initial="hidden"
+              animate="show"
+            >
               {/* Creation Mode Toggle */}
-              <div className="space-y-2">
-                <Label>Start From</Label>
-                <div className="grid grid-cols-2 gap-2">
-                  <button
-                    onClick={() => {
-                      setCreationMode('scratch');
-                      setSelectedCatalogItem(null);
-                    }}
-                    className={cn(
-                      "flex flex-col items-center gap-2 p-4 rounded-lg border-2 transition-all",
-                      creationMode === 'scratch'
-                        ? "border-primary bg-primary/5"
-                        : "border-border hover:border-primary/50"
-                    )}
-                  >
-                    <Sparkles className={cn("h-6 w-6", creationMode === 'scratch' ? "text-primary" : "text-muted-foreground")} />
-                    <div className="text-center">
-                      <p className="text-sm font-medium">From Scratch</p>
-                      <p className="text-xs text-muted-foreground">Describe your ideal piece</p>
-                    </div>
-                  </button>
-                  <button
-                    onClick={() => setCreationMode('catalog')}
-                    className={cn(
-                      "flex flex-col items-center gap-2 p-4 rounded-lg border-2 transition-all",
-                      creationMode === 'catalog'
-                        ? "border-primary bg-primary/5"
-                        : "border-border hover:border-primary/50"
-                    )}
-                  >
-                    <Package className={cn("h-6 w-6", creationMode === 'catalog' ? "text-primary" : "text-muted-foreground")} />
-                    <div className="text-center">
-                      <p className="text-sm font-medium">From Catalog</p>
-                      <p className="text-xs text-muted-foreground">Pick & customize</p>
-                    </div>
-                  </button>
-                </div>
-              </div>
-
-              {/* Catalog Picker (shown when catalog mode selected) */}
-              {creationMode === 'catalog' && (
-                <div className="space-y-2">
-                  <Label>Select Base Item</Label>
-                  <CatalogPickerSection
-                    onSelect={handleCatalogItemSelect}
-                    selectedItemId={selectedCatalogItem?.id || null}
+              <motion.div variants={staggerItem}>
+                <FormSection 
+                  icon={Layers} 
+                  title="Start From" 
+                  collapsible={false}
+                >
+                  <CreationModeToggle 
+                    mode={creationMode} 
+                    onModeChange={handleModeChange}
                   />
-                </div>
-              )}
+                </FormSection>
+              </motion.div>
 
-              {/* Project Selection */}
-              <div className="space-y-2">
-                <Label>Save to Project</Label>
-                <Select value={selectedProjectId} onValueChange={setSelectedProjectId}>
-                  <SelectTrigger className="bg-muted/50">
-                    <SelectValue placeholder="Select project" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {projects.map(project => (
-                      <SelectItem key={project.id} value={project.id}>
-                        {project.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+              {/* Catalog Picker */}
+              <AnimatePresence>
+                {creationMode === 'catalog' && (
+                  <motion.div
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: 'auto' }}
+                    exit={{ opacity: 0, height: 0 }}
+                    transition={{ duration: 0.3 }}
+                  >
+                    <FormSection icon={Box} title="Select Base Item">
+                      <CatalogPickerSection
+                        onSelect={handleCatalogItemSelect}
+                        selectedItemId={selectedCatalogItem?.id || null}
+                      />
+                    </FormSection>
+                  </motion.div>
+                )}
+              </AnimatePresence>
 
-              {/* Name */}
-              <div className="space-y-2">
-                <Label>Product Name *</Label>
-                <Input
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  placeholder="e.g., Modern Oak Dining Table"
-                  className="bg-muted/50"
-                  required
-                />
-              </div>
-
-              {/* Description */}
-              <div className="space-y-2">
-                <Label>{creationMode === 'catalog' ? 'Customization Details *' : 'Description *'}</Label>
-                <Textarea
-                  value={prompt}
-                  onChange={(e) => setPrompt(e.target.value)}
-                  placeholder={
-                    creationMode === 'catalog' && selectedCatalogItem
-                      ? `Describe what you want to change... e.g., Change color to navy blue, use leather instead of fabric, make it smaller`
-                      : "Describe your furniture in detail... e.g., Modern oak dining table with brass legs and minimalist design, seats 6 people"
-                  }
-                  rows={4}
-                  className="bg-muted/50"
-                />
-              </div>
+              {/* Project & Basic Info */}
+              <motion.div variants={staggerItem}>
+                <FormSection icon={FolderOpen} title="Basic Info">
+                  <div className="space-y-3">
+                    <div className="space-y-1.5">
+                      <Label className="text-xs text-muted-foreground uppercase tracking-wider">Project</Label>
+                      <Select value={selectedProjectId} onValueChange={setSelectedProjectId}>
+                        <SelectTrigger className="glass-input h-10">
+                          <SelectValue placeholder="Select project" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {projects.map(project => (
+                            <SelectItem key={project.id} value={project.id}>
+                              {project.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    
+                    <div className="space-y-1.5">
+                      <Label className="text-xs text-muted-foreground uppercase tracking-wider">Product Name *</Label>
+                      <Input
+                        value={name}
+                        onChange={(e) => setName(e.target.value)}
+                        placeholder="e.g., Modern Oak Dining Table"
+                        className="glass-input h-10"
+                        required
+                      />
+                    </div>
+                    
+                    <div className="space-y-1.5">
+                      <Label className="text-xs text-muted-foreground uppercase tracking-wider">
+                        {creationMode === 'catalog' ? 'Customization Details *' : 'Description *'}
+                      </Label>
+                      <Textarea
+                        value={prompt}
+                        onChange={(e) => setPrompt(e.target.value)}
+                        placeholder={
+                          creationMode === 'catalog' && selectedCatalogItem
+                            ? "Describe what you want to change..."
+                            : "Describe your furniture in detail..."
+                        }
+                        rows={3}
+                        className="glass-input resize-none"
+                      />
+                    </div>
+                  </div>
+                </FormSection>
+              </motion.div>
 
               {/* Category & Price */}
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label>Category</Label>
-                  <Select value={category} onValueChange={setCategory}>
-                    <SelectTrigger className="bg-muted/50">
-                      <SelectValue placeholder="Select" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {CATEGORIES.map(cat => (
-                        <SelectItem key={cat} value={cat}>{cat}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label>Est. Price (₹)</Label>
-                  <div className="relative">
-                    <IndianRupee className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
-                    <Input
-                      type="number"
-                      value={estimatedPrice}
-                      onChange={(e) => setEstimatedPrice(e.target.value)}
-                      placeholder="50000"
-                      className="bg-muted/50 pl-9"
-                    />
+              <motion.div variants={staggerItem}>
+                <FormSection icon={Tag} title="Classification">
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1.5">
+                      <Label className="text-xs text-muted-foreground uppercase tracking-wider">Category</Label>
+                      <Select value={category} onValueChange={setCategory}>
+                        <SelectTrigger className="glass-input h-10">
+                          <SelectValue placeholder="Select" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {CATEGORIES.map(cat => (
+                            <SelectItem key={cat} value={cat}>{cat}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label className="text-xs text-muted-foreground uppercase tracking-wider">Est. Price (₹)</Label>
+                      <div className="relative">
+                        <IndianRupee className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                        <Input
+                          type="number"
+                          value={estimatedPrice}
+                          onChange={(e) => setEstimatedPrice(e.target.value)}
+                          placeholder="50000"
+                          className="glass-input h-10 pl-9"
+                        />
+                      </div>
+                    </div>
                   </div>
-                </div>
-              </div>
+                </FormSection>
+              </motion.div>
 
               {/* Materials */}
-              <div className="space-y-2">
-                <Label>Materials (100+ options)</Label>
-                <MaterialsPicker
-                  selectedMaterials={selectedMaterials}
-                  onSelectionChange={setSelectedMaterials}
-                  maxHeight="300px"
-                />
-              </div>
+              <motion.div variants={staggerItem}>
+                <FormSection 
+                  icon={Palette} 
+                  title="Materials" 
+                  badge={selectedMaterials.length > 0 ? selectedMaterials.length : undefined}
+                >
+                  <MaterialsPicker
+                    selectedMaterials={selectedMaterials}
+                    onSelectionChange={setSelectedMaterials}
+                    maxHeight="250px"
+                  />
+                </FormSection>
+              </motion.div>
 
               {/* Styles */}
-              <div className="space-y-2">
-                <Label>Style</Label>
-                <div className="flex flex-wrap gap-2">
-                  {STYLES.map(style => (
-                    <Badge
-                      key={style}
-                      variant={selectedStyles.includes(style) ? 'default' : 'outline'}
-                      className="cursor-pointer transition-colors"
-                      onClick={() => toggleStyle(style)}
-                    >
-                      {style}
-                    </Badge>
-                  ))}
-                </div>
-              </div>
+              <motion.div variants={staggerItem}>
+                <FormSection 
+                  icon={Layers} 
+                  title="Style" 
+                  badge={selectedStyles.length > 0 ? selectedStyles.length : undefined}
+                >
+                  <div className="flex flex-wrap gap-2">
+                    {STYLES.map(style => (
+                      <Badge
+                        key={style}
+                        variant={selectedStyles.includes(style) ? 'default' : 'outline'}
+                        className={cn(
+                          "cursor-pointer transition-all duration-200",
+                          selectedStyles.includes(style) 
+                            ? "bg-primary hover:bg-primary/90" 
+                            : "hover:border-primary/50 hover:bg-primary/5"
+                        )}
+                        onClick={() => toggleStyle(style)}
+                      >
+                        {style}
+                      </Badge>
+                    ))}
+                  </div>
+                </FormSection>
+              </motion.div>
 
               {/* Dimensions */}
-              <div className="space-y-2">
-                <Label>Dimensions (cm)</Label>
-                <div className="grid grid-cols-3 gap-2">
-                  <Input
-                    type="number"
-                    value={dimensions.width}
-                    onChange={(e) => setDimensions(prev => ({ ...prev, width: e.target.value }))}
-                    placeholder="Width"
-                    className="bg-muted/50"
-                  />
-                  <Input
-                    type="number"
-                    value={dimensions.depth}
-                    onChange={(e) => setDimensions(prev => ({ ...prev, depth: e.target.value }))}
-                    placeholder="Depth"
-                    className="bg-muted/50"
-                  />
-                  <Input
-                    type="number"
-                    value={dimensions.height}
-                    onChange={(e) => setDimensions(prev => ({ ...prev, height: e.target.value }))}
-                    placeholder="Height"
-                    className="bg-muted/50"
-                  />
-                </div>
-              </div>
+              <motion.div variants={staggerItem}>
+                <FormSection icon={Maximize2} title="Dimensions (cm)">
+                  <div className="grid grid-cols-3 gap-2">
+                    <div className="space-y-1.5">
+                      <Label className="text-[10px] text-muted-foreground uppercase tracking-wider">Width</Label>
+                      <Input
+                        type="number"
+                        value={dimensions.width}
+                        onChange={(e) => setDimensions(prev => ({ ...prev, width: e.target.value }))}
+                        placeholder="W"
+                        className="glass-input h-9 text-center"
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label className="text-[10px] text-muted-foreground uppercase tracking-wider">Depth</Label>
+                      <Input
+                        type="number"
+                        value={dimensions.depth}
+                        onChange={(e) => setDimensions(prev => ({ ...prev, depth: e.target.value }))}
+                        placeholder="D"
+                        className="glass-input h-9 text-center"
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label className="text-[10px] text-muted-foreground uppercase tracking-wider">Height</Label>
+                      <Input
+                        type="number"
+                        value={dimensions.height}
+                        onChange={(e) => setDimensions(prev => ({ ...prev, height: e.target.value }))}
+                        placeholder="H"
+                        className="glass-input h-9 text-center"
+                      />
+                    </div>
+                  </div>
+                </FormSection>
+              </motion.div>
 
               {/* Reference Images */}
-              <div className="space-y-2">
-                <Label>Reference Images</Label>
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept="image/*"
-                  multiple
-                  onChange={handleFileSelect}
-                  className="hidden"
-                />
-                
-                {referenceImages.length > 0 ? (
-                  <div className="grid grid-cols-3 gap-2">
-                    {referenceImages.map((img, index) => (
-                      <div key={index} className="relative aspect-square rounded-lg overflow-hidden bg-muted">
-                        <img src={img} alt="Reference" className="w-full h-full object-cover" />
-                        <Button
-                          variant="destructive"
-                          size="icon"
-                          className="absolute top-1 right-1 h-6 w-6"
-                          onClick={() => removeReferenceImage(index)}
+              <motion.div variants={staggerItem}>
+                <FormSection 
+                  icon={Upload} 
+                  title="Reference Images" 
+                  badge={referenceImages.length > 0 ? referenceImages.length : undefined}
+                >
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/*"
+                    multiple
+                    onChange={handleFileSelect}
+                    className="hidden"
+                  />
+                  
+                  {referenceImages.length > 0 ? (
+                    <div className="grid grid-cols-3 gap-2">
+                      {referenceImages.map((img, index) => (
+                        <motion.div 
+                          key={index} 
+                          className="relative aspect-square rounded-xl overflow-hidden bg-muted group"
+                          initial={{ opacity: 0, scale: 0.9 }}
+                          animate={{ opacity: 1, scale: 1 }}
+                          transition={{ delay: index * 0.1 }}
                         >
-                          <X className="h-3 w-3" />
-                        </Button>
-                      </div>
-                    ))}
-                    {referenceImages.length < 3 && (
-                      <button
-                        onClick={() => fileInputRef.current?.click()}
-                        className="aspect-square rounded-lg border-2 border-dashed border-border flex items-center justify-center hover:border-primary/50 transition-colors"
-                      >
-                        <Upload className="h-5 w-5 text-muted-foreground" />
-                      </button>
-                    )}
-                  </div>
-                ) : (
-                  <Button
-                    variant="outline"
-                    className="w-full h-20 border-dashed gap-2"
-                    onClick={() => fileInputRef.current?.click()}
-                  >
-                    <Upload className="h-5 w-5" />
-                    Upload Reference Images
-                  </Button>
-                )}
-              </div>
-            </div>
+                          <img src={img} alt="Reference" className="w-full h-full object-cover" />
+                          <Button
+                            variant="destructive"
+                            size="icon"
+                            className="absolute top-1 right-1 h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
+                            onClick={() => removeReferenceImage(index)}
+                          >
+                            <X className="h-3 w-3" />
+                          </Button>
+                        </motion.div>
+                      ))}
+                      {referenceImages.length < 3 && (
+                        <motion.button
+                          onClick={() => fileInputRef.current?.click()}
+                          className="aspect-square rounded-xl border-2 border-dashed border-border/50 flex items-center justify-center hover:border-primary/50 hover:bg-primary/5 transition-all"
+                          whileHover={{ scale: 1.02 }}
+                          whileTap={{ scale: 0.98 }}
+                        >
+                          <Upload className="h-5 w-5 text-muted-foreground" />
+                        </motion.button>
+                      )}
+                    </div>
+                  ) : (
+                    <motion.button
+                      onClick={() => fileInputRef.current?.click()}
+                      className="w-full h-20 rounded-xl border-2 border-dashed border-border/50 flex flex-col items-center justify-center gap-2 hover:border-primary/50 hover:bg-primary/5 transition-all"
+                      whileHover={{ scale: 1.01 }}
+                      whileTap={{ scale: 0.99 }}
+                    >
+                      <Upload className="h-5 w-5 text-muted-foreground" />
+                      <span className="text-xs text-muted-foreground">Upload reference images</span>
+                    </motion.button>
+                  )}
+                </FormSection>
+              </motion.div>
+            </motion.div>
           </ScrollArea>
 
           {/* Generate Button */}
-          <div className="p-4 border-t border-border">
-            <Button
-              onClick={handleGenerate}
-              disabled={isGenerating || !prompt.trim()}
-              className="w-full gap-2"
-              size="lg"
+          <div className="p-4 border-t border-border/50 glass">
+            <motion.div
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
             >
-              {isGenerating ? (
-                <>
-                  <Loader2 className="h-5 w-5 animate-spin" />
-                  Generating...
-                </>
-              ) : (
-                <>
-                  <Palette className="h-5 w-5" />
-                  Generate Product
-                </>
-              )}
-            </Button>
+              <Button
+                onClick={handleGenerate}
+                disabled={isGenerating || !prompt.trim()}
+                className={cn(
+                  "w-full gap-2 h-12 text-base font-medium rounded-xl",
+                  !isGenerating && prompt.trim() && "btn-glow"
+                )}
+                size="lg"
+              >
+                {isGenerating ? (
+                  <>
+                    <Loader2 className="h-5 w-5 animate-spin" />
+                    Generating...
+                  </>
+                ) : (
+                  <>
+                    <Palette className="h-5 w-5" />
+                    Generate Product
+                  </>
+                )}
+              </Button>
+            </motion.div>
           </div>
-        </div>
+        </motion.div>
 
         {/* Center - Preview Canvas */}
-        <div className="flex-1 flex flex-col bg-muted/30">
-          {/* Zoom Controls */}
-          <div className="flex items-center justify-between px-4 py-2 border-b border-border bg-card/50">
-            <div className="flex items-center gap-2">
-              <Button
-                variant="outline"
-                size="icon"
-                className="h-8 w-8"
-                onClick={() => setZoom(prev => Math.max(25, prev - 25))}
-              >
-                <ZoomOut className="h-4 w-4" />
-              </Button>
-              <span className="text-sm text-muted-foreground w-12 text-center">{zoom}%</span>
-              <Button
-                variant="outline"
-                size="icon"
-                className="h-8 w-8"
-                onClick={() => setZoom(prev => Math.min(200, prev + 25))}
-              >
-                <ZoomIn className="h-4 w-4" />
-              </Button>
-            </div>
-            {generatedImage && (
-              <div className="flex items-center gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setShowImageEditor(true)}
-                  disabled={isGenerating}
-                  className="gap-2"
-                >
-                  <Wand2 className="h-4 w-4" />
-                  Refine
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={handleGenerate}
-                  disabled={isGenerating}
-                  className="gap-2"
-                >
-                  <RefreshCw className={cn("h-4 w-4", isGenerating && "animate-spin")} />
-                  Regenerate
-                </Button>
-              </div>
-            )}
-          </div>
-
-          {/* Preview Area */}
-          <div className="flex-1 flex items-center justify-center p-8 overflow-auto">
-            <div 
-              className={cn(
-                'rounded-xl border border-border overflow-hidden bg-card shadow-lg transition-all',
-                'flex items-center justify-center'
-              )}
-              style={{ 
-                width: `${Math.min(600, 600 * (zoom / 100))}px`,
-                height: `${Math.min(600, 600 * (zoom / 100))}px`,
-              }}
-            >
-              {isGenerating ? (
-                <div className="text-center p-8">
-                  <Loader2 className="h-16 w-16 animate-spin text-primary mx-auto mb-4" />
-                  <p className="text-lg font-medium">Creating your furniture...</p>
-                  <p className="text-sm text-muted-foreground mt-2">This may take a moment</p>
-                </div>
-              ) : generatedImage ? (
-                <img 
-                  src={generatedImage} 
-                  alt="Generated Furniture" 
-                  className="w-full h-full object-contain"
-                />
-              ) : (
-                <div className="text-center p-8">
-                  <ImageIcon className="h-16 w-16 mx-auto mb-4 text-muted-foreground/50" />
-                  <p className="text-lg font-medium text-muted-foreground">Preview Area</p>
-                  <p className="text-sm text-muted-foreground mt-2">
-                    Describe your furniture and click Generate
-                  </p>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
+        <PreviewCanvas
+          generatedImage={generatedImage}
+          isGenerating={isGenerating}
+          zoom={zoom}
+          onZoomChange={setZoom}
+          onRefine={() => setShowImageEditor(true)}
+          onRegenerate={handleGenerate}
+          onShare={handleShare}
+          onDownload={handleDownload}
+        />
 
         {/* Right Panel - History, BOM & Technical Drawings */}
-        <div className="w-80 border-l border-border flex flex-col bg-card/50">
+        <motion.div 
+          initial={{ opacity: 0, x: 20 }}
+          animate={{ opacity: 1, x: 0 }}
+          className="w-80 border-l border-border/50 flex flex-col bg-card/30"
+        >
           <Tabs value={activeRightTab} onValueChange={setActiveRightTab} className="flex flex-col h-full">
-            <TabsList className="grid grid-cols-3 m-4">
-              <TabsTrigger value="preview" className="gap-1 text-xs px-2">
-                <History className="h-3 w-3" />
-                History
-              </TabsTrigger>
-              <TabsTrigger value="bom" className="gap-1 text-xs px-2">
-                <FileText className="h-3 w-3" />
-                BOM
-              </TabsTrigger>
-              <TabsTrigger value="drawings" className="gap-1 text-xs px-2">
-                <Ruler className="h-3 w-3" />
-                Drawings
-              </TabsTrigger>
-            </TabsList>
+            {/* Pill-style Tabs */}
+            <div className="p-3 border-b border-border/50">
+              <TabsList className="grid grid-cols-3 h-10 p-1 bg-muted/30 rounded-xl">
+                <TabsTrigger 
+                  value="history" 
+                  className="gap-1.5 text-xs rounded-lg data-[state=active]:bg-background data-[state=active]:shadow-sm"
+                >
+                  <History className="h-3.5 w-3.5" />
+                  History
+                </TabsTrigger>
+                <TabsTrigger 
+                  value="bom" 
+                  className="gap-1.5 text-xs rounded-lg data-[state=active]:bg-background data-[state=active]:shadow-sm"
+                >
+                  <FileText className="h-3.5 w-3.5" />
+                  BOM
+                </TabsTrigger>
+                <TabsTrigger 
+                  value="drawings" 
+                  className="gap-1.5 text-xs rounded-lg data-[state=active]:bg-background data-[state=active]:shadow-sm"
+                >
+                  <Ruler className="h-3.5 w-3.5" />
+                  Drawings
+                </TabsTrigger>
+              </TabsList>
+            </div>
 
-            <TabsContent value="preview" className="flex-1 m-0 overflow-hidden">
+            <TabsContent value="history" className="flex-1 m-0 overflow-hidden">
               <ScrollArea className="h-full">
-                <div className="p-4 space-y-3">
-                  {generationHistory.length === 0 ? (
-                    <div className="text-center py-8 text-muted-foreground">
-                      <History className="h-10 w-10 mx-auto mb-3 opacity-50" />
-                      <p className="text-sm">No generation history yet</p>
-                    </div>
-                  ) : (
-                    generationHistory.map((item) => (
-                      <button
-                        key={item.id}
-                        onClick={() => selectFromHistory(item)}
-                        className={cn(
-                          'w-full rounded-lg overflow-hidden border-2 transition-all',
-                          generatedImage === item.imageUrl
-                            ? 'border-primary ring-2 ring-primary/20'
-                            : 'border-border hover:border-primary/50'
-                        )}
+                <div className="p-3 space-y-2">
+                  <AnimatePresence>
+                    {generationHistory.length === 0 ? (
+                      <motion.div 
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        className="text-center py-12 text-muted-foreground"
                       >
-                        <img 
-                          src={item.imageUrl} 
-                          alt="Generated" 
-                          className="w-full aspect-square object-cover"
-                        />
-                        <div className="p-2 bg-muted/50 text-left">
-                          <p className="text-xs text-muted-foreground line-clamp-2">
-                            {item.prompt}
-                          </p>
-                          <p className="text-[10px] text-muted-foreground/70 mt-1">
-                            {item.timestamp.toLocaleTimeString()}
-                          </p>
+                        <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-muted/50 flex items-center justify-center">
+                          <History className="h-8 w-8 opacity-40" />
                         </div>
-                      </button>
-                    ))
-                  )}
+                        <p className="text-sm font-medium">No history yet</p>
+                        <p className="text-xs text-muted-foreground/70 mt-1">Generated images will appear here</p>
+                      </motion.div>
+                    ) : (
+                      generationHistory.map((item, index) => (
+                        <motion.button
+                          key={item.id}
+                          initial={{ opacity: 0, x: 20 }}
+                          animate={{ opacity: 1, x: 0 }}
+                          transition={{ delay: index * 0.05 }}
+                          onClick={() => selectFromHistory(item)}
+                          className={cn(
+                            'w-full rounded-xl overflow-hidden border-2 transition-all duration-200',
+                            'hover:shadow-lg hover:scale-[1.02]',
+                            generatedImage === item.imageUrl
+                              ? 'border-primary ring-2 ring-primary/20 shadow-[0_0_20px_hsl(var(--primary)/0.2)]'
+                              : 'border-border/50 hover:border-primary/50'
+                          )}
+                        >
+                          <img 
+                            src={item.imageUrl} 
+                            alt="Generated" 
+                            className="w-full aspect-square object-cover"
+                          />
+                          <div className="p-2.5 bg-muted/30 text-left">
+                            <p className="text-xs text-muted-foreground line-clamp-2 leading-relaxed">
+                              {item.prompt}
+                            </p>
+                            <p className="text-[10px] text-muted-foreground/60 mt-1.5 font-mono">
+                              {item.timestamp.toLocaleTimeString()}
+                            </p>
+                          </div>
+                        </motion.button>
+                      ))
+                    )}
+                  </AnimatePresence>
                 </div>
               </ScrollArea>
             </TabsContent>
@@ -766,12 +777,15 @@ export default function CreateCustomFurniture() {
                     item_image_url: generatedImage,
                     item_price: parseFloat(estimatedPrice) || null,
                   }}
-                  onClose={() => setActiveRightTab('preview')}
+                  onClose={() => setActiveRightTab('history')}
                 />
               ) : (
                 <div className="flex flex-col items-center justify-center h-full p-6 text-center text-muted-foreground">
-                  <FileText className="h-12 w-12 mb-4 opacity-50" />
-                  <p className="text-sm">Generate furniture to see BOM analysis</p>
+                  <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-muted/50 flex items-center justify-center">
+                    <FileText className="h-8 w-8 opacity-40" />
+                  </div>
+                  <p className="text-sm font-medium">No BOM available</p>
+                  <p className="text-xs text-muted-foreground/70 mt-1">Generate furniture to see analysis</p>
                 </div>
               )}
             </TabsContent>
@@ -786,13 +800,16 @@ export default function CreateCustomFurniture() {
                 />
               ) : (
                 <div className="flex flex-col items-center justify-center h-full p-6 text-center text-muted-foreground">
-                  <Ruler className="h-12 w-12 mb-4 opacity-50" />
-                  <p className="text-sm">Generate furniture to create technical drawings</p>
+                  <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-muted/50 flex items-center justify-center">
+                    <Ruler className="h-8 w-8 opacity-40" />
+                  </div>
+                  <p className="text-sm font-medium">No drawings available</p>
+                  <p className="text-xs text-muted-foreground/70 mt-1">Generate furniture to create drawings</p>
                 </div>
               )}
             </TabsContent>
           </Tabs>
-        </div>
+        </motion.div>
       </div>
 
       {/* Product Image Editor */}
@@ -805,7 +822,6 @@ export default function CreateCustomFurniture() {
           productCategory={category || 'Custom'}
           onSave={(newImageUrl) => {
             setGeneratedImage(newImageUrl);
-            // Add to history
             setGenerationHistory(prev => [{
               id: Date.now().toString(),
               imageUrl: newImageUrl,
