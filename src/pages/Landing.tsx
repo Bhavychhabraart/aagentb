@@ -5,7 +5,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { Send, Grid3X3, Image, Palette, Package, Settings2, Loader2, X, Brain } from "lucide-react";
+import { Send, Grid3X3, Image, Palette, Package, Settings2, Loader2, X, Brain, Sparkles } from "lucide-react";
 import { LayoutUploadModal } from "@/components/creation/LayoutUploadModal";
 import { RoomPhotoModal } from "@/components/creation/RoomPhotoModal";
 import { StyleRefModal } from "@/components/creation/StyleRefModal";
@@ -42,6 +42,7 @@ export default function Landing() {
   const [activeModal, setActiveModal] = useState<"layout" | "room" | "style" | "products" | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [memoryEnabled, setMemoryEnabledState] = useState(true);
+  const [agentBModeEnabled, setAgentBModeEnabled] = useState(true);
 
   // Load memory settings
   useEffect(() => {
@@ -189,10 +190,13 @@ export default function Landing() {
         return;
       }
 
-      // If memory is enabled, go to Agent B onboarding flow
-      if (memoryEnabled && (session.prompt.trim() || session.layout || session.roomPhoto)) {
+      // If Agent B mode is enabled, go to Agent B onboarding flow
+      if (agentBModeEnabled && (session.prompt.trim() || session.layout || session.roomPhoto)) {
         if (session.prompt.trim()) {
           params.set("prompt", encodeURIComponent(session.prompt));
+        }
+        if (memoryEnabled) {
+          params.set("memoryEnabled", "true");
         }
         navigate(`/onboarding?${params.toString()}`);
         return;
@@ -399,7 +403,7 @@ export default function Landing() {
           ))}
         </div>
 
-        {/* Tools + Memory buttons */}
+        {/* Tools + Memory + Agent B buttons */}
         <div className="flex justify-center gap-2 mb-4">
           <Button variant="outline" size="sm" className="gap-2">
             <Settings2 className="w-4 h-4" />
@@ -419,6 +423,21 @@ export default function Landing() {
               memoryEnabled && "text-primary"
             )} />
             Memory: {memoryEnabled ? "ON" : "OFF"}
+          </Button>
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={() => setAgentBModeEnabled(!agentBModeEnabled)}
+            className={cn(
+              "gap-2 transition-all duration-200",
+              agentBModeEnabled && "border-violet-500/50 bg-violet-500/5 text-violet-500 hover:bg-violet-500/10"
+            )}
+          >
+            <Sparkles className={cn(
+              "w-4 h-4 transition-colors",
+              agentBModeEnabled && "text-violet-500"
+            )} />
+            Agent B: {agentBModeEnabled ? "ON" : "OFF"}
           </Button>
         </div>
 
