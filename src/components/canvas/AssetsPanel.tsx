@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { Image, Palette, Package, ChevronDown, ChevronUp, ShoppingBag, Loader2, Search, X, Maximize2, Sparkles, Library, ExternalLink, Plus } from 'lucide-react';
+import { Image, Palette, Package, ChevronDown, ChevronUp, ShoppingBag, Loader2, Search, X, Maximize2, Sparkles, Library, ExternalLink, Plus, Download } from 'lucide-react';
+import { exportCatalogToCSV } from '@/utils/exportCatalogCSV';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { supabase } from '@/integrations/supabase/client';
 import { cn } from '@/lib/utils';
@@ -403,6 +404,15 @@ export function AssetsPanel({ projectId, onAssetSelect, onCatalogItemSelect, onC
                         </button>
                       )}
                     </div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-7 px-2"
+                      onClick={() => exportCatalogToCSV(catalogItems)}
+                      title="Download catalog as CSV"
+                    >
+                      <Download className="h-3.5 w-3.5" />
+                    </Button>
                     <Button
                       variant="outline"
                       size="sm"
