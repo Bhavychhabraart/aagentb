@@ -2,3 +2,6 @@ project_id = "rdbpwexwuzakmrutcrfg"
 
 [functions.agent-b-analyze]
 verify_jwt = false
+
+[functions.generate-layout]
+verify_jwt = false
