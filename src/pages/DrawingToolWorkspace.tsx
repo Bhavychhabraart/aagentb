@@ -163,6 +163,8 @@ export default function DrawingToolWorkspace() {
 
     setIsGenerating(true);
     try {
+      console.log("Calling generate-drawing-plan with:", { url: uploadedLayout.url, toolType });
+      
       const { data, error } = await supabase.functions.invoke("generate-drawing-plan", {
         body: {
           base_layout_url: uploadedLayout.url,
@@ -172,20 +174,34 @@ export default function DrawingToolWorkspace() {
         },
       });
 
+      console.log("Edge function response:", { data, error });
+
       if (error) throw error;
 
       if (data?.plan_url) {
+        console.log("Setting generated plan URL:", data.plan_url.substring(0, 100) + "...");
         setGeneratedPlan(data.plan_url);
         toast({
           title: "Plan generated!",
           description: `Your ${tool?.title} is ready`,
+        });
+      } else if (data?.message) {
+        toast({
+          title: "Generation note",
+          description: data.message,
+        });
+      } else {
+        toast({
+          title: "No image generated",
+          description: "The AI could not generate an image. Try a different layout.",
+          variant: "destructive",
         });
       }
     } catch (error) {
       console.error("Generation error:", error);
       toast({
         title: "Generation failed",
-        description: "Please try again",
+        description: error instanceof Error ? error.message : "Please try again",
         variant: "destructive",
       });
     } finally {
