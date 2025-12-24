@@ -12,7 +12,6 @@ import { getMemorySettings, setMemoryEnabled } from "@/services/designMemoryServ
 // Landing page components
 import { Header } from "@/components/landing/Header";
 import { HeroSection } from "@/components/landing/HeroSection";
-import { ToolsGrid } from "@/components/landing/ToolsGrid";
 import { InputCards } from "@/components/landing/InputCards";
 import { ControlButtons } from "@/components/landing/ControlButtons";
 import { PromptSection } from "@/components/landing/PromptSection";
@@ -266,16 +265,6 @@ export default function Landing() {
 
       <main className="relative z-10 flex flex-col items-center justify-center px-6 pt-12 pb-24">
         <HeroSection />
-
-        <ToolsGrid />
-
-        <div className="w-full max-w-4xl mb-8">
-          <div className="flex items-center gap-4 mb-6">
-            <div className="flex-1 h-px bg-border" />
-            <span className="text-sm text-muted-foreground">or start with references</span>
-            <div className="flex-1 h-px bg-border" />
-          </div>
-        </div>
 
         <InputCards
           layout={session.layout}
