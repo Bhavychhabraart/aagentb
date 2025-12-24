@@ -39,7 +39,7 @@ export function FormSection({
         onClick={() => collapsible && setIsOpen(!isOpen)}
         disabled={!collapsible}
         className={cn(
-          "w-full flex items-center justify-between px-4 py-3",
+          "w-full flex items-center justify-between px-3 py-2",
           "text-left transition-colors",
           collapsible && "hover:bg-muted/30 cursor-pointer",
           !collapsible && "cursor-default"
@@ -81,7 +81,7 @@ export function FormSection({
             exit={{ height: 0, opacity: 0 }}
             transition={{ duration: 0.25, ease: [0.4, 0, 0.2, 1] }}
           >
-            <div className="px-4 pb-4 space-y-3">
+            <div className="px-3 pb-3 space-y-2">
               {children}
             </div>
           </motion.div>

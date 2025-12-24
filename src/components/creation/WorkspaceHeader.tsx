@@ -25,7 +25,7 @@ export function WorkspaceHeader({
   onSave,
 }: WorkspaceHeaderProps) {
   return (
-    <header className="workspace-header flex items-center justify-between px-6 py-4">
+    <header className="workspace-header flex items-center justify-between px-4 py-2.5 shrink-0">
       <div className="flex items-center gap-4">
         <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
           <Button 
@@ -41,19 +41,18 @@ export function WorkspaceHeader({
         <div className="flex items-center gap-4">
           {/* Icon with gradient background */}
           <motion.div 
-            className="relative p-3 rounded-2xl bg-gradient-to-br from-primary/20 to-primary/5 border border-primary/20"
+            className="relative p-2 rounded-xl bg-gradient-to-br from-primary/20 to-primary/5 border border-primary/20"
             initial={{ scale: 0.9, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
             transition={{ delay: 0.1 }}
           >
-            <Sparkles className="h-6 w-6 text-primary" />
-            <div className="absolute inset-0 rounded-2xl bg-primary/10 animate-pulse" />
+            <Sparkles className="h-5 w-5 text-primary" />
           </motion.div>
           
-          <div className="space-y-1">
-            <div className="flex items-center gap-3">
+          <div className="space-y-0.5">
+            <div className="flex items-center gap-2">
               <motion.h1 
-                className="text-xl font-semibold tracking-tight"
+                className="text-base font-semibold tracking-tight"
                 initial={{ opacity: 0, x: -10 }}
                 animate={{ opacity: 1, x: 0 }}
                 transition={{ delay: 0.15 }}
@@ -67,16 +66,16 @@ export function WorkspaceHeader({
                 animate={{ opacity: 1, scale: 1 }}
                 transition={{ delay: 0.2 }}
                 className={cn(
-                  "px-2.5 py-1 rounded-full text-[10px] font-semibold uppercase tracking-wider",
+                  "px-2 py-0.5 rounded-full text-[9px] font-semibold uppercase tracking-wider",
                   "bg-gradient-to-r from-primary/20 to-accent/20 text-primary border border-primary/30"
                 )}
               >
-                AI-Powered
+                AI
               </motion.div>
             </div>
             
             <motion.p 
-              className="text-sm text-muted-foreground"
+              className="text-xs text-muted-foreground hidden sm:block"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               transition={{ delay: 0.25 }}
