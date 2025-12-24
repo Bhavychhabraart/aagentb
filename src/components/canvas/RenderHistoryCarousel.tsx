@@ -1,5 +1,6 @@
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
+import { History } from 'lucide-react';
 import {
   Carousel,
   CarouselContent,
@@ -30,14 +31,17 @@ export function RenderHistoryCarousel({
   if (renders.length === 0) return null;
 
   return (
-    <div className="absolute bottom-[12%] left-1/2 -translate-x-1/2 z-20 w-full max-w-2xl px-4">
-      <div className="bg-black/70 backdrop-blur-md rounded-xl border border-border/30 p-3">
+    <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-20 w-full max-w-2xl px-4">
+      <div className="glass-premium rounded-xl border border-border/20 p-3">
         <div className="flex items-center justify-between mb-2 px-1">
-          <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-            Render History
-          </span>
+          <div className="flex items-center gap-2">
+            <History className="h-3.5 w-3.5 text-primary" />
+            <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+              Render History
+            </span>
+          </div>
           <span className="text-xs font-mono text-muted-foreground">
-            {renders.length} render{renders.length !== 1 ? 's' : ''}
+            {renders.length} version{renders.length !== 1 ? 's' : ''}
           </span>
         </div>
         
@@ -59,10 +63,10 @@ export function RenderHistoryCarousel({
                     onClick={() => onSelect(render)}
                     className={cn(
                       'relative w-full aspect-video rounded-lg overflow-hidden',
-                      'border-2 transition-all duration-200',
+                      'border transition-all duration-200',
                       'hover:scale-105 hover:z-10',
                       isCurrent
-                        ? 'border-primary ring-2 ring-primary/30'
+                        ? 'border-primary ring-1 ring-primary/40'
                         : 'border-border/30 hover:border-primary/50'
                     )}
                   >
@@ -75,21 +79,21 @@ export function RenderHistoryCarousel({
                     
                     {/* Current badge */}
                     {isCurrent && (
-                      <div className="absolute top-1 right-1 px-1.5 py-0.5 bg-primary rounded text-[10px] font-medium text-primary-foreground">
+                      <div className="absolute top-1 right-1 px-1.5 py-0.5 bg-primary/90 backdrop-blur-sm rounded text-[10px] font-medium text-primary-foreground">
                         Current
                       </div>
                     )}
                     
                     {/* Timestamp overlay */}
-                    <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 to-transparent p-1">
-                      <span className="text-[10px] font-mono text-white/80">
+                    <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-background/90 to-transparent p-1">
+                      <span className="text-[10px] font-mono text-foreground/80">
                         {format(timestamp, 'HH:mm')}
                       </span>
                     </div>
                     
                     {/* Version number */}
-                    <div className="absolute top-1 left-1 w-5 h-5 rounded bg-black/60 flex items-center justify-center">
-                      <span className="text-[10px] font-mono text-white">
+                    <div className="absolute top-1 left-1 w-5 h-5 rounded glass flex items-center justify-center">
+                      <span className="text-[10px] font-mono text-foreground">
                         {renders.length - index}
                       </span>
                     </div>
@@ -98,8 +102,8 @@ export function RenderHistoryCarousel({
               );
             })}
           </CarouselContent>
-          <CarouselPrevious className="left-0 h-8 w-8" />
-          <CarouselNext className="right-0 h-8 w-8" />
+          <CarouselPrevious className="left-0 h-8 w-8 glass border-border/30 hover:bg-primary/20" />
+          <CarouselNext className="right-0 h-8 w-8 glass border-border/30 hover:bg-primary/20" />
         </Carousel>
       </div>
     </div>

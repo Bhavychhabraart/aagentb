@@ -1,10 +1,20 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Eye, Camera as CameraIcon, Plus, Lock, Unlock, Maximize2, Minimize2, Map, Sparkles } from 'lucide-react';
+import { 
+  Eye, Camera as CameraIcon, Plus, Lock, Unlock, Maximize2, Minimize2, Map, Sparkles,
+  ZoomIn, ZoomOut, RotateCcw, Download, Crop, Undo2, Wand2, Video, LayoutGrid,
+  Move, FileDown, ShoppingCart
+} from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from '@/components/ui/tooltip';
 import { CameraPlacement, CameraData } from './CameraPlacement';
 import { CameraPropertiesPanel } from './CameraPropertiesPanel';
+import { RenderHistoryCarousel, RenderHistoryItem } from './RenderHistoryCarousel';
+import { SelectionOverlay, SelectionRegion } from './SelectionOverlay';
+import { SelectiveEditPanel } from './SelectiveEditPanel';
+import { AIDirectorPanel } from './AIDirectorPanel';
+import { MulticamPanel, CameraView, ZoneRegion } from './MulticamPanel';
+import { CatalogFurnitureItem } from '@/services/catalogService';
 
 interface SplitWorkspaceProps {
   layoutImageUrl: string | null;
@@ -20,6 +30,25 @@ interface SplitWorkspaceProps {
   onGenerateFromCamera: (cameraId: string, prompt: string) => void;
   onToggleRoomLock: () => void;
   onOpenFullCatalog?: () => void;
+  // Toolbar actions
+  onSelectiveEdit?: (region: SelectionRegion, prompt: string, catalogItem?: CatalogFurnitureItem) => void;
+  onAIDirectorChange?: (prompt: string) => void;
+  onMulticamGenerate?: (view: CameraView, customPrompt?: string, zone?: ZoneRegion) => void;
+  onPositionFurniture?: () => void;
+  onExport?: () => void;
+  onStartOrder?: () => void;
+  onUndo?: () => void;
+  canUndo?: boolean;
+  isSelectiveEditing?: boolean;
+  isMulticamGenerating?: boolean;
+  multicamViews?: Record<CameraView, string | null>;
+  onSetMulticamAsMain?: (imageUrl: string) => void;
+  // Render history
+  allRenders?: RenderHistoryItem[];
+  currentRenderId?: string | null;
+  onRenderHistorySelect?: (render: RenderHistoryItem) => void;
+  stagedItems?: CatalogFurnitureItem[];
+  projectId?: string;
 }
 
 export function SplitWorkspace({
@@ -36,15 +65,38 @@ export function SplitWorkspace({
   onGenerateFromCamera,
   onToggleRoomLock,
   onOpenFullCatalog,
+  onSelectiveEdit,
+  onAIDirectorChange,
+  onMulticamGenerate,
+  onPositionFurniture,
+  onExport,
+  onStartOrder,
+  onUndo,
+  canUndo = false,
+  isSelectiveEditing = false,
+  isMulticamGenerating = false,
+  multicamViews = { perspective: null, front: null, side: null, top: null, custom: null },
+  onSetMulticamAsMain,
+  allRenders = [],
+  currentRenderId,
+  onRenderHistorySelect,
+  stagedItems = [],
+  projectId,
 }: SplitWorkspaceProps) {
   const [isMinimapExpanded, setIsMinimapExpanded] = useState(false);
+  const [zoom, setZoom] = useState(1);
+  const [selectionMode, setSelectionMode] = useState(false);
+  const [currentSelection, setCurrentSelection] = useState<SelectionRegion | null>(null);
+  const [showAIDirector, setShowAIDirector] = useState(false);
+  const [showMulticam, setShowMulticam] = useState(false);
+  const [showComparison, setShowComparison] = useState(false);
+  
   const selectedCamera = cameras.find(c => c.id === selectedCameraId);
 
   // Handle 'A' key for fullscreen catalog
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'a' || e.key === 'A') {
-        // Don't trigger if typing in an input
         if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
           return;
         }
@@ -56,10 +108,53 @@ export function SplitWorkspace({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [onOpenFullCatalog]);
 
+  const handleZoomIn = () => setZoom((z) => Math.min(z + 0.25, 3));
+  const handleZoomOut = () => setZoom((z) => Math.max(z - 0.25, 0.5));
+  const handleReset = () => setZoom(1);
+
+  const handleDownload = () => {
+    if (birdEyeRenderUrl) {
+      const link = document.createElement('a');
+      link.href = birdEyeRenderUrl;
+      link.download = `render-${Date.now()}.png`;
+      link.click();
+    }
+  };
+
+  const toggleSelectionMode = () => {
+    if (selectionMode) {
+      setSelectionMode(false);
+      setCurrentSelection(null);
+    } else {
+      setSelectionMode(true);
+      setShowComparison(false);
+    }
+  };
+
+  const handleSelectionComplete = (region: SelectionRegion | null) => {
+    setCurrentSelection(region);
+  };
+
+  const handleSelectiveEditSubmit = (prompt: string, catalogItem?: CatalogFurnitureItem) => {
+    if (currentSelection && onSelectiveEdit) {
+      onSelectiveEdit(currentSelection, prompt, catalogItem);
+    }
+  };
+
+  const handleSelectiveEditCancel = () => {
+    setCurrentSelection(null);
+    setSelectionMode(false);
+  };
+
+  const canSelectArea = !!birdEyeRenderUrl && !isGenerating && !showComparison && onSelectiveEdit;
+  const canUseDirector = !!birdEyeRenderUrl && !isGenerating && !selectionMode && onAIDirectorChange;
+  const canUseMulticam = !!birdEyeRenderUrl && !isGenerating && !selectionMode && onMulticamGenerate;
+  const hasLayoutToCompare = !!layoutImageUrl && !!birdEyeRenderUrl;
+
   return (
     <TooltipProvider>
       <div className="flex-1 flex flex-col bg-gradient-premium relative overflow-hidden">
-        {/* Premium Header Bar */}
+        {/* Premium Header Bar with Full Toolbar */}
         <div className="workspace-header relative z-20 flex items-center justify-between px-4 py-3">
           {/* Left: Title & Status */}
           <div className="flex items-center gap-4">
@@ -81,24 +176,238 @@ export function SplitWorkspace({
             )}
           </div>
 
-          {/* Center: Lock Status */}
-          {isRoomLocked && (
-            <div className="absolute left-1/2 -translate-x-1/2 flex items-center gap-2 px-4 py-1.5 rounded-full glass border-warning/30 bg-warning/10">
-              <Lock className="h-3.5 w-3.5 text-warning" />
-              <span className="text-xs font-medium text-warning">Room Locked</span>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={onToggleRoomLock}
-                className="h-6 px-2 text-xs text-warning hover:bg-warning/20"
-              >
-                <Unlock className="h-3 w-3 mr-1" />
-                Unlock
-              </Button>
-            </div>
-          )}
+          {/* Center: Main Toolbar */}
+          <div className="flex items-center gap-1 glass-premium rounded-xl px-2 py-1.5">
+            {/* Selection Tool */}
+            {onSelectiveEdit && (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={canSelectArea ? toggleSelectionMode : undefined}
+                    disabled={!canSelectArea}
+                    className={cn(
+                      "h-8 w-8",
+                      selectionMode ? "bg-amber-500/30 text-amber-400" : canSelectArea ? "hover:bg-primary/20" : "opacity-50"
+                    )}
+                  >
+                    <Crop className="h-4 w-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>{selectionMode ? 'Exit selection' : 'Select area to edit'}</p>
+                </TooltipContent>
+              </Tooltip>
+            )}
 
-          {/* Right: Actions */}
+            {/* Comparison Toggle */}
+            {hasLayoutToCompare && !selectionMode && (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => setShowComparison(!showComparison)}
+                    className={cn(
+                      "h-8 w-8",
+                      showComparison ? "bg-primary/30 text-primary" : "hover:bg-primary/20"
+                    )}
+                  >
+                    <LayoutGrid className="h-4 w-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>{showComparison ? 'Hide comparison' : 'Compare with layout'}</p>
+                </TooltipContent>
+              </Tooltip>
+            )}
+
+            {/* Position Furniture */}
+            {onPositionFurniture && !selectionMode && (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={onPositionFurniture}
+                    className="h-8 w-8 hover:bg-primary/20 text-primary"
+                  >
+                    <Move className="h-4 w-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>Position furniture</p>
+                </TooltipContent>
+              </Tooltip>
+            )}
+
+            <div className="w-px h-5 bg-border/30 mx-1" />
+
+            {/* Zoom Controls */}
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={handleZoomOut}
+              disabled={zoom <= 0.5 || !birdEyeRenderUrl || selectionMode}
+              className="h-8 w-8 hover:bg-primary/20"
+            >
+              <ZoomOut className="h-4 w-4" />
+            </Button>
+            <span className="text-xs font-mono px-2 min-w-[3rem] text-center text-muted-foreground">
+              {Math.round(zoom * 100)}%
+            </span>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={handleZoomIn}
+              disabled={zoom >= 3 || !birdEyeRenderUrl || selectionMode}
+              className="h-8 w-8 hover:bg-primary/20"
+            >
+              <ZoomIn className="h-4 w-4" />
+            </Button>
+
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={handleReset}
+              disabled={!birdEyeRenderUrl}
+              className="h-8 w-8 hover:bg-primary/20"
+            >
+              <RotateCcw className="h-4 w-4" />
+            </Button>
+
+            <div className="w-px h-5 bg-border/30 mx-1" />
+
+            {/* Download */}
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={handleDownload}
+                  disabled={!birdEyeRenderUrl}
+                  className="h-8 w-8 hover:bg-primary/20"
+                >
+                  <Download className="h-4 w-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>Download render</p>
+              </TooltipContent>
+            </Tooltip>
+
+            {/* Start Order */}
+            {onStartOrder && (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={onStartOrder}
+                    className="h-8 w-8 hover:bg-primary/20 text-success"
+                  >
+                    <ShoppingCart className="h-4 w-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>Start Order</p>
+                </TooltipContent>
+              </Tooltip>
+            )}
+
+            {/* Export */}
+            {onExport && (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={onExport}
+                    className="h-8 w-8 hover:bg-primary/20 text-primary"
+                  >
+                    <FileDown className="h-4 w-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>Export PPT / Invoice</p>
+                </TooltipContent>
+              </Tooltip>
+            )}
+
+            <div className="w-px h-5 bg-border/30 mx-1" />
+
+            {/* Undo */}
+            {onUndo && (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={onUndo}
+                    disabled={!canUndo}
+                    className={cn(
+                      "h-8 w-8",
+                      canUndo ? "hover:bg-primary/20 text-primary" : "text-muted-foreground/50"
+                    )}
+                  >
+                    <Undo2 className="h-4 w-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>{canUndo ? 'Undo to previous' : 'No previous version'}</p>
+                </TooltipContent>
+              </Tooltip>
+            )}
+
+            {/* AI Director */}
+            {onAIDirectorChange && (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={canUseDirector ? () => setShowAIDirector(!showAIDirector) : undefined}
+                    disabled={!canUseDirector}
+                    className={cn(
+                      "h-8 w-8",
+                      showAIDirector ? "bg-primary/30 text-primary" : canUseDirector ? "hover:bg-primary/20 text-primary" : "opacity-50"
+                    )}
+                  >
+                    <Wand2 className="h-4 w-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>{showAIDirector ? 'Close AI Director' : 'AI Director'}</p>
+                </TooltipContent>
+              </Tooltip>
+            )}
+
+            {/* Multicam */}
+            {onMulticamGenerate && (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={canUseMulticam ? () => setShowMulticam(!showMulticam) : undefined}
+                    disabled={!canUseMulticam}
+                    className={cn(
+                      "h-8 w-8",
+                      showMulticam ? "bg-cyan-500/30 text-cyan-400" : canUseMulticam ? "hover:bg-primary/20 text-cyan-400" : "opacity-50"
+                    )}
+                  >
+                    <Video className="h-4 w-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>{showMulticam ? 'Close Multicam' : 'Multicam views'}</p>
+                </TooltipContent>
+              </Tooltip>
+            )}
+          </div>
+
+          {/* Right: Room Actions */}
           <div className="flex items-center gap-2">
             {/* Keyboard hint for catalog */}
             {onOpenFullCatalog && (
@@ -118,9 +427,8 @@ export function SplitWorkspace({
               </Tooltip>
             )}
 
-            {!isRoomLocked && (
+            {!isRoomLocked ? (
               <>
-                {/* Lock Room Button */}
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <Button
@@ -138,7 +446,6 @@ export function SplitWorkspace({
                   </TooltipContent>
                 </Tooltip>
 
-                {/* Add Camera Button */}
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <Button
@@ -147,7 +454,7 @@ export function SplitWorkspace({
                     >
                       <Plus className="h-3.5 w-3.5 mr-1" />
                       <CameraIcon className="h-3.5 w-3.5 mr-1.5" />
-                      Add Camera
+                      Camera
                     </Button>
                   </TooltipTrigger>
                   <TooltipContent>
@@ -155,6 +462,20 @@ export function SplitWorkspace({
                   </TooltipContent>
                 </Tooltip>
               </>
+            ) : (
+              <div className="flex items-center gap-2 px-3 py-1.5 rounded-full glass border-warning/30 bg-warning/10">
+                <Lock className="h-3.5 w-3.5 text-warning" />
+                <span className="text-xs font-medium text-warning">Locked</span>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={onToggleRoomLock}
+                  className="h-6 px-2 text-xs text-warning hover:bg-warning/20"
+                >
+                  <Unlock className="h-3 w-3 mr-1" />
+                  Unlock
+                </Button>
+              </div>
             )}
           </div>
         </div>
@@ -163,9 +484,12 @@ export function SplitWorkspace({
         <div className="flex-1 relative overflow-hidden">
           {birdEyeRenderUrl ? (
             <>
-              {/* Bird's Eye Render - Full Screen */}
+              {/* Bird's Eye Render */}
               <div className="absolute inset-0 flex items-center justify-center p-6">
-                <div className="relative w-full h-full max-w-[90%] max-h-[90%] gradient-border gradient-border-subtle rounded-2xl overflow-hidden">
+                <div 
+                  className="relative w-full h-full max-w-[90%] max-h-[85%] gradient-border gradient-border-subtle rounded-2xl overflow-hidden"
+                  style={{ transform: `scale(${zoom})` }}
+                >
                   <img
                     src={birdEyeRenderUrl}
                     alt="Bird's Eye View"
@@ -174,7 +498,7 @@ export function SplitWorkspace({
                   />
                   
                   {/* Camera Placement Overlay */}
-                  {!isRoomLocked && (
+                  {!isRoomLocked && !selectionMode && (
                     <CameraPlacement
                       cameras={cameras}
                       selectedCameraId={selectedCameraId}
@@ -185,7 +509,16 @@ export function SplitWorkspace({
                     />
                   )}
 
-                  {/* Locked overlay with subtle pattern */}
+                  {/* Selection Overlay */}
+                  {selectionMode && (
+                    <SelectionOverlay
+                      imageUrl={birdEyeRenderUrl}
+                      onSelectionComplete={handleSelectionComplete}
+                      isActive={selectionMode}
+                    />
+                  )}
+
+                  {/* Locked overlay */}
                   {isRoomLocked && (
                     <div className="absolute inset-0 bg-background/5 backdrop-blur-[1px] pointer-events-none" />
                   )}
@@ -193,13 +526,45 @@ export function SplitWorkspace({
               </div>
 
               {/* Camera count badge */}
-              {cameras.length > 0 && (
+              {cameras.length > 0 && !selectionMode && (
                 <div className="absolute top-4 right-4 px-3 py-1.5 glass-premium rounded-full flex items-center gap-2 animate-fade-in">
                   <CameraIcon className="h-3.5 w-3.5 text-cyan-400" />
                   <span className="text-xs font-medium text-foreground">
                     {cameras.length} camera{cameras.length !== 1 ? 's' : ''}
                   </span>
                 </div>
+              )}
+
+              {/* Selective Edit Panel */}
+              {selectionMode && currentSelection && birdEyeRenderUrl && (
+                <SelectiveEditPanel
+                  selection={currentSelection}
+                  renderUrl={birdEyeRenderUrl}
+                  onSubmit={handleSelectiveEditSubmit}
+                  onCancel={handleSelectiveEditCancel}
+                  isProcessing={isSelectiveEditing}
+                />
+              )}
+
+              {/* AI Director Panel */}
+              {showAIDirector && onAIDirectorChange && (
+                <AIDirectorPanel
+                  onApplyChange={onAIDirectorChange}
+                  onClose={() => setShowAIDirector(false)}
+                  isProcessing={isGenerating}
+                />
+              )}
+
+              {/* Multicam Panel */}
+              {showMulticam && onMulticamGenerate && (
+                <MulticamPanel
+                  onGenerateView={onMulticamGenerate}
+                  onClose={() => setShowMulticam(false)}
+                  isGenerating={isMulticamGenerating}
+                  generatedViews={multicamViews}
+                  onSelectView={(view, url) => onSetMulticamAsMain?.(url)}
+                  projectId={projectId}
+                />
               )}
             </>
           ) : (
@@ -226,16 +591,17 @@ export function SplitWorkspace({
             </div>
           )}
 
-          {/* Floating Minimap */}
+          {/* Floating Minimap - Clean glass styling */}
           {layoutImageUrl && (
             <div 
               className={cn(
-                "absolute bottom-4 left-4 z-10 minimap-container transition-all duration-300 ease-out",
-                isMinimapExpanded ? "w-80 h-64" : "w-40 h-32"
+                "absolute bottom-20 left-4 z-10 transition-all duration-300 ease-out rounded-xl overflow-hidden",
+                "glass-premium border border-border/20",
+                isMinimapExpanded ? "w-80 h-64" : "w-36 h-28"
               )}
             >
               {/* Minimap Header */}
-              <div className="absolute top-0 left-0 right-0 z-10 flex items-center justify-between px-2 py-1.5 bg-gradient-to-b from-background/90 to-transparent">
+              <div className="absolute top-0 left-0 right-0 z-10 flex items-center justify-between px-2 py-1.5 bg-gradient-to-b from-background/80 to-transparent">
                 <div className="flex items-center gap-1.5">
                   <Map className="h-3 w-3 text-primary" />
                   <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Layout</span>
@@ -262,7 +628,8 @@ export function SplitWorkspace({
 
               {/* Hover expand hint */}
               {!isMinimapExpanded && (
-                <div className="absolute inset-0 flex items-center justify-center bg-background/60 opacity-0 hover:opacity-100 transition-opacity cursor-pointer"
+                <div 
+                  className="absolute inset-0 flex items-center justify-center bg-background/40 opacity-0 hover:opacity-100 transition-opacity cursor-pointer"
                   onClick={() => setIsMinimapExpanded(true)}
                 >
                   <Maximize2 className="h-4 w-4 text-muted-foreground" />
@@ -271,8 +638,17 @@ export function SplitWorkspace({
             </div>
           )}
 
-          {/* Camera Properties Panel (slides in when camera is selected) */}
-          {selectedCamera && !isRoomLocked && (
+          {/* Render History Carousel */}
+          {allRenders.length > 0 && onRenderHistorySelect && (
+            <RenderHistoryCarousel
+              renders={allRenders}
+              currentRenderId={currentRenderId}
+              onSelect={onRenderHistorySelect}
+            />
+          )}
+
+          {/* Camera Properties Panel */}
+          {selectedCamera && !isRoomLocked && !selectionMode && (
             <CameraPropertiesPanel
               camera={selectedCamera}
               onUpdate={onCameraUpdate}
