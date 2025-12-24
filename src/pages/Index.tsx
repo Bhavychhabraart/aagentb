@@ -227,6 +227,31 @@ const Index = () => {
         // Add welcome message for staging mode
         addStagingWelcomeMessage();
       }
+
+      // Check for Agent B onboarding data from /onboarding page
+      const fromOnboarding = searchParams.get('fromOnboarding');
+      if (fromOnboarding === 'true') {
+        const onboardingDataStr = localStorage.getItem(`agentb_onboarding_${currentProjectId}`);
+        if (onboardingDataStr) {
+          try {
+            const onboardingData = JSON.parse(onboardingDataStr);
+            // Set Agent B state from onboarding
+            setAgentBUnderstanding(onboardingData.understanding);
+            setAgentBQuestions(onboardingData.questions || []);
+            setAgentBAnswers(onboardingData.answers || []);
+            setAgentBUserPrompt(onboardingData.prompt || '');
+            setAgentBState('confirmation');
+            // Clear from localStorage
+            localStorage.removeItem(`agentb_onboarding_${currentProjectId}`);
+            // Clear URL params
+            const newParams = new URLSearchParams(searchParams);
+            newParams.delete('fromOnboarding');
+            setSearchParams(newParams, { replace: true });
+          } catch (e) {
+            console.error('Failed to parse onboarding data:', e);
+          }
+        }
+      }
     }
   }, [currentProjectId]);
 

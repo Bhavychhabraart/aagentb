@@ -189,7 +189,16 @@ export default function Landing() {
         return;
       }
 
-      // Standard flow - navigate with generation params
+      // If memory is enabled, go to Agent B onboarding flow
+      if (memoryEnabled && (session.prompt.trim() || session.layout || session.roomPhoto)) {
+        if (session.prompt.trim()) {
+          params.set("prompt", encodeURIComponent(session.prompt));
+        }
+        navigate(`/onboarding?${params.toString()}`);
+        return;
+      }
+
+      // Standard flow (memory off) - navigate with generation params
       if (session.prompt.trim()) {
         params.set("prompt", encodeURIComponent(session.prompt));
       }
