@@ -35,6 +35,7 @@ const App = () => (
               <Route path="/vendor" element={<VendorDashboard />} />
               <Route path="/layout-creator" element={<LayoutCreator />} />
               <Route path="/create-furniture" element={<CreateCustomFurniture />} />
+              <Route path="/custom-furniture/create" element={<CreateCustomFurniture />} />
               <Route path="/furniture-library" element={<CustomFurnitureLibrary />} />
               <Route path="/custom-furniture" element={<CustomFurnitureLibrary />} />
               <Route path="*" element={<NotFound />} />
