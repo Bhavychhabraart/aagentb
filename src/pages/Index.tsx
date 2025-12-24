@@ -4,7 +4,9 @@ import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { AppSidebar } from '@/components/layout/AppSidebar';
-import { ChatPanel, ChatMessage, ChatInputType } from '@/components/canvas/ChatPanel';
+import { ChatPanel, ChatMessage, ChatInputType, AgentBState } from '@/components/canvas/ChatPanel';
+import { AgentBUnderstanding } from '@/components/canvas/AgentBBrief';
+import { AgentBQuestion, AgentBAnswer } from '@/components/canvas/AgentBQuestions';
 import { RenderViewer } from '@/components/canvas/RenderViewer';
 import { SplitWorkspace } from '@/components/canvas/SplitWorkspace';
 import { CameraData } from '@/components/canvas/CameraPlacement';
@@ -90,6 +92,16 @@ const Index = () => {
   const [showRoomPhotoModal, setShowRoomPhotoModal] = useState(false);
   const [showStyleRefModal, setShowStyleRefModal] = useState(false);
   const [showProductsModal, setShowProductsModal] = useState(false);
+
+  // Agent B state
+  const [agentBEnabled, setAgentBEnabled] = useState(true);
+  const [agentBState, setAgentBState] = useState<AgentBState>('idle');
+  const [agentBUnderstanding, setAgentBUnderstanding] = useState<AgentBUnderstanding | null>(null);
+  const [agentBQuestions, setAgentBQuestions] = useState<AgentBQuestion[]>([]);
+  const [agentBAnswers, setAgentBAnswers] = useState<AgentBAnswer[]>([]);
+  const [agentBProgress, setAgentBProgress] = useState(0);
+  const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
+  const [agentBUserPrompt, setAgentBUserPrompt] = useState('');
 
   // Redirect to auth if not logged in
   useEffect(() => {
@@ -926,6 +938,239 @@ Ready to generate a render! Describe your vision.`;
     }
     setStagedItems([]);
   }, [user, currentProjectId, addMessage, triggerGeneration, editRender, stagedItems, currentRenderUrl]);
+
+  // ========== AGENT B HANDLERS ==========
+  
+  // Start Agent B analysis flow
+  const handleAgentBAnalysis = useCallback(async (userPrompt: string) => {
+    if (!currentProjectId) return;
+
+    setAgentBState('thinking');
+    setAgentBProgress(0);
+    setAgentBUserPrompt(userPrompt);
+
+    // Animate progress
+    const progressInterval = setInterval(() => {
+      setAgentBProgress(prev => Math.min(prev + 5, 90));
+    }, 200);
+
+    try {
+      // Fetch project references
+      const references = await fetchProjectReferences(currentProjectId);
+
+      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/agent-b-analyze`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+        },
+        body: JSON.stringify({
+          userPrompt,
+          layoutUrl: references.layoutUrl,
+          roomPhotoUrl: references.roomPhotoUrl,
+          styleRefUrls: references.styleRefUrls,
+          stagedProducts: stagedItems.map(item => ({
+            name: item.name,
+            category: item.category,
+            imageUrl: item.imageUrl,
+          })),
+        }),
+      });
+
+      clearInterval(progressInterval);
+      setAgentBProgress(100);
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || 'Agent B analysis failed');
+      }
+
+      const data = await response.json();
+
+      setAgentBUnderstanding(data.understanding);
+      setAgentBQuestions(data.questions || []);
+      setAgentBAnswers([]);
+      setCurrentQuestionIndex(0);
+      
+      // Transition to brief view
+      setTimeout(() => {
+        setAgentBState('brief');
+      }, 500);
+
+    } catch (error) {
+      console.error('Agent B analysis failed:', error);
+      clearInterval(progressInterval);
+      setAgentBState('idle');
+      toast({
+        variant: 'destructive',
+        title: 'Agent B Error',
+        description: error instanceof Error ? error.message : 'Analysis failed',
+      });
+    }
+  }, [currentProjectId, stagedItems, toast]);
+
+  // Handle Agent B brief confirmation
+  const handleAgentBConfirmBrief = useCallback(() => {
+    if (agentBQuestions.length > 0) {
+      setAgentBState('questions');
+    } else {
+      setAgentBState('confirmation');
+    }
+  }, [agentBQuestions.length]);
+
+  // Handle Agent B brief correction (go back to chat)
+  const handleAgentBCorrectBrief = useCallback(() => {
+    setAgentBState('idle');
+  }, []);
+
+  // Handle Agent B question answer
+  const handleAgentBAnswer = useCallback((answer: AgentBAnswer) => {
+    setAgentBAnswers(prev => {
+      const existing = prev.findIndex(a => a.questionId === answer.questionId);
+      if (existing >= 0) {
+        const updated = [...prev];
+        updated[existing] = answer;
+        return updated;
+      }
+      return [...prev, answer];
+    });
+  }, []);
+
+  // Navigate to next question
+  const handleAgentBNextQuestion = useCallback(() => {
+    if (currentQuestionIndex < agentBQuestions.length - 1) {
+      setCurrentQuestionIndex(prev => prev + 1);
+    }
+  }, [currentQuestionIndex, agentBQuestions.length]);
+
+  // Navigate to previous question
+  const handleAgentBPreviousQuestion = useCallback(() => {
+    if (currentQuestionIndex > 0) {
+      setCurrentQuestionIndex(prev => prev - 1);
+    }
+  }, [currentQuestionIndex]);
+
+  // Skip current question
+  const handleAgentBSkipQuestion = useCallback(() => {
+    if (currentQuestionIndex < agentBQuestions.length - 1) {
+      setCurrentQuestionIndex(prev => prev + 1);
+    } else {
+      setAgentBState('confirmation');
+    }
+  }, [currentQuestionIndex, agentBQuestions.length]);
+
+  // Complete questions phase
+  const handleAgentBCompleteQuestions = useCallback(() => {
+    setAgentBState('confirmation');
+  }, []);
+
+  // Go back to edit brief
+  const handleAgentBEditBrief = useCallback(() => {
+    setAgentBState('brief');
+  }, []);
+
+  // Go back to edit questions
+  const handleAgentBEditQuestions = useCallback(() => {
+    setAgentBState('questions');
+    setCurrentQuestionIndex(0);
+  }, []);
+
+  // Final generation with Agent B context
+  const handleAgentBGenerate = useCallback(async () => {
+    if (!user || !currentProjectId || !agentBUnderstanding) return;
+
+    setAgentBState('generating');
+
+    // Build enhanced prompt from Agent B context
+    let enhancedPrompt = agentBUserPrompt || 'Design my space';
+    
+    // Add understanding context
+    enhancedPrompt += `\n\n[Room: ${agentBUnderstanding.roomType}, Style: ${agentBUnderstanding.detectedStyle}]`;
+    
+    // Add answers context
+    if (agentBAnswers.length > 0) {
+      const answersText = agentBAnswers.map(a => {
+        const question = agentBQuestions.find(q => q.id === a.questionId);
+        const answerText = a.customText || a.selectedOptions.join(', ');
+        return question ? `${question.question}: ${answerText}` : answerText;
+      }).join('; ');
+      enhancedPrompt += `\n[Preferences: ${answersText}]`;
+    }
+
+    // Add staged products
+    if (agentBUnderstanding.stagedProducts.length > 0) {
+      enhancedPrompt += `\n[Featured products: ${agentBUnderstanding.stagedProducts.join(', ')}]`;
+    }
+
+    // Add user message
+    await addMessage('user', `🧠 Agent B: ${agentBUserPrompt}\n\n📋 ${agentBUnderstanding.roomType} • ${agentBUnderstanding.detectedStyle}`, {
+      type: 'text',
+      stagedFurniture: stagedItems.length > 0 ? stagedItems.map(i => ({ id: i.id, name: i.name })) : undefined,
+    } as ChatMessage['metadata']);
+
+    // Reset Agent B state
+    setAgentBState('idle');
+    setAgentBUnderstanding(null);
+    setAgentBQuestions([]);
+    setAgentBAnswers([]);
+    setCurrentQuestionIndex(0);
+    setAgentBUserPrompt('');
+
+    // Check if we should edit or generate
+    const shouldEdit = currentRenderUrl !== null;
+
+    if (shouldEdit) {
+      editRender(enhancedPrompt, stagedItems);
+    } else {
+      triggerGeneration(enhancedPrompt, stagedItems);
+    }
+
+    // Clear staged items
+    if (stagedItems.length > 0) {
+      await supabase
+        .from('staged_furniture')
+        .delete()
+        .eq('project_id', currentProjectId);
+    }
+    setStagedItems([]);
+  }, [user, currentProjectId, agentBUnderstanding, agentBUserPrompt, agentBAnswers, agentBQuestions, stagedItems, currentRenderUrl, addMessage, editRender, triggerGeneration]);
+
+  // Modified handleSendMessage to support Agent B
+  const handleSendMessageWithAgentB = useCallback(async (content: string) => {
+    if (!user || !currentProjectId) return;
+
+    // If Agent B is enabled and no render exists, start Agent B flow
+    if (agentBEnabled && !currentRenderUrl) {
+      handleAgentBAnalysis(content);
+      return;
+    }
+
+    // Otherwise, use normal flow
+    const shouldEdit = currentRenderUrl !== null;
+
+    const messageContent = stagedItems.length > 0
+      ? `${content}\n\n📦 Staged furniture: ${stagedItems.map(i => i.name).join(', ')}`
+      : content;
+
+    await addMessage('user', messageContent, { 
+      type: 'text',
+      stagedFurniture: stagedItems.length > 0 ? stagedItems.map(i => ({ id: i.id, name: i.name })) : undefined,
+    } as ChatMessage['metadata']);
+
+    if (shouldEdit) {
+      editRender(content, stagedItems);
+    } else {
+      triggerGeneration(content, stagedItems);
+    }
+
+    if (stagedItems.length > 0) {
+      await supabase
+        .from('staged_furniture')
+        .delete()
+        .eq('project_id', currentProjectId);
+    }
+    setStagedItems([]);
+  }, [user, currentProjectId, agentBEnabled, currentRenderUrl, stagedItems, addMessage, editRender, triggerGeneration, handleAgentBAnalysis]);
 
   const handleCatalogItemSelect = useCallback(async (item: CatalogFurnitureItem) => {
     if (!user || !currentProjectId) return;
@@ -1952,8 +2197,8 @@ Ready to generate a render! Describe your vision.`;
           <div className="flex-1 overflow-hidden">
             <ChatPanel
               messages={messages}
-              isLoading={isProcessing || isGenerating || isSelectiveEditing}
-              onSendMessage={handleSendMessage}
+              isLoading={isProcessing || isGenerating || isSelectiveEditing || agentBState === 'generating'}
+              onSendMessage={handleSendMessageWithAgentB}
               onInputTypeSelect={handleChatInputTypeSelect}
               stagedItems={stagedItems}
               onClearStagedItems={handleClearStagedItems}
@@ -1966,6 +2211,26 @@ Ready to generate a render! Describe your vision.`;
                   setCurrentRenderId(matchingRender.id);
                 }
               }}
+              // Agent B props
+              agentBEnabled={agentBEnabled}
+              onAgentBToggle={setAgentBEnabled}
+              agentBState={agentBState}
+              agentBUnderstanding={agentBUnderstanding}
+              agentBQuestions={agentBQuestions}
+              agentBAnswers={agentBAnswers}
+              agentBProgress={agentBProgress}
+              onAgentBConfirmBrief={handleAgentBConfirmBrief}
+              onAgentBCorrectBrief={handleAgentBCorrectBrief}
+              onAgentBAnswer={handleAgentBAnswer}
+              onAgentBNextQuestion={handleAgentBNextQuestion}
+              onAgentBPreviousQuestion={handleAgentBPreviousQuestion}
+              onAgentBSkipQuestion={handleAgentBSkipQuestion}
+              onAgentBCompleteQuestions={handleAgentBCompleteQuestions}
+              onAgentBGenerate={handleAgentBGenerate}
+              onAgentBEditBrief={handleAgentBEditBrief}
+              onAgentBEditQuestions={handleAgentBEditQuestions}
+              currentQuestionIndex={currentQuestionIndex}
+              userPrompt={agentBUserPrompt}
             />
           </div>
           <AssetsPanel 
