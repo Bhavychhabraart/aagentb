@@ -15,6 +15,7 @@ import LayoutCreator from "./pages/LayoutCreator";
 import CreateCustomFurniture from "./pages/CreateCustomFurniture";
 import CustomFurnitureLibrary from "./pages/CustomFurnitureLibrary";
 import AgentBOnboarding from "./pages/AgentBOnboarding";
+import AgentBBrain from "./pages/AgentBBrain";
 
 const queryClient = new QueryClient();
 
@@ -32,6 +33,7 @@ const App = () => (
               <Route path="/dashboard" element={<Dashboard />} />
               <Route path="/workspace" element={<Index />} />
               <Route path="/onboarding" element={<AgentBOnboarding />} />
+              <Route path="/agent-b/brain" element={<AgentBBrain />} />
               <Route path="/vendor" element={<VendorDashboard />} />
               <Route path="/layout-creator" element={<LayoutCreator />} />
               <Route path="/create-furniture" element={<CreateCustomFurniture />} />

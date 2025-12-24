@@ -14,6 +14,132 @@ export type Database = {
   }
   public: {
     Tables: {
+      agent_b_knowledge: {
+        Row: {
+          content: Json | null
+          created_at: string | null
+          description: string | null
+          file_url: string | null
+          id: string
+          is_active: boolean | null
+          knowledge_type: string
+          tags: string[] | null
+          thumbnail_url: string | null
+          title: string
+          updated_at: string | null
+          user_id: string
+          weight: number | null
+        }
+        Insert: {
+          content?: Json | null
+          created_at?: string | null
+          description?: string | null
+          file_url?: string | null
+          id?: string
+          is_active?: boolean | null
+          knowledge_type: string
+          tags?: string[] | null
+          thumbnail_url?: string | null
+          title: string
+          updated_at?: string | null
+          user_id: string
+          weight?: number | null
+        }
+        Update: {
+          content?: Json | null
+          created_at?: string | null
+          description?: string | null
+          file_url?: string | null
+          id?: string
+          is_active?: boolean | null
+          knowledge_type?: string
+          tags?: string[] | null
+          thumbnail_url?: string | null
+          title?: string
+          updated_at?: string | null
+          user_id?: string
+          weight?: number | null
+        }
+        Relationships: []
+      }
+      agent_b_layout_templates: {
+        Row: {
+          canvas_data: Json
+          created_at: string | null
+          id: string
+          is_favorite: boolean | null
+          name: string
+          room_dimensions: Json | null
+          room_type: string | null
+          thumbnail_url: string | null
+          use_count: number | null
+          user_id: string
+        }
+        Insert: {
+          canvas_data: Json
+          created_at?: string | null
+          id?: string
+          is_favorite?: boolean | null
+          name: string
+          room_dimensions?: Json | null
+          room_type?: string | null
+          thumbnail_url?: string | null
+          use_count?: number | null
+          user_id: string
+        }
+        Update: {
+          canvas_data?: Json
+          created_at?: string | null
+          id?: string
+          is_favorite?: boolean | null
+          name?: string
+          room_dimensions?: Json | null
+          room_type?: string | null
+          thumbnail_url?: string | null
+          use_count?: number | null
+          user_id?: string
+        }
+        Relationships: []
+      }
+      agent_b_style_collections: {
+        Row: {
+          colors: string[] | null
+          created_at: string | null
+          description: string | null
+          furniture_styles: string[] | null
+          id: string
+          image_urls: string[] | null
+          is_active: boolean | null
+          materials: string[] | null
+          name: string
+          user_id: string
+        }
+        Insert: {
+          colors?: string[] | null
+          created_at?: string | null
+          description?: string | null
+          furniture_styles?: string[] | null
+          id?: string
+          image_urls?: string[] | null
+          is_active?: boolean | null
+          materials?: string[] | null
+          name: string
+          user_id: string
+        }
+        Update: {
+          colors?: string[] | null
+          created_at?: string | null
+          description?: string | null
+          furniture_styles?: string[] | null
+          id?: string
+          image_urls?: string[] | null
+          is_active?: boolean | null
+          materials?: string[] | null
+          name?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       cameras: {
         Row: {
           capture_height: number
