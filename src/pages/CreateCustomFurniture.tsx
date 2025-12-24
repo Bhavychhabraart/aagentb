@@ -346,7 +346,7 @@ export default function CreateCustomFurniture() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-subtle flex flex-col">
+    <div className="h-screen bg-gradient-subtle flex flex-col overflow-hidden">
       {/* Premium Header */}
       <WorkspaceHeader
         title={isEditing ? 'Edit Custom Furniture' : 'Create Custom Furniture'}
@@ -360,16 +360,16 @@ export default function CreateCustomFurniture() {
       />
 
       {/* Main Content */}
-      <div className="flex-1 flex overflow-hidden">
+      <div className="flex-1 flex overflow-hidden min-h-0">
         {/* Left Panel - Form with Collapsible Sections */}
         <motion.div 
           initial={{ opacity: 0, x: -20 }}
           animate={{ opacity: 1, x: 0 }}
-          className="w-[380px] border-r border-border/50 flex flex-col bg-card/30"
+          className="w-[360px] min-w-[320px] border-r border-border/50 flex flex-col bg-card/30 overflow-hidden"
         >
-          <ScrollArea className="flex-1">
+          <ScrollArea className="flex-1 min-h-0">
             <motion.div 
-              className="p-4 space-y-3"
+              className="p-3 space-y-2"
               variants={staggerContainer}
               initial="hidden"
               animate="show"
@@ -637,7 +637,7 @@ export default function CreateCustomFurniture() {
           </ScrollArea>
 
           {/* Generate Button */}
-          <div className="p-4 border-t border-border/50 glass">
+          <div className="p-3 border-t border-border/50 glass shrink-0">
             <motion.div
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
@@ -683,7 +683,7 @@ export default function CreateCustomFurniture() {
         <motion.div 
           initial={{ opacity: 0, x: 20 }}
           animate={{ opacity: 1, x: 0 }}
-          className="w-80 border-l border-border/50 flex flex-col bg-card/30"
+          className="w-72 min-w-[280px] border-l border-border/50 flex flex-col bg-card/30 overflow-hidden"
         >
           <Tabs value={activeRightTab} onValueChange={setActiveRightTab} className="flex flex-col h-full">
             {/* Pill-style Tabs */}
