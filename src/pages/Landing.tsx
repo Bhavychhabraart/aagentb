@@ -1,15 +1,17 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { Send, Grid3X3, Image, Palette, Package, Settings2, Loader2, X } from "lucide-react";
+import { Send, Grid3X3, Image, Palette, Package, Settings2, Loader2, X, Brain } from "lucide-react";
 import { LayoutUploadModal } from "@/components/creation/LayoutUploadModal";
 import { RoomPhotoModal } from "@/components/creation/RoomPhotoModal";
 import { StyleRefModal } from "@/components/creation/StyleRefModal";
 import { ProductPickerModal } from "@/components/creation/ProductPickerModal";
+import { getMemorySettings, setMemoryEnabled } from "@/services/designMemoryService";
+import { cn } from "@/lib/utils";
 
 interface UploadedItem {
   file?: File;
@@ -39,6 +41,31 @@ export default function Landing() {
   const [projectName, setProjectName] = useState("");
   const [activeModal, setActiveModal] = useState<"layout" | "room" | "style" | "products" | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [memoryEnabled, setMemoryEnabledState] = useState(true);
+
+  // Load memory settings
+  useEffect(() => {
+    if (user) {
+      getMemorySettings(user.id).then(settings => {
+        if (settings) {
+          setMemoryEnabledState(settings.memory_enabled);
+        }
+      });
+    }
+  }, [user]);
+
+  const handleMemoryToggle = async () => {
+    if (!user) return;
+    const newValue = !memoryEnabled;
+    setMemoryEnabledState(newValue);
+    await setMemoryEnabled(user.id, newValue);
+    toast({
+      title: newValue ? "Design Memory enabled" : "Design Memory disabled",
+      description: newValue 
+        ? "Your preferences will be learned and remembered." 
+        : "Preferences won't be tracked.",
+    });
+  };
 
   const inputCards = [
     {
@@ -363,11 +390,26 @@ export default function Landing() {
           ))}
         </div>
 
-        {/* Tools button */}
-        <div className="flex justify-center mb-4">
+        {/* Tools + Memory buttons */}
+        <div className="flex justify-center gap-2 mb-4">
           <Button variant="outline" size="sm" className="gap-2">
             <Settings2 className="w-4 h-4" />
             Tools
+          </Button>
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={handleMemoryToggle}
+            className={cn(
+              "gap-2 transition-all duration-200",
+              memoryEnabled && "border-primary/50 bg-primary/5 text-primary hover:bg-primary/10"
+            )}
+          >
+            <Brain className={cn(
+              "w-4 h-4 transition-colors",
+              memoryEnabled && "text-primary"
+            )} />
+            Memory: {memoryEnabled ? "ON" : "OFF"}
           </Button>
         </div>
 
