@@ -1382,6 +1382,264 @@ Ready to generate a render! Describe your vision.`;
     setCurrentRenderUrl(imageUrl);
   }, []);
 
+  // =========== CAMERA CRUD OPERATIONS ===========
+
+  // Load cameras for current room
+  const loadCameras = useCallback(async () => {
+    if (!currentProjectId) return;
+    
+    const { data, error } = await supabase
+      .from('cameras')
+      .select('*')
+      .eq('project_id', currentProjectId)
+      .eq('room_id', currentRoomId)
+      .order('created_at', { ascending: true });
+    
+    if (error) {
+      console.error('Failed to load cameras:', error);
+      return;
+    }
+    
+    const cameraData: CameraData[] = (data || []).map(c => ({
+      id: c.id,
+      name: c.name,
+      x: Number(c.x_position),
+      y: Number(c.y_position),
+      rotation: Number(c.rotation),
+      fovAngle: Number(c.fov_angle),
+      captureWidth: Number(c.capture_width),
+      captureHeight: Number(c.capture_height),
+    }));
+    
+    setCameras(cameraData);
+  }, [currentProjectId, currentRoomId]);
+
+  // Load cameras when project/room changes
+  useEffect(() => {
+    if (currentProjectId) {
+      loadCameras();
+    }
+  }, [currentProjectId, currentRoomId, loadCameras]);
+
+  // Add new camera
+  const handleCameraAdd = useCallback(async () => {
+    if (!user || !currentProjectId) return;
+    
+    const newCameraName = `Camera ${cameras.length + 1}`;
+    
+    const { data, error } = await supabase
+      .from('cameras')
+      .insert({
+        project_id: currentProjectId,
+        room_id: currentRoomId,
+        user_id: user.id,
+        name: newCameraName,
+        x_position: 50,
+        y_position: 50,
+        rotation: 0,
+        fov_angle: 60,
+        capture_width: 100,
+        capture_height: 75,
+      })
+      .select()
+      .single();
+    
+    if (error) {
+      console.error('Failed to create camera:', error);
+      toast({ variant: 'destructive', title: 'Error', description: 'Failed to create camera' });
+      return;
+    }
+    
+    const newCamera: CameraData = {
+      id: data.id,
+      name: data.name,
+      x: Number(data.x_position),
+      y: Number(data.y_position),
+      rotation: Number(data.rotation),
+      fovAngle: Number(data.fov_angle),
+      captureWidth: Number(data.capture_width),
+      captureHeight: Number(data.capture_height),
+    };
+    
+    setCameras(prev => [...prev, newCamera]);
+    setSelectedCameraId(data.id);
+    toast({ title: 'Camera added', description: 'Drag to position, then generate a view' });
+  }, [user, currentProjectId, currentRoomId, cameras.length, toast]);
+
+  // Update camera
+  const handleCameraUpdate = useCallback(async (camera: CameraData) => {
+    // Update local state immediately for smooth UX
+    setCameras(prev => prev.map(c => c.id === camera.id ? camera : c));
+    
+    // Debounced save to database
+    const { error } = await supabase
+      .from('cameras')
+      .update({
+        name: camera.name,
+        x_position: camera.x,
+        y_position: camera.y,
+        rotation: camera.rotation,
+        fov_angle: camera.fovAngle,
+        capture_width: camera.captureWidth,
+        capture_height: camera.captureHeight,
+      })
+      .eq('id', camera.id);
+    
+    if (error) {
+      console.error('Failed to update camera:', error);
+    }
+  }, []);
+
+  // Delete camera
+  const handleCameraDelete = useCallback(async (cameraId: string) => {
+    const { error } = await supabase
+      .from('cameras')
+      .delete()
+      .eq('id', cameraId);
+    
+    if (error) {
+      console.error('Failed to delete camera:', error);
+      toast({ variant: 'destructive', title: 'Error', description: 'Failed to delete camera' });
+      return;
+    }
+    
+    setCameras(prev => prev.filter(c => c.id !== cameraId));
+    if (selectedCameraId === cameraId) {
+      setSelectedCameraId(null);
+    }
+    toast({ title: 'Camera deleted' });
+  }, [selectedCameraId, toast]);
+
+  // Generate view from camera position
+  const handleGenerateFromCamera = useCallback(async (cameraId: string, prompt: string) => {
+    if (!user || !currentProjectId || !currentRenderUrl) return;
+    
+    const camera = cameras.find(c => c.id === cameraId);
+    if (!camera) return;
+    
+    setIsGenerating(true);
+    
+    try {
+      // Build camera-aware prompt
+      const cameraPrompt = `Generate a perspective view from camera position at ${camera.x.toFixed(0)}%, ${camera.y.toFixed(0)}% of the room, looking at angle ${camera.rotation}° with ${camera.fovAngle}° field of view. ${prompt}`;
+      
+      const { data: renderRecord, error: renderError } = await supabase
+        .from('renders')
+        .insert({
+          project_id: currentProjectId,
+          user_id: user.id,
+          prompt: `Camera ${camera.name}: ${prompt}`,
+          status: 'generating',
+          room_upload_id: currentUpload?.id || null,
+          parent_render_id: currentRenderId,
+        })
+        .select()
+        .single();
+      
+      if (renderError) throw renderError;
+      
+      await addMessage('user', `📷 ${camera.name}: ${prompt}`, { type: 'text' });
+      await addMessage('assistant', `Generating view from ${camera.name}...`, { type: 'text', status: 'pending' });
+      
+      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/edit-render`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+        },
+        body: JSON.stringify({
+          currentRenderUrl,
+          userPrompt: cameraPrompt,
+          cameraPosition: {
+            x: camera.x,
+            y: camera.y,
+            rotation: camera.rotation,
+            fov: camera.fovAngle,
+          },
+        }),
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || 'Camera render failed');
+      }
+      
+      const { imageUrl } = await response.json();
+      
+      await supabase
+        .from('renders')
+        .update({ render_url: imageUrl, status: 'completed' })
+        .eq('id', renderRecord.id);
+      
+      setCurrentRenderUrl(imageUrl);
+      setCurrentRenderId(renderRecord.id);
+      
+      await addMessage('assistant', `View from ${camera.name} generated!`, {
+        type: 'render',
+        imageUrl,
+        status: 'ready',
+      });
+      
+      loadAllRenders();
+      toast({ title: 'Camera view generated', description: `${camera.name} perspective ready` });
+    } catch (error) {
+      console.error('Camera render failed:', error);
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      await addMessage('assistant', `Camera render failed: ${message}`, { type: 'text', status: 'failed' });
+      toast({ variant: 'destructive', title: 'Generation failed', description: message });
+    } finally {
+      setIsGenerating(false);
+    }
+  }, [user, currentProjectId, currentRenderUrl, currentRenderId, currentUpload, cameras, addMessage, toast, loadAllRenders]);
+
+  // Toggle room lock
+  const handleToggleRoomLock = useCallback(async () => {
+    if (!currentRoomId) return;
+    
+    const newLockedState = !isRoomLocked;
+    
+    const { error } = await supabase
+      .from('rooms')
+      .update({
+        is_locked: newLockedState,
+        locked_at: newLockedState ? new Date().toISOString() : null,
+        locked_render_url: newLockedState ? currentRenderUrl : null,
+      })
+      .eq('id', currentRoomId);
+    
+    if (error) {
+      console.error('Failed to toggle room lock:', error);
+      toast({ variant: 'destructive', title: 'Error', description: 'Failed to update room lock' });
+      return;
+    }
+    
+    setIsRoomLocked(newLockedState);
+    toast({ 
+      title: newLockedState ? 'Room locked' : 'Room unlocked',
+      description: newLockedState ? 'Room is now in view-only mode' : 'You can now edit this room',
+    });
+  }, [currentRoomId, isRoomLocked, currentRenderUrl, toast]);
+
+  // Load room lock status when room changes
+  useEffect(() => {
+    const loadRoomLockStatus = async () => {
+      if (!currentRoomId) {
+        setIsRoomLocked(false);
+        return;
+      }
+      
+      const { data } = await supabase
+        .from('rooms')
+        .select('is_locked')
+        .eq('id', currentRoomId)
+        .maybeSingle();
+      
+      setIsRoomLocked(data?.is_locked ?? false);
+    };
+    
+    loadRoomLockStatus();
+  }, [currentRoomId]);
+
   // Handle chat input type selection (open modals)
   const handleChatInputTypeSelect = useCallback((type: ChatInputType) => {
     switch (type) {
@@ -1630,28 +1888,46 @@ Ready to generate a render! Describe your vision.`;
             </div>
           )}
           
-        <RenderViewer
-          imageUrl={currentRenderUrl}
-          isGenerating={isGenerating}
-          layoutImageUrl={layoutImageUrl}
-          roomPhotoUrl={roomPhotoUrl}
-          onPositionFurniture={stagedItems.length > 0 && (currentRenderUrl || roomPhotoUrl) ? () => setShowPositioner(true) : undefined}
-          onExport={() => setShowExportModal(true)}
-          onStartOrder={stagedItems.length > 0 ? () => setShowOrderModal(true) : undefined}
-          onSelectiveEdit={handleSelectiveEdit}
-          onAIDirectorChange={handleAIDirectorChange}
-          onMulticamGenerate={handleMulticamGenerate}
-          isSelectiveEditing={isSelectiveEditing}
-          isMulticamGenerating={isMulticamGenerating}
-          multicamViews={multicamViews}
-          onSetMulticamAsMain={handleSetMulticamAsMain}
-          projectId={currentProjectId || undefined}
-          allRenders={allRenders}
-          currentRenderId={currentRenderId}
-          onRenderHistorySelect={handleRenderHistorySelect}
-          onUndo={handleUndo}
-          canUndo={canUndo}
-        />
+        {/* Main Workspace - Split View with Camera Placement */}
+        {useSplitWorkspace ? (
+          <SplitWorkspace
+            layoutImageUrl={layoutImageUrl}
+            birdEyeRenderUrl={currentRenderUrl || roomPhotoUrl}
+            isGenerating={isGenerating}
+            cameras={cameras}
+            selectedCameraId={selectedCameraId}
+            isRoomLocked={isRoomLocked}
+            onCameraAdd={handleCameraAdd}
+            onCameraSelect={setSelectedCameraId}
+            onCameraUpdate={handleCameraUpdate}
+            onCameraDelete={handleCameraDelete}
+            onGenerateFromCamera={handleGenerateFromCamera}
+            onToggleRoomLock={handleToggleRoomLock}
+          />
+        ) : (
+          <RenderViewer
+            imageUrl={currentRenderUrl}
+            isGenerating={isGenerating}
+            layoutImageUrl={layoutImageUrl}
+            roomPhotoUrl={roomPhotoUrl}
+            onPositionFurniture={stagedItems.length > 0 && (currentRenderUrl || roomPhotoUrl) ? () => setShowPositioner(true) : undefined}
+            onExport={() => setShowExportModal(true)}
+            onStartOrder={stagedItems.length > 0 ? () => setShowOrderModal(true) : undefined}
+            onSelectiveEdit={handleSelectiveEdit}
+            onAIDirectorChange={handleAIDirectorChange}
+            onMulticamGenerate={handleMulticamGenerate}
+            isSelectiveEditing={isSelectiveEditing}
+            isMulticamGenerating={isMulticamGenerating}
+            multicamViews={multicamViews}
+            onSetMulticamAsMain={handleSetMulticamAsMain}
+            projectId={currentProjectId || undefined}
+            allRenders={allRenders}
+            currentRenderId={currentRenderId}
+            onRenderHistorySelect={handleRenderHistorySelect}
+            onUndo={handleUndo}
+            canUndo={canUndo}
+          />
+        )}
         
         <div className="w-96 shrink-0 flex flex-col">
           <div className="flex-1 overflow-hidden">
