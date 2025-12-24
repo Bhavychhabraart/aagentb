@@ -26,6 +26,14 @@ import { LayoutUploadModal } from '@/components/creation/LayoutUploadModal';
 import { RoomPhotoModal } from '@/components/creation/RoomPhotoModal';
 import { StyleRefModal } from '@/components/creation/StyleRefModal';
 import { ProductPickerModal, ProductItem } from '@/components/creation/ProductPickerModal';
+import {
+  getMemorySettings,
+  setMemoryEnabled,
+  getPreferencesContext,
+  recordPreferences,
+  mapQuestionToCategory,
+  UserPreferencesContext,
+} from '@/services/designMemoryService';
 
 interface RoomUpload {
   id: string;
@@ -102,6 +110,67 @@ const Index = () => {
   const [agentBProgress, setAgentBProgress] = useState(0);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [agentBUserPrompt, setAgentBUserPrompt] = useState('');
+
+  // Design Memory state
+  const [memoryEnabled, setMemoryEnabledState] = useState(true);
+  const [userPreferences, setUserPreferences] = useState<UserPreferencesContext | null>(null);
+  const [isLearning, setIsLearning] = useState(false);
+
+  // Load memory settings on user login
+  useEffect(() => {
+    if (user) {
+      getMemorySettings(user.id).then(settings => {
+        setMemoryEnabledState(settings?.memory_enabled ?? true);
+      });
+      getPreferencesContext(user.id).then(setUserPreferences);
+    }
+  }, [user]);
+
+  // Toggle memory enabled
+  const handleMemoryToggle = useCallback(async (enabled: boolean) => {
+    if (!user) return;
+    setMemoryEnabledState(enabled);
+    await setMemoryEnabled(user.id, enabled);
+  }, [user]);
+
+  // Learn from Agent B answers
+  const learnFromAgentBAnswers = useCallback(async () => {
+    if (!user || !memoryEnabled || !agentBUnderstanding) return;
+    
+    setIsLearning(true);
+    const prefsToRecord: Array<{ category: any; key: string; source: any; weight?: number }> = [];
+
+    // Learn detected style
+    if (agentBUnderstanding.detectedStyle) {
+      prefsToRecord.push({ category: 'style', key: agentBUnderstanding.detectedStyle, source: 'agent_b_analysis', weight: 2 });
+    }
+
+    // Learn colors
+    for (const color of agentBUnderstanding.colorPalette || []) {
+      prefsToRecord.push({ category: 'color', key: color, source: 'agent_b_analysis', weight: 1 });
+    }
+
+    // Learn from answers
+    for (const answer of agentBAnswers) {
+      const question = agentBQuestions.find(q => q.id === answer.questionId);
+      if (question) {
+        const category = mapQuestionToCategory(question.question);
+        for (const option of answer.selectedOptions) {
+          if (option !== 'custom') {
+            prefsToRecord.push({ category, key: option, source: 'agent_b_answer', weight: 3 });
+          }
+        }
+        if (answer.customText) {
+          prefsToRecord.push({ category, key: answer.customText, source: 'agent_b_answer', weight: 3 });
+        }
+      }
+    }
+
+    await recordPreferences(user.id, prefsToRecord);
+    // Refresh preferences
+    getPreferencesContext(user.id).then(setUserPreferences);
+    setIsLearning(false);
+  }, [user, memoryEnabled, agentBUnderstanding, agentBAnswers, agentBQuestions]);
 
   // Redirect to auth if not logged in
   useEffect(() => {

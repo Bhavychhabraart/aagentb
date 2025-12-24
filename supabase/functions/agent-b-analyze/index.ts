@@ -6,12 +6,28 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+interface PreferenceItem {
+  key: string;
+  weight: number;
+}
+
+interface UserPreferences {
+  styles: PreferenceItem[];
+  colors: PreferenceItem[];
+  furniture: PreferenceItem[];
+  functions: PreferenceItem[];
+  lighting: PreferenceItem[];
+  budget: PreferenceItem[];
+}
+
 interface AnalysisRequest {
   userPrompt: string;
   layoutUrl?: string;
   roomPhotoUrl?: string;
   styleRefUrls?: string[];
   stagedProducts?: Array<{ name: string; category: string; imageUrl?: string }>;
+  userPreferences?: UserPreferences;
+  memoryEnabled?: boolean;
 }
 
 interface AnalysisResponse {
@@ -25,12 +41,14 @@ interface AnalysisResponse {
     hasStyleRef: boolean;
     layoutAnalysis?: string;
     styleNotes?: string;
+    rememberedPreferences?: string[];
   };
   questions: Array<{
     id: number;
     question: string;
     options: string[];
     type: 'single' | 'multiple';
+    preselected?: string[];
   }>;
 }
 
@@ -47,7 +65,15 @@ serve(async (req) => {
     }
 
     const requestData: AnalysisRequest = await req.json();
-    const { userPrompt, layoutUrl, roomPhotoUrl, styleRefUrls = [], stagedProducts = [] } = requestData;
+    const { 
+      userPrompt, 
+      layoutUrl, 
+      roomPhotoUrl, 
+      styleRefUrls = [], 
+      stagedProducts = [],
+      userPreferences,
+      memoryEnabled = false,
+    } = requestData;
 
     console.log("Agent B analyzing:", {
       hasPrompt: !!userPrompt,
@@ -55,19 +81,58 @@ serve(async (req) => {
       hasRoomPhoto: !!roomPhotoUrl,
       styleRefCount: styleRefUrls.length,
       productCount: stagedProducts.length,
+      memoryEnabled,
+      hasPreferences: !!userPreferences,
     });
+
+    // Build preferences context for the AI
+    let preferencesContext = '';
+    if (memoryEnabled && userPreferences) {
+      const prefParts: string[] = [];
+      
+      if (userPreferences.styles.length > 0) {
+        prefParts.push(`Preferred styles: ${userPreferences.styles.map(p => p.key).join(', ')}`);
+      }
+      if (userPreferences.colors.length > 0) {
+        prefParts.push(`Preferred colors: ${userPreferences.colors.map(p => p.key).join(', ')}`);
+      }
+      if (userPreferences.furniture.length > 0) {
+        prefParts.push(`Preferred furniture: ${userPreferences.furniture.map(p => p.key).join(', ')}`);
+      }
+      if (userPreferences.functions.length > 0) {
+        prefParts.push(`Preferred room functions: ${userPreferences.functions.map(p => p.key).join(', ')}`);
+      }
+      if (userPreferences.lighting.length > 0) {
+        prefParts.push(`Preferred lighting: ${userPreferences.lighting.map(p => p.key).join(', ')}`);
+      }
+      if (userPreferences.budget.length > 0) {
+        prefParts.push(`Budget preferences: ${userPreferences.budget.map(p => p.key).join(', ')}`);
+      }
+      
+      if (prefParts.length > 0) {
+        preferencesContext = `\n\nUser's learned preferences (use these to personalize questions and pre-select options):\n${prefParts.join('\n')}`;
+      }
+    }
 
     // Build messages for AI analysis
     const messages: Array<{ role: string; content: string | Array<{ type: string; text?: string; image_url?: { url: string } }> }> = [
       {
         role: "system",
-        content: `You are Agent B, an intelligent interior design consultant. Analyze the user's input and extract understanding about their design intent.
+        content: `You are Agent B, an intelligent interior design consultant with memory capabilities. Analyze the user's input and extract understanding about their design intent.
+${preferencesContext}
 
 Your task:
 1. Identify the room type (living room, bedroom, kitchen, etc.)
 2. Detect the design style from any references or descriptions
 3. Note any staged products and their categories
 4. Generate 5 smart clarifying questions to better understand their vision
+5. If user preferences are provided, acknowledge them in your understanding and pre-select matching options in questions
+
+${memoryEnabled ? `IMPORTANT: The user has Design Memory enabled. Use their learned preferences to:
+- Pre-select options in questions that match their preferences
+- Skip questions they've consistently answered the same way (weight > 3)
+- Include a "rememberedPreferences" field listing which preferences you're using
+- Make the experience feel personalized` : ''}
 
 Return ONLY valid JSON in this exact format:
 {
@@ -80,14 +145,16 @@ Return ONLY valid JSON in this exact format:
     "hasLayout": boolean,
     "hasStyleRef": boolean,
     "layoutAnalysis": "brief description of layout if available",
-    "styleNotes": "brief style observations"
+    "styleNotes": "brief style observations",
+    "rememberedPreferences": ["preference 1 used", "preference 2 used"] // only if memory enabled
   },
   "questions": [
     {
       "id": 1,
       "question": "What is the primary function of this room?",
       "options": ["Relaxation & Entertainment", "Work & Productivity", "Guest Hosting", "Multi-purpose"],
-      "type": "single"
+      "type": "single",
+      "preselected": ["Relaxation & Entertainment"] // based on user preferences
     },
     // ... 4 more questions
   ]
@@ -204,18 +271,24 @@ Available context:`;
     } catch (parseError) {
       console.error("Failed to parse AI response:", content);
       
+      // Build fallback with preferences if available
+      const fallbackPreselected = memoryEnabled && userPreferences?.functions?.length 
+        ? [userPreferences.functions[0].key] 
+        : [];
+      
       // Return a fallback response
       analysisResult = {
         understanding: {
           roomType: "Living Space",
-          detectedStyle: "Contemporary",
+          detectedStyle: userPreferences?.styles?.[0]?.key || "Contemporary",
           dimensions: "Standard",
-          colorPalette: ["#F5F5F5", "#2C3E50", "#3498DB"],
+          colorPalette: userPreferences?.colors?.slice(0, 3).map(c => c.key) || ["#F5F5F5", "#2C3E50", "#3498DB"],
           stagedProducts: stagedProducts.map(p => p.name),
           hasLayout: !!layoutUrl,
           hasStyleRef: styleRefUrls.length > 0,
           layoutAnalysis: layoutUrl ? "Floor plan detected" : undefined,
           styleNotes: "Modern aesthetic detected",
+          rememberedPreferences: memoryEnabled ? userPreferences?.styles?.slice(0, 2).map(s => s.key) : undefined,
         },
         questions: [
           {
@@ -223,6 +296,7 @@ Available context:`;
             question: "What is the primary function of this room?",
             options: ["Relaxation & Entertainment", "Work & Productivity", "Guest Hosting", "Family Gathering"],
             type: "single",
+            preselected: fallbackPreselected,
           },
           {
             id: 2,
@@ -261,6 +335,7 @@ Available context:`;
       roomType: analysisResult.understanding.roomType,
       style: analysisResult.understanding.detectedStyle,
       questionCount: analysisResult.questions.length,
+      memoryUsed: !!analysisResult.understanding.rememberedPreferences?.length,
     });
 
     return new Response(JSON.stringify(analysisResult), {

@@ -158,6 +158,66 @@ export type Database = {
         }
         Relationships: []
       }
+      design_memory_settings: {
+        Row: {
+          auto_learn: boolean | null
+          created_at: string | null
+          id: string
+          memory_enabled: boolean | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          auto_learn?: boolean | null
+          created_at?: string | null
+          id?: string
+          memory_enabled?: boolean | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          auto_learn?: boolean | null
+          created_at?: string | null
+          id?: string
+          memory_enabled?: boolean | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
+      design_preferences: {
+        Row: {
+          category: string
+          created_at: string | null
+          id: string
+          last_used: string | null
+          preference_key: string
+          source: string | null
+          user_id: string
+          weight: number | null
+        }
+        Insert: {
+          category: string
+          created_at?: string | null
+          id?: string
+          last_used?: string | null
+          preference_key: string
+          source?: string | null
+          user_id: string
+          weight?: number | null
+        }
+        Update: {
+          category?: string
+          created_at?: string | null
+          id?: string
+          last_used?: string | null
+          preference_key?: string
+          source?: string | null
+          user_id?: string
+          weight?: number | null
+        }
+        Relationships: []
+      }
       layouts: {
         Row: {
           canvas_data: Json | null
