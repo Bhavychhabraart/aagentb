@@ -289,9 +289,7 @@ export default function Landing() {
 
         <ControlButtons
           memoryEnabled={memoryEnabled}
-          agentBEnabled={agentBModeEnabled}
           onMemoryToggle={handleMemoryToggle}
-          onAgentBToggle={() => setAgentBModeEnabled(!agentBModeEnabled)}
         />
 
         <PromptSection
