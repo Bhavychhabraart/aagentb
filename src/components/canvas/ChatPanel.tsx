@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { Send, Loader2, Image as ImageIcon, Sparkles, FileImage, Clock, Package, Edit3, Eye, Plus, Grid3X3, Camera, Palette, Box, Brain, Wand2 } from 'lucide-react';
+import { Send, Loader2, Image as ImageIcon, Sparkles, FileImage, Clock, Package, Edit3, Eye, Plus, Grid3X3, Camera, Palette, Box, Brain, ToggleLeft, ToggleRight, Wand2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -157,6 +157,26 @@ export function ChatPanel({
           </span>
         </div>
         <div className="flex items-center gap-2">
+          {/* Agent B Toggle */}
+          {onAgentBToggle && agentBState === 'idle' && (
+            <button
+              onClick={() => onAgentBToggle(!agentBEnabled)}
+              className={cn(
+                "flex items-center gap-1.5 px-2 py-1 rounded-full text-xs font-medium transition-all duration-200",
+                agentBEnabled 
+                  ? "bg-gradient-to-r from-primary/20 to-accent/20 border border-primary/40 text-primary"
+                  : "bg-muted/50 border border-border/30 text-muted-foreground hover:text-foreground hover:border-primary/30"
+              )}
+            >
+              <Brain className="h-3 w-3" />
+              <span>Agent B</span>
+              {agentBEnabled ? (
+                <ToggleRight className="h-3.5 w-3.5" />
+              ) : (
+                <ToggleLeft className="h-3.5 w-3.5" />
+              )}
+            </button>
+          )}
           {/* Mode Selector - Only show when renders exist and Agent B is enabled */}
           {currentRenderUrl && agentBEnabled && onToggleNewRenderMode && agentBState === 'idle' && (
             <div className="flex items-center rounded-full bg-muted/50 border border-border/30 p-0.5">
@@ -186,14 +206,19 @@ export function ChatPanel({
               </button>
             </div>
           )}
-          {/* Mode Indicator - When no render exists */}
-          {!currentRenderUrl && (
+          {/* Mode Indicator - When Agent B is off or no render exists */}
+          {(!currentRenderUrl || !agentBEnabled) && (
             isEditMode ? (
               <div className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-amber-500/10 border border-amber-500/30">
                 <Edit3 className="h-3 w-3 text-amber-500" />
                 <span className="text-xs font-medium text-amber-500">Edit Mode</span>
               </div>
-            ) : null
+            ) : !agentBEnabled && (
+              <div className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-primary/10 border border-primary/30">
+                <Sparkles className="h-3 w-3 text-primary" />
+                <span className="text-xs font-medium text-primary">Generate</span>
+              </div>
+            )
           )}
         </div>
       </div>

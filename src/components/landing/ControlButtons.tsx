@@ -1,7 +1,7 @@
 import { motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { Settings2, Brain, Grid3X3, Lightbulb, Zap, Droplets, Sofa, ChevronDown } from "lucide-react";
+import { Settings2, Brain, Sparkles, Grid3X3, Lightbulb, Zap, Droplets, Sofa, ChevronDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
   Tooltip,
@@ -18,7 +18,9 @@ import {
 
 interface ControlButtonsProps {
   memoryEnabled: boolean;
+  agentBEnabled: boolean;
   onMemoryToggle: () => void;
+  onAgentBToggle: () => void;
 }
 
 const drawingTools = [
@@ -31,7 +33,9 @@ const drawingTools = [
 
 export function ControlButtons({
   memoryEnabled,
+  agentBEnabled,
   onMemoryToggle,
+  onAgentBToggle,
 }: ControlButtonsProps) {
   const navigate = useNavigate();
 
@@ -104,6 +108,31 @@ export function ControlButtons({
           </TooltipTrigger>
           <TooltipContent side="bottom" className="glass-premium max-w-xs">
             <p className="text-xs">Learn and remember your design preferences across sessions</p>
+          </TooltipContent>
+        </Tooltip>
+
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={onAgentBToggle}
+              className={cn(
+                "gap-2 transition-all duration-300 glass",
+                agentBEnabled 
+                  ? "border-violet-500/50 bg-violet-500/10 text-violet-400 hover:bg-violet-500/15" 
+                  : "border-border/50 hover:border-violet-500/40"
+              )}
+            >
+              <Sparkles className={cn(
+                "w-4 h-4 transition-all duration-300",
+                agentBEnabled && "text-violet-400"
+              )} />
+              <span className="hidden sm:inline">Agent B:</span> {agentBEnabled ? "ON" : "OFF"}
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent side="bottom" className="glass-premium max-w-xs">
+            <p className="text-xs">Interactive questionnaire for refined design generation</p>
           </TooltipContent>
         </Tooltip>
       </motion.div>
