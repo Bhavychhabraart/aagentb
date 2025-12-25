@@ -39,7 +39,26 @@ interface CustomFurnitureItem {
   created_at: string;
 }
 
-const CATEGORIES = ['All', 'Seating', 'Tables', 'Storage', 'Lighting', 'Beds', 'Decor', 'Outdoor', 'Office', 'Custom'];
+const CATEGORIES = [
+  'All',
+  'Furniture',
+  'Seating',
+  'Tables',
+  'Storage',
+  'Beds',
+  'Lighting',
+  'Rugs',
+  'Art',
+  'Decor',
+  'Tiles',
+  'Bath Ware',
+  'Vanity',
+  'Wardrobe',
+  'Kitchen',
+  'Outdoor',
+  'Office',
+  'Custom'
+];
 
 export default function CustomFurnitureLibrary() {
   const navigate = useNavigate();

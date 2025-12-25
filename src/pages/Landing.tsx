@@ -28,6 +28,7 @@ interface CreationSession {
   roomPhoto?: UploadedItem;
   styleRefs: UploadedItem[];
   products: Array<{ name: string; imageUrl?: string }>;
+  isProductCollage: boolean;
   prompt: string;
 }
 
@@ -39,6 +40,7 @@ export default function Landing() {
   const [session, setSession] = useState<CreationSession>({
     styleRefs: [],
     products: [],
+    isProductCollage: true,
     prompt: "",
   });
 
@@ -85,6 +87,16 @@ export default function Landing() {
   }, [session, projectName, user, agentBModeEnabled, memoryEnabled]);
 
   const handleGenerate = async () => {
+    // Validate mandatory project name
+    if (!projectName.trim()) {
+      toast({
+        title: "Project name required",
+        description: "Please enter a project name to continue.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     if (!session.prompt.trim() && !session.layout && !session.roomPhoto && session.styleRefs.length === 0) {
       toast({
         title: "Add something to generate",
@@ -326,8 +338,8 @@ export default function Landing() {
       <ProductPickerModal
         open={activeModal === "products"}
         onOpenChange={(open) => !open && setActiveModal(null)}
-        onSave={(products) => {
-          setSession((prev) => ({ ...prev, products }));
+        onSave={(products, asCollage) => {
+          setSession((prev) => ({ ...prev, products, isProductCollage: asCollage }));
           setActiveModal(null);
         }}
         currentProducts={session.products}

@@ -28,20 +28,25 @@ export function PromptSection({
       transition={{ delay: 0.6, duration: 0.5 }}
       className="w-full max-w-2xl space-y-4"
     >
-      {/* Project Name Input */}
+      {/* Project Name Input - Required */}
       <div className="relative">
         <input
           type="text"
           value={projectName}
           onChange={(e) => onProjectNameChange(e.target.value)}
-          placeholder="Project name (optional)"
+          placeholder="Project name *"
+          required
           className={cn(
             "w-full px-4 py-3 rounded-xl",
             "glass-input text-sm font-medium",
             "placeholder:text-muted-foreground/60",
-            "focus:outline-none"
+            "focus:outline-none",
+            !projectName.trim() && "border-destructive/50"
           )}
         />
+        <span className="absolute right-3 top-1/2 -translate-y-1/2 text-destructive text-sm font-medium">
+          *
+        </span>
       </div>
       
       {/* Prompt Textarea */}
