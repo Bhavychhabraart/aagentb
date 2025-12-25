@@ -333,6 +333,7 @@ Output: The edited image with ONLY the masked/specified region modified.`;
           model: 'google/gemini-3-pro-image-preview',
           messages: [{ role: 'user', content }],
           modalities: ['image', 'text'],
+          generationConfig: { aspectRatio: '16:9' }, // Maintain consistent aspect ratio
         }),
       });
 

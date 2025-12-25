@@ -33,7 +33,7 @@ export function SelectiveEditPanel({
   const [selectedCatalogItem, setSelectedCatalogItem] = useState<CatalogFurnitureItem | null>(null);
   const [selectedFinish, setSelectedFinish] = useState<FinishItem | null>(null);
   const [additionalInstructions, setAdditionalInstructions] = useState('');
-  const [uploadedImageUrl, setUploadedImageUrl] = useState<string | null>(null);
+  const [uploadedImageUrls, setUploadedImageUrls] = useState<string[]>([]);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
 
   // Generate selection preview when component mounts or selection changes
@@ -68,11 +68,12 @@ export function SelectiveEditPanel({
         onSubmit(finalPrompt);
       }
     } else if (editMode === 'upload') {
-      if (uploadedImageUrl) {
+      if (uploadedImageUrls.length > 0) {
         const finalPrompt = additionalInstructions.trim()
-          ? `Use this reference image to modify the selected area. ${additionalInstructions.trim()}`
-          : `Apply the uploaded reference image to this area`;
-        onSubmit(finalPrompt, undefined, uploadedImageUrl);
+          ? `Use these ${uploadedImageUrls.length} reference image(s) to modify the selected area. ${additionalInstructions.trim()}`
+          : `Apply the uploaded reference image(s) to this area`;
+        // Pass the first image URL as the primary reference (edge function will receive all via array)
+        onSubmit(finalPrompt, undefined, uploadedImageUrls[0]);
       }
     }
   };
@@ -98,7 +99,7 @@ export function SelectiveEditPanel({
       ? selectedCatalogItem !== null
       : editMode === 'finish'
         ? selectedFinish !== null
-        : uploadedImageUrl !== null;
+        : uploadedImageUrls.length > 0;
 
   return (
     <div className="absolute bottom-[12%] left-1/2 -translate-x-1/2 z-30 w-full max-w-lg px-4">
@@ -252,8 +253,9 @@ export function SelectiveEditPanel({
           {editMode === 'upload' && (
             <div className="mb-3">
               <SelectiveEditUploader
-                selectedImage={uploadedImageUrl}
-                onImageSelect={setUploadedImageUrl}
+                selectedImages={uploadedImageUrls}
+                onImagesChange={setUploadedImageUrls}
+                maxImages={5}
               />
               
               {/* Instructions for how to apply the upload */}
@@ -261,7 +263,7 @@ export function SelectiveEditPanel({
                 <Textarea
                   value={additionalInstructions}
                   onChange={(e) => setAdditionalInstructions(e.target.value)}
-                  placeholder="Describe how to apply this image (e.g., 'Use as fabric texture' or 'Replace with this chair')"
+                  placeholder="Describe how to apply these images (e.g., 'Use as fabric texture' or 'Replace with this chair')"
                   disabled={isProcessing}
                   className="min-h-[50px] resize-none text-xs"
                 />
@@ -281,9 +283,9 @@ export function SelectiveEditPanel({
                     ? selectedFinish
                       ? `Selected: ${selectedFinish.name}`
                       : 'Select a finish, then click Apply Edit'
-                    : uploadedImageUrl
-                      ? 'Image ready - click Apply Edit'
-                      : 'Upload an image, then click Apply Edit'}
+                    : uploadedImageUrls.length > 0
+                      ? `${uploadedImageUrls.length} image(s) ready - click Apply Edit`
+                      : 'Upload image(s), then click Apply Edit'}
             </p>
             <div className="flex gap-2">
               <Button
