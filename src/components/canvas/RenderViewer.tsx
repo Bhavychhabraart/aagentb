@@ -19,7 +19,7 @@ interface RenderViewerProps {
   onPositionFurniture?: () => void;
   onExport?: () => void;
   onStartOrder?: () => void;
-  onSelectiveEdit?: (region: SelectionRegion, prompt: string, catalogItem?: CatalogFurnitureItem) => void;
+  onSelectiveEdit?: (region: SelectionRegion, prompt: string, catalogItem?: CatalogFurnitureItem, referenceImageUrl?: string) => void;
   onAIDirectorChange?: (prompt: string) => void;
   onMulticamGenerate?: (view: CameraView, customPrompt?: string, zone?: ZoneRegion) => void;
   projectId?: string;
@@ -125,9 +125,9 @@ export function RenderViewer({
     setCurrentSelection(region);
   };
 
-  const handleSelectiveEditSubmit = (prompt: string, catalogItem?: CatalogFurnitureItem) => {
+  const handleSelectiveEditSubmit = (prompt: string, catalogItem?: CatalogFurnitureItem, referenceImageUrl?: string) => {
     if (currentSelection && onSelectiveEdit) {
-      onSelectiveEdit(currentSelection, prompt, catalogItem);
+      onSelectiveEdit(currentSelection, prompt, catalogItem, referenceImageUrl);
       // Don't exit selection mode yet - let the parent handle that after processing
     }
   };
