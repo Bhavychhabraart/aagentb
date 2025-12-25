@@ -19,12 +19,20 @@ interface CustomFurnitureModalProps {
 }
 
 const CATEGORIES = [
+  'Furniture',
   'Seating',
   'Tables',
   'Storage',
-  'Lighting',
   'Beds',
+  'Lighting',
+  'Rugs',
+  'Art',
   'Decor',
+  'Tiles',
+  'Bath Ware',
+  'Vanity',
+  'Wardrobe',
+  'Kitchen',
   'Outdoor',
   'Office',
 ];
@@ -154,10 +162,10 @@ export function CustomFurnitureModal({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Palette className="h-5 w-5 text-primary" />
-            Custom Furniture Design
+            Custom Product Design
           </DialogTitle>
           <DialogDescription>
-            Describe your ideal furniture piece and let AI generate it for you
+            Describe your ideal product and let AI generate it for you
           </DialogDescription>
         </DialogHeader>
 
@@ -260,7 +268,7 @@ export function CustomFurnitureModal({
               ) : (
                 <>
                   <Palette className="h-4 w-4" />
-                  Generate Furniture
+                  Generate Product
                 </>
               )}
             </Button>

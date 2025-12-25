@@ -30,7 +30,7 @@ import { FormSection } from '@/components/creation/FormSection';
 import { PreviewCanvas } from '@/components/creation/PreviewCanvas';
 import { CreationModeToggle } from '@/components/creation/CreationModeToggle';
 
-const CATEGORIES = ['Seating', 'Tables', 'Storage', 'Lighting', 'Beds', 'Decor', 'Outdoor', 'Office'];
+const CATEGORIES = ['Furniture', 'Seating', 'Tables', 'Storage', 'Beds', 'Lighting', 'Rugs', 'Art', 'Decor', 'Tiles', 'Bath Ware', 'Vanity', 'Wardrobe', 'Kitchen', 'Outdoor', 'Office'];
 const STYLES = ['Modern', 'Traditional', 'Minimalist', 'Industrial', 'Scandinavian', 'Bohemian', 'Art Deco', 'Mid-Century'];
 
 interface GenerationHistoryItem {
@@ -349,8 +349,8 @@ export default function CreateCustomFurniture() {
     <div className="h-screen bg-gradient-subtle flex flex-col overflow-hidden">
       {/* Premium Header */}
       <WorkspaceHeader
-        title={isEditing ? 'Edit Custom Furniture' : 'Create Custom Furniture'}
-        subtitle="Design your ideal furniture piece with AI"
+        title={isEditing ? 'Edit Custom Product' : 'Create Custom Product'}
+        subtitle="Design your ideal product with AI"
         isEditing={isEditing}
         isSaving={isSaving}
         canSave={!!generatedImage && !!selectedProjectId && !!name.trim()}

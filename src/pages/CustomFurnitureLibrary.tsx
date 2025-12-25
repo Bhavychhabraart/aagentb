@@ -159,7 +159,7 @@ export default function CustomFurnitureLibrary() {
                 <ArrowLeft className="h-5 w-5" />
               </Button>
               <div>
-                <h1 className="text-2xl font-bold text-foreground">Custom Furniture Library</h1>
+                <h1 className="text-2xl font-bold text-foreground">Custom Product Library</h1>
                 <p className="text-sm text-muted-foreground">
                   {items.length} items • Total value: ₹{totalValue.toLocaleString('en-IN')}
                 </p>
@@ -237,17 +237,17 @@ export default function CustomFurnitureLibrary() {
           <div className="text-center py-20">
             <Package className="h-16 w-16 mx-auto text-muted-foreground/50 mb-4" />
             <h2 className="text-xl font-semibold text-foreground mb-2">
-              {items.length === 0 ? 'No custom furniture yet' : 'No items match your search'}
+              {items.length === 0 ? 'No custom products yet' : 'No items match your search'}
             </h2>
             <p className="text-muted-foreground mb-6">
               {items.length === 0 
-                ? 'Create your first custom furniture piece using AI'
+                ? 'Create your first custom product using AI'
                 : 'Try adjusting your filters or search query'}
             </p>
             {items.length === 0 && (
               <Button onClick={() => navigate('/custom-furniture/create')} className="gap-2">
                 <Plus className="h-4 w-4" />
-                Create Custom Furniture
+                Create Custom Product
               </Button>
             )}
           </div>
