@@ -1552,7 +1552,7 @@ Ready to generate a render! Describe your vision.`;
       });
 
       // Reload all renders to include the new one
-      loadAllRenders();
+      await loadAllRenders();
 
       toast({ title: 'Edit complete', description: catalogItem ? `${catalogItem.name} placed in selected area.` : 'Selected area has been updated.' });
     } catch (error) {
@@ -1666,7 +1666,7 @@ Ready to generate a render! Describe your vision.`;
         status: 'ready',
       });
 
-      loadAllRenders();
+      await loadAllRenders();
       toast({ title: 'Changes applied', description: 'AI Director modifications complete.' });
     } catch (error) {
       console.error('AI Director failed:', error);
@@ -1951,7 +1951,7 @@ Ready to generate a render! Describe your vision.`;
         status: 'ready',
       });
       
-      loadAllRenders();
+      await loadAllRenders();
       toast({ title: 'Camera view generated', description: `${camera.name} perspective ready` });
     } catch (error) {
       console.error('Camera render failed:', error);
