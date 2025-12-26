@@ -26,6 +26,7 @@ import { LayoutUploadModal } from '@/components/creation/LayoutUploadModal';
 import { RoomPhotoModal } from '@/components/creation/RoomPhotoModal';
 import { StyleRefModal } from '@/components/creation/StyleRefModal';
 import { ProductPickerModal, ProductItem } from '@/components/creation/ProductPickerModal';
+import { PageTransition } from '@/components/layout/PageTransition';
 import {
   getMemorySettings,
   setMemoryEnabled,
@@ -2438,6 +2439,7 @@ Ready to generate a render! Describe your vision.`;
   }
 
   return (
+    <PageTransition>
     <SidebarProvider>
       <div className="flex h-screen w-full bg-background">
         <AppSidebar
@@ -2613,6 +2615,7 @@ Ready to generate a render! Describe your vision.`;
       />
     </div>
   </SidebarProvider>
+  </PageTransition>
 );
 };
 
