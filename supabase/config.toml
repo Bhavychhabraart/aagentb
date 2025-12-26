@@ -8,3 +8,6 @@ verify_jwt = false
 
 [functions.generate-drawing-plan]
 verify_jwt = false
+
+[functions.edit-furniture]
+verify_jwt = false
