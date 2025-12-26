@@ -88,6 +88,9 @@ interface PremiumWorkspaceProps {
   onStopZoneDrawing?: () => void;
   onGenerateZoneView?: (zone: Zone, viewType: ViewType) => void;
   onToggleZonesPanel?: () => void;
+  // Zone generation state
+  generatingZoneName?: string | null;
+  generatingViewType?: ViewType | null;
 }
 
 interface ToolbarItem {
@@ -126,6 +129,8 @@ export function PremiumWorkspace({
   onStopZoneDrawing,
   onGenerateZoneView,
   onToggleZonesPanel,
+  generatingZoneName,
+  generatingViewType,
 }: PremiumWorkspaceProps) {
   const [showDirectorInput, setShowDirectorInput] = useState(false);
   const [directorPrompt, setDirectorPrompt] = useState('');
@@ -430,12 +435,43 @@ export function PremiumWorkspace({
                   </div>
                 )}
 
-                {/* Generating overlay */}
-                {isGenerating && renderUrl && (
-                  <div className="absolute inset-0 bg-background/60 backdrop-blur-sm flex items-center justify-center">
-                    <div className="glass-premium rounded-2xl p-6 flex flex-col items-center gap-3">
-                      <Loader2 className="h-8 w-8 text-primary animate-spin" />
-                      <p className="text-sm font-medium">Generating...</p>
+                {/* Generating overlay - enhanced with zone info */}
+                {(isGenerating || isMulticamGenerating) && renderUrl && (
+                  <div className="absolute inset-0 bg-background/70 backdrop-blur-md flex items-center justify-center z-20">
+                    <div className="glass-premium rounded-2xl p-8 flex flex-col items-center gap-4 max-w-sm text-center animate-scale-in">
+                      {/* Animated loader with pulse ring */}
+                      <div className="relative">
+                        <div className="absolute inset-0 rounded-full bg-primary/20 animate-ping" />
+                        <div className="relative w-16 h-16 rounded-full bg-gradient-to-br from-primary/30 to-primary/10 flex items-center justify-center border border-primary/30">
+                          <Loader2 className="h-8 w-8 text-primary animate-spin" />
+                        </div>
+                      </div>
+                      
+                      {/* Zone-specific generation info */}
+                      {generatingZoneName ? (
+                        <>
+                          <div className="space-y-1">
+                            <p className="text-base font-semibold text-foreground">
+                              Generating {generatingViewType ? viewTypeOptions.find(v => v.id === generatingViewType)?.label : 'View'}
+                            </p>
+                            <p className="text-sm text-muted-foreground">
+                              Zone: <span className="text-primary font-medium">"{generatingZoneName}"</span>
+                            </p>
+                          </div>
+                          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                            <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
+                            <span>Creating focused camera view...</span>
+                          </div>
+                        </>
+                      ) : (
+                        <>
+                          <p className="text-base font-semibold text-foreground">Generating...</p>
+                          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                            <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
+                            <span>AI is crafting your render</span>
+                          </div>
+                        </>
+                      )}
                     </div>
                   </div>
                 )}
