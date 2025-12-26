@@ -44,7 +44,7 @@ export function ControlButtons({
       <motion.div 
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.5, duration: 0.4 }}
+        transition={{ delay: 0.8, duration: 0.4 }}
         className="flex justify-center gap-2 mb-6"
       >
         <DropdownMenu>
@@ -54,10 +54,10 @@ export function ControlButtons({
                 <Button 
                   variant="outline" 
                   size="sm" 
-                  className="gap-2 glass border-border/50 hover:border-primary/40"
+                  className="gap-2 glass-premium border-border/30 hover:border-primary/40 rounded-full px-4"
                 >
                   <Settings2 className="w-4 h-4" />
-                  <span className="hidden sm:inline">Tools</span>
+                  <span className="hidden sm:inline text-xs">Tools</span>
                   <ChevronDown className="w-3 h-3 opacity-50" />
                 </Button>
               </DropdownMenuTrigger>
@@ -93,17 +93,23 @@ export function ControlButtons({
               size="sm" 
               onClick={onMemoryToggle}
               className={cn(
-                "gap-2 transition-all duration-300 glass",
+                "gap-2 transition-all duration-300 rounded-full px-4",
                 memoryEnabled 
-                  ? "border-primary/50 bg-primary/10 text-primary hover:bg-primary/15" 
-                  : "border-border/50 hover:border-primary/40"
+                  ? "glass-premium border-primary/50 bg-primary/10 text-primary hover:bg-primary/15" 
+                  : "glass-premium border-border/30 hover:border-primary/40"
               )}
             >
               <Brain className={cn(
                 "w-4 h-4 transition-all duration-300",
                 memoryEnabled && "text-primary"
               )} />
-              <span className="hidden sm:inline">Memory:</span> {memoryEnabled ? "ON" : "OFF"}
+              <span className="text-xs">Memory</span>
+              <span className={cn(
+                "text-[10px] px-1.5 py-0.5 rounded-full",
+                memoryEnabled ? "bg-primary/20 text-primary" : "bg-muted text-muted-foreground"
+              )}>
+                {memoryEnabled ? "ON" : "OFF"}
+              </span>
             </Button>
           </TooltipTrigger>
           <TooltipContent side="bottom" className="glass-premium max-w-xs">
@@ -118,17 +124,23 @@ export function ControlButtons({
               size="sm" 
               onClick={onAgentBToggle}
               className={cn(
-                "gap-2 transition-all duration-300 glass",
+                "gap-2 transition-all duration-300 rounded-full px-4",
                 agentBEnabled 
-                  ? "border-violet-500/50 bg-violet-500/10 text-violet-400 hover:bg-violet-500/15" 
-                  : "border-border/50 hover:border-violet-500/40"
+                  ? "glass-premium border-violet-500/50 bg-violet-500/10 text-violet-400 hover:bg-violet-500/15" 
+                  : "glass-premium border-border/30 hover:border-violet-500/40"
               )}
             >
               <Sparkles className={cn(
                 "w-4 h-4 transition-all duration-300",
                 agentBEnabled && "text-violet-400"
               )} />
-              <span className="hidden sm:inline">Agent B:</span> {agentBEnabled ? "ON" : "OFF"}
+              <span className="text-xs">Agent B</span>
+              <span className={cn(
+                "text-[10px] px-1.5 py-0.5 rounded-full",
+                agentBEnabled ? "bg-violet-500/20 text-violet-400" : "bg-muted text-muted-foreground"
+              )}>
+                {agentBEnabled ? "ON" : "OFF"}
+              </span>
             </Button>
           </TooltipTrigger>
           <TooltipContent side="bottom" className="glass-premium max-w-xs">
