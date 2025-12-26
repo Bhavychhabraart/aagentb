@@ -26,6 +26,7 @@ import { LayoutUploadModal } from '@/components/creation/LayoutUploadModal';
 import { RoomPhotoModal } from '@/components/creation/RoomPhotoModal';
 import { StyleRefModal } from '@/components/creation/StyleRefModal';
 import { ProductPickerModal, ProductItem } from '@/components/creation/ProductPickerModal';
+import { Zone } from '@/components/canvas/ZoneSelector';
 import {
   getMemorySettings,
   setMemoryEnabled,
@@ -100,6 +101,12 @@ const Index = () => {
   const [showRoomPhotoModal, setShowRoomPhotoModal] = useState(false);
   const [showStyleRefModal, setShowStyleRefModal] = useState(false);
   const [showProductsModal, setShowProductsModal] = useState(false);
+
+  // Zone selection state
+  const [showZonesPanel, setShowZonesPanel] = useState(false);
+  const [isDrawingZone, setIsDrawingZone] = useState(false);
+  const [selectedZoneId, setSelectedZoneId] = useState<string | null>(null);
+  const [zones, setZones] = useState<Zone[]>([]);
 
   // Agent B state
   const [agentBEnabled, setAgentBEnabled] = useState(false);
@@ -1753,6 +1760,160 @@ Ready to generate a render! Describe your vision.`;
     setCurrentRenderUrl(imageUrl);
   }, []);
 
+  // =========== ZONE OPERATIONS ===========
+
+  // Load zones for current project
+  const loadZones = useCallback(async () => {
+    if (!currentProjectId) return;
+
+    const { data, error } = await supabase
+      .from('staging_zones')
+      .select('*')
+      .eq('project_id', currentProjectId)
+      .order('created_at', { ascending: true });
+
+    if (error) {
+      console.error('Failed to load zones:', error);
+      return;
+    }
+
+    setZones(data?.map(z => ({
+      id: z.id,
+      name: z.name,
+      x_start: Number(z.x_start),
+      y_start: Number(z.y_start),
+      x_end: Number(z.x_end),
+      y_end: Number(z.y_end),
+      camera_position: z.camera_position || undefined,
+    })) || []);
+  }, [currentProjectId]);
+
+  // Load zones when project changes
+  useEffect(() => {
+    if (currentProjectId) {
+      loadZones();
+    }
+  }, [currentProjectId, loadZones]);
+
+  // Create a new zone
+  const handleZoneCreate = useCallback(async (zone: Omit<Zone, 'id'>) => {
+    if (!user || !currentProjectId) return;
+
+    const { data, error } = await supabase
+      .from('staging_zones')
+      .insert({
+        project_id: currentProjectId,
+        user_id: user.id,
+        name: zone.name,
+        x_start: zone.x_start,
+        y_start: zone.y_start,
+        x_end: zone.x_end,
+        y_end: zone.y_end,
+      })
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Failed to create zone:', error);
+      toast({ variant: 'destructive', title: 'Error', description: 'Failed to create zone' });
+      return;
+    }
+
+    const newZone: Zone = {
+      id: data.id,
+      name: data.name,
+      x_start: Number(data.x_start),
+      y_start: Number(data.y_start),
+      x_end: Number(data.x_end),
+      y_end: Number(data.y_end),
+    };
+
+    setZones(prev => [...prev, newZone]);
+    setSelectedZoneId(data.id);
+    toast({ title: 'Zone created', description: `"${zone.name}" added` });
+  }, [user, currentProjectId, toast]);
+
+  // Delete a zone
+  const handleZoneDelete = useCallback(async (zoneId: string) => {
+    const { error } = await supabase
+      .from('staging_zones')
+      .delete()
+      .eq('id', zoneId);
+
+    if (error) {
+      console.error('Failed to delete zone:', error);
+      toast({ variant: 'destructive', title: 'Error', description: 'Failed to delete zone' });
+      return;
+    }
+
+    setZones(prev => prev.filter(z => z.id !== zoneId));
+    if (selectedZoneId === zoneId) {
+      setSelectedZoneId(null);
+    }
+    toast({ title: 'Zone deleted' });
+  }, [selectedZoneId, toast]);
+
+  // Select a zone
+  const handleZoneSelect = useCallback((zone: Zone | null) => {
+    setSelectedZoneId(zone?.id || null);
+  }, []);
+
+  // Generate a focused render of a zone
+  const handleGenerateZoneView = useCallback(async (zone: Zone) => {
+    if (!user || !currentProjectId || !currentRenderUrl) {
+      toast({ variant: 'destructive', title: 'Error', description: 'Generate a render first to create zone views' });
+      return;
+    }
+
+    setIsMulticamGenerating(true);
+
+    try {
+      const zonePrompt = `Generate a focused, detailed view of this specific zone: "${zone.name}". Crop and zoom into the area from ${zone.x_start.toFixed(0)}% to ${zone.x_end.toFixed(0)}% horizontally and ${zone.y_start.toFixed(0)}% to ${zone.y_end.toFixed(0)}% vertically. Show this area of the room in detail with proper camera perspective.`;
+
+      await addMessage('user', `🎯 Generating view for zone: ${zone.name}...`, { type: 'text' });
+
+      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/edit-render`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+        },
+        body: JSON.stringify({
+          currentRenderUrl: currentRenderUrl,
+          userPrompt: zonePrompt,
+          focusRegion: {
+            x: zone.x_start,
+            y: zone.y_start,
+            width: zone.x_end - zone.x_start,
+            height: zone.y_end - zone.y_start,
+          },
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || 'Zone view generation failed');
+      }
+
+      const { imageUrl } = await response.json();
+
+      await addMessage('assistant', `Zone view "${zone.name}" generated!`, {
+        type: 'render',
+        imageUrl,
+        status: 'ready',
+      });
+
+      toast({ title: 'Zone view ready', description: `"${zone.name}" view generated` });
+    } catch (error) {
+      console.error('Zone view generation failed:', error);
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      await addMessage('assistant', `Failed to generate zone view: ${message}`, { type: 'text', status: 'failed' });
+      toast({ variant: 'destructive', title: 'Failed', description: message });
+    } finally {
+      setIsMulticamGenerating(false);
+    }
+  }, [user, currentProjectId, currentRenderUrl, addMessage, toast]);
+
   // =========== CAMERA CRUD OPERATIONS ===========
 
   // Load cameras for current room
@@ -2293,6 +2454,18 @@ Ready to generate a render! Describe your vision.`;
             onRenderHistorySelect={handleRenderHistorySelect}
             stagedItems={stagedItems}
             projectId={currentProjectId || undefined}
+            // Zone props
+            zones={zones}
+            selectedZoneId={selectedZoneId}
+            isDrawingZone={isDrawingZone}
+            showZonesPanel={showZonesPanel}
+            onZoneCreate={handleZoneCreate}
+            onZoneDelete={handleZoneDelete}
+            onZoneSelect={handleZoneSelect}
+            onStartZoneDrawing={() => setIsDrawingZone(true)}
+            onStopZoneDrawing={() => setIsDrawingZone(false)}
+            onGenerateZoneView={handleGenerateZoneView}
+            onToggleZonesPanel={() => setShowZonesPanel(!showZonesPanel)}
           />
         ) : (
           <RenderViewer

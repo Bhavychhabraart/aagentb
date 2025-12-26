@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { 
   Eye, Camera as CameraIcon, Plus, Lock, Unlock, Maximize2, Minimize2, Map, Sparkles,
   ZoomIn, ZoomOut, RotateCcw, Download, Crop, Undo2, Wand2, Video, LayoutGrid,
-  Move, FileDown, ShoppingCart
+  Move, FileDown, ShoppingCart, Layers
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -15,6 +15,8 @@ import { SelectiveEditPanel } from './SelectiveEditPanel';
 import { AIDirectorPanel } from './AIDirectorPanel';
 import { MulticamPanel, CameraView, ZoneRegion } from './MulticamPanel';
 import { CatalogFurnitureItem } from '@/services/catalogService';
+import { ZoneSelector, Zone } from './ZoneSelector';
+import { ZonesPanel } from './ZonesPanel';
 
 interface SplitWorkspaceProps {
   layoutImageUrl: string | null;
@@ -49,6 +51,18 @@ interface SplitWorkspaceProps {
   onRenderHistorySelect?: (render: RenderHistoryItem) => void;
   stagedItems?: CatalogFurnitureItem[];
   projectId?: string;
+  // Zone props
+  zones?: Zone[];
+  selectedZoneId?: string | null;
+  isDrawingZone?: boolean;
+  showZonesPanel?: boolean;
+  onZoneCreate?: (zone: Omit<Zone, 'id'>) => void;
+  onZoneDelete?: (zoneId: string) => void;
+  onZoneSelect?: (zone: Zone | null) => void;
+  onStartZoneDrawing?: () => void;
+  onStopZoneDrawing?: () => void;
+  onGenerateZoneView?: (zone: Zone) => void;
+  onToggleZonesPanel?: () => void;
 }
 
 export function SplitWorkspace({
@@ -82,6 +96,18 @@ export function SplitWorkspace({
   onRenderHistorySelect,
   stagedItems = [],
   projectId,
+  // Zone props
+  zones = [],
+  selectedZoneId,
+  isDrawingZone = false,
+  showZonesPanel = false,
+  onZoneCreate,
+  onZoneDelete,
+  onZoneSelect,
+  onStartZoneDrawing,
+  onStopZoneDrawing,
+  onGenerateZoneView,
+  onToggleZonesPanel,
 }: SplitWorkspaceProps) {
   const [isMinimapExpanded, setIsMinimapExpanded] = useState(false);
   const [zoom, setZoom] = useState(1);
@@ -405,6 +431,29 @@ export function SplitWorkspace({
                 </TooltipContent>
               </Tooltip>
             )}
+
+            {/* Zones */}
+            {onToggleZonesPanel && (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={onToggleZonesPanel}
+                    disabled={!birdEyeRenderUrl || isGenerating}
+                    className={cn(
+                      "h-8 w-8",
+                      showZonesPanel || isDrawingZone ? "bg-amber-500/30 text-amber-400" : birdEyeRenderUrl ? "hover:bg-primary/20 text-amber-400" : "opacity-50"
+                    )}
+                  >
+                    <Layers className="h-4 w-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>{showZonesPanel ? 'Close Zones' : 'Zones - Define areas for focused renders'}</p>
+                </TooltipContent>
+              </Tooltip>
+            )}
           </div>
 
           {/* Right: Room Actions */}
@@ -518,6 +567,51 @@ export function SplitWorkspace({
                     />
                   )}
 
+                  {/* Zone Selector Overlay */}
+                  {isDrawingZone && onZoneCreate && onZoneDelete && onZoneSelect && onStopZoneDrawing && (
+                    <div className="absolute inset-0">
+                      <ZoneSelector
+                        imageUrl={birdEyeRenderUrl}
+                        zones={zones}
+                        onZoneCreate={onZoneCreate}
+                        onZoneDelete={onZoneDelete}
+                        onZoneSelect={onZoneSelect}
+                        selectedZoneId={selectedZoneId || null}
+                        isDrawing={isDrawingZone}
+                        onDrawingChange={(drawing) => {
+                          if (!drawing) onStopZoneDrawing();
+                        }}
+                      />
+                    </div>
+                  )}
+
+                  {/* Zone Overlays when not drawing */}
+                  {!isDrawingZone && !selectionMode && zones.length > 0 && (
+                    <div className="absolute inset-0 pointer-events-none">
+                      {zones.map((zone) => (
+                        <div
+                          key={zone.id}
+                          className={cn(
+                            "absolute border-2 transition-all",
+                            selectedZoneId === zone.id
+                              ? "border-primary bg-primary/10"
+                              : "border-amber-500/50 bg-amber-500/5"
+                          )}
+                          style={{
+                            left: `${zone.x_start}%`,
+                            top: `${zone.y_start}%`,
+                            width: `${zone.x_end - zone.x_start}%`,
+                            height: `${zone.y_end - zone.y_start}%`,
+                          }}
+                        >
+                          <div className="absolute top-1 left-1 px-1.5 py-0.5 bg-black/60 rounded text-[10px] text-white font-medium">
+                            {zone.name}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
                   {/* Locked overlay */}
                   {isRoomLocked && (
                     <div className="absolute inset-0 bg-background/5 backdrop-blur-[1px] pointer-events-none" />
@@ -564,6 +658,20 @@ export function SplitWorkspace({
                   generatedViews={multicamViews}
                   onSelectView={(view, url) => onSetMulticamAsMain?.(url)}
                   projectId={projectId}
+                />
+              )}
+
+              {/* Zones Panel */}
+              {showZonesPanel && projectId && onZoneSelect && onStartZoneDrawing && onGenerateZoneView && onToggleZonesPanel && (
+                <ZonesPanel
+                  projectId={projectId}
+                  renderUrl={birdEyeRenderUrl}
+                  onZoneSelect={onZoneSelect}
+                  selectedZoneId={selectedZoneId || null}
+                  onStartDrawing={onStartZoneDrawing}
+                  onGenerateZoneView={onGenerateZoneView}
+                  isGenerating={isMulticamGenerating}
+                  onClose={onToggleZonesPanel}
                 />
               )}
             </>
