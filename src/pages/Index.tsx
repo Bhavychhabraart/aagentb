@@ -102,7 +102,7 @@ const Index = () => {
   const [showProductsModal, setShowProductsModal] = useState(false);
 
   // Agent B state
-  const [agentBEnabled, setAgentBEnabled] = useState(true);
+  const [agentBEnabled, setAgentBEnabled] = useState(false);
   const [agentBState, setAgentBState] = useState<AgentBState>('idle');
   const [agentBUnderstanding, setAgentBUnderstanding] = useState<AgentBUnderstanding | null>(null);
   const [agentBQuestions, setAgentBQuestions] = useState<AgentBQuestion[]>([]);
