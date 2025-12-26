@@ -18,12 +18,7 @@ export function Header({ user }: HeaderProps) {
       className="relative z-10 flex items-center justify-between px-6 py-4"
     >
       <div className="flex items-center gap-10">
-        <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-primary to-violet-500 flex items-center justify-center">
-            <span className="text-sm font-bold text-white">B</span>
-          </div>
-          <h1 className="text-xl font-bold text-foreground tracking-tight">Agent B</h1>
-        </div>
+      <h1 className="text-xl font-bold text-foreground tracking-tight">Agent B</h1>
         
         <nav className="hidden md:flex items-center gap-8">
           <a href="#" className="text-sm text-muted-foreground hover:text-foreground transition-colors duration-200">

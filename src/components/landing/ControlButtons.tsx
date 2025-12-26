@@ -42,43 +42,32 @@ export function ControlButtons({
   return (
     <TooltipProvider delayDuration={300}>
       <motion.div 
-        initial={{ opacity: 0, y: 10 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.8, duration: 0.4 }}
-        className="flex justify-center gap-2 mb-6"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ delay: 0.45, duration: 0.3 }}
+        className="flex justify-center gap-1.5 mb-3"
       >
         <DropdownMenu>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <DropdownMenuTrigger asChild>
-                <Button 
-                  variant="outline" 
-                  size="sm" 
-                  className="gap-2 glass-premium border-border/30 hover:border-primary/40 rounded-full px-4"
-                >
-                  <Settings2 className="w-4 h-4" />
-                  <span className="hidden sm:inline text-xs">Tools</span>
-                  <ChevronDown className="w-3 h-3 opacity-50" />
-                </Button>
-              </DropdownMenuTrigger>
-            </TooltipTrigger>
-            <TooltipContent side="bottom" className="glass-premium">
-              <p className="text-xs">Architectural drawing tools</p>
-            </TooltipContent>
-          </Tooltip>
-          <DropdownMenuContent align="start" className="w-72 bg-popover border-border z-50">
+          <DropdownMenuTrigger asChild>
+            <Button variant="ghost" size="sm" className="h-7 gap-1.5 text-xs text-muted-foreground hover:text-foreground px-2">
+              <Settings2 className="w-3 h-3" />
+              <span>Tools</span>
+              <ChevronDown className="w-2.5 h-2.5 opacity-50" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="start" className="w-64 bg-popover border-border z-50">
             {drawingTools.map((tool) => {
               const ToolIcon = tool.icon;
               return (
                 <DropdownMenuItem
                   key={tool.id}
                   onClick={() => navigate(`/tools/${tool.id}`)}
-                  className="flex items-center gap-3 py-3 cursor-pointer"
+                  className="flex items-center gap-2 py-2 cursor-pointer"
                 >
-                  <ToolIcon className="w-5 h-5 text-primary" />
+                  <ToolIcon className="w-4 h-4 text-primary" />
                   <div>
-                    <p className="font-medium text-sm">{tool.title}</p>
-                    <p className="text-xs text-muted-foreground">{tool.subtitle}</p>
+                    <p className="font-medium text-xs">{tool.title}</p>
+                    <p className="text-[10px] text-muted-foreground">{tool.subtitle}</p>
                   </div>
                 </DropdownMenuItem>
               );
@@ -86,67 +75,43 @@ export function ControlButtons({
           </DropdownMenuContent>
         </DropdownMenu>
 
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button 
-              variant="outline" 
-              size="sm" 
-              onClick={onMemoryToggle}
-              className={cn(
-                "gap-2 transition-all duration-300 rounded-full px-4",
-                memoryEnabled 
-                  ? "glass-premium border-primary/50 bg-primary/10 text-primary hover:bg-primary/15" 
-                  : "glass-premium border-border/30 hover:border-primary/40"
-              )}
-            >
-              <Brain className={cn(
-                "w-4 h-4 transition-all duration-300",
-                memoryEnabled && "text-primary"
-              )} />
-              <span className="text-xs">Memory</span>
-              <span className={cn(
-                "text-[10px] px-1.5 py-0.5 rounded-full",
-                memoryEnabled ? "bg-primary/20 text-primary" : "bg-muted text-muted-foreground"
-              )}>
-                {memoryEnabled ? "ON" : "OFF"}
-              </span>
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent side="bottom" className="glass-premium max-w-xs">
-            <p className="text-xs">Learn and remember your design preferences across sessions</p>
-          </TooltipContent>
-        </Tooltip>
+        <Button 
+          variant="ghost" 
+          size="sm" 
+          onClick={onMemoryToggle}
+          className={cn(
+            "h-7 gap-1.5 text-xs px-2",
+            memoryEnabled ? "text-primary" : "text-muted-foreground hover:text-foreground"
+          )}
+        >
+          <Brain className="w-3 h-3" />
+          <span>Memory</span>
+          <span className={cn(
+            "text-[9px] px-1 rounded",
+            memoryEnabled ? "bg-primary/20 text-primary" : "bg-muted text-muted-foreground"
+          )}>
+            {memoryEnabled ? "ON" : "OFF"}
+          </span>
+        </Button>
 
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button 
-              variant="outline" 
-              size="sm" 
-              onClick={onAgentBToggle}
-              className={cn(
-                "gap-2 transition-all duration-300 rounded-full px-4",
-                agentBEnabled 
-                  ? "glass-premium border-violet-500/50 bg-violet-500/10 text-violet-400 hover:bg-violet-500/15" 
-                  : "glass-premium border-border/30 hover:border-violet-500/40"
-              )}
-            >
-              <Sparkles className={cn(
-                "w-4 h-4 transition-all duration-300",
-                agentBEnabled && "text-violet-400"
-              )} />
-              <span className="text-xs">Agent B</span>
-              <span className={cn(
-                "text-[10px] px-1.5 py-0.5 rounded-full",
-                agentBEnabled ? "bg-violet-500/20 text-violet-400" : "bg-muted text-muted-foreground"
-              )}>
-                {agentBEnabled ? "ON" : "OFF"}
-              </span>
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent side="bottom" className="glass-premium max-w-xs">
-            <p className="text-xs">Interactive questionnaire for refined design generation</p>
-          </TooltipContent>
-        </Tooltip>
+        <Button 
+          variant="ghost" 
+          size="sm" 
+          onClick={onAgentBToggle}
+          className={cn(
+            "h-7 gap-1.5 text-xs px-2",
+            agentBEnabled ? "text-violet-400" : "text-muted-foreground hover:text-foreground"
+          )}
+        >
+          <Sparkles className="w-3 h-3" />
+          <span>Agent B</span>
+          <span className={cn(
+            "text-[9px] px-1 rounded",
+            agentBEnabled ? "bg-violet-500/20 text-violet-400" : "bg-muted text-muted-foreground"
+          )}>
+            {agentBEnabled ? "ON" : "OFF"}
+          </span>
+        </Button>
       </motion.div>
     </TooltipProvider>
   );
