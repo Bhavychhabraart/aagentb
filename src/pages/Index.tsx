@@ -8,10 +8,10 @@ import { ChatPanel, ChatMessage, ChatInputType, AgentBState } from '@/components
 import { AgentBUnderstanding } from '@/components/canvas/AgentBBrief';
 import { AgentBQuestion, AgentBAnswer } from '@/components/canvas/AgentBQuestions';
 import { RenderViewer } from '@/components/canvas/RenderViewer';
-import { SplitWorkspace } from '@/components/canvas/SplitWorkspace';
+import { PremiumWorkspace, Zone } from '@/components/canvas/PremiumWorkspace';
+import { SleekChatInput } from '@/components/canvas/SleekChatInput';
 import { CameraData } from '@/components/canvas/CameraPlacement';
 import { UploadDialog } from '@/components/canvas/UploadDialog';
-import { AssetsPanel } from '@/components/canvas/AssetsPanel';
 import { ExportModal } from '@/components/canvas/ExportModal';
 import { OrderFlowModal } from '@/components/canvas/OrderFlowModal';
 import { SidebarProvider } from '@/components/ui/sidebar';
@@ -26,7 +26,7 @@ import { LayoutUploadModal } from '@/components/creation/LayoutUploadModal';
 import { RoomPhotoModal } from '@/components/creation/RoomPhotoModal';
 import { StyleRefModal } from '@/components/creation/StyleRefModal';
 import { ProductPickerModal, ProductItem } from '@/components/creation/ProductPickerModal';
-import { Zone } from '@/components/canvas/ZoneSelector';
+import { LayoutUploadModal } from '@/components/creation/LayoutUploadModal';
 import {
   getMemorySettings,
   setMemoryEnabled,
@@ -2420,41 +2420,26 @@ Ready to generate a render! Describe your vision.`;
             </div>
           )}
           
-        {/* Main Workspace - Split View with Camera Placement */}
-        {useSplitWorkspace ? (
-          <SplitWorkspace
-            layoutImageUrl={layoutImageUrl}
-            birdEyeRenderUrl={currentRenderUrl || roomPhotoUrl}
+          {/* Premium Workspace */}
+          <PremiumWorkspace
+            renderUrl={currentRenderUrl || roomPhotoUrl}
             isGenerating={isGenerating}
-            cameras={cameras}
-            selectedCameraId={selectedCameraId}
-            isRoomLocked={isRoomLocked}
-            onCameraAdd={handleCameraAdd}
-            onCameraSelect={setSelectedCameraId}
-            onCameraUpdate={handleCameraUpdate}
-            onCameraDelete={handleCameraDelete}
-            onGenerateFromCamera={handleGenerateFromCamera}
-            onToggleRoomLock={handleToggleRoomLock}
-            // Toolbar actions
+            allRenders={allRenders}
+            currentRenderId={currentRenderId}
+            onRenderHistorySelect={handleRenderHistorySelect}
             onSelectiveEdit={handleSelectiveEdit}
             onAIDirectorChange={handleAIDirectorChange}
             onMulticamGenerate={handleMulticamGenerate}
             onPositionFurniture={stagedItems.length > 0 && (currentRenderUrl || roomPhotoUrl) ? () => setShowPositioner(true) : undefined}
             onExport={() => setShowExportModal(true)}
-            onStartOrder={stagedItems.length > 0 ? () => setShowOrderModal(true) : undefined}
             onUndo={handleUndo}
             canUndo={canUndo}
             isSelectiveEditing={isSelectiveEditing}
             isMulticamGenerating={isMulticamGenerating}
             multicamViews={multicamViews}
             onSetMulticamAsMain={handleSetMulticamAsMain}
-            // Render history
-            allRenders={allRenders}
-            currentRenderId={currentRenderId}
-            onRenderHistorySelect={handleRenderHistorySelect}
             stagedItems={stagedItems}
             projectId={currentProjectId || undefined}
-            // Zone props
             zones={zones}
             selectedZoneId={selectedZoneId}
             isDrawingZone={isDrawingZone}
@@ -2467,82 +2452,21 @@ Ready to generate a render! Describe your vision.`;
             onGenerateZoneView={handleGenerateZoneView}
             onToggleZonesPanel={() => setShowZonesPanel(!showZonesPanel)}
           />
-        ) : (
-          <RenderViewer
-            imageUrl={currentRenderUrl}
-            isGenerating={isGenerating}
-            layoutImageUrl={layoutImageUrl}
-            roomPhotoUrl={roomPhotoUrl}
-            onPositionFurniture={stagedItems.length > 0 && (currentRenderUrl || roomPhotoUrl) ? () => setShowPositioner(true) : undefined}
-            onExport={() => setShowExportModal(true)}
-            onStartOrder={stagedItems.length > 0 ? () => setShowOrderModal(true) : undefined}
-            onSelectiveEdit={handleSelectiveEdit}
-            onAIDirectorChange={handleAIDirectorChange}
-            onMulticamGenerate={handleMulticamGenerate}
-            isSelectiveEditing={isSelectiveEditing}
-            isMulticamGenerating={isMulticamGenerating}
-            multicamViews={multicamViews}
-            onSetMulticamAsMain={handleSetMulticamAsMain}
-            projectId={currentProjectId || undefined}
-            allRenders={allRenders}
-            currentRenderId={currentRenderId}
-            onRenderHistorySelect={handleRenderHistorySelect}
-            onUndo={handleUndo}
-            canUndo={canUndo}
-          />
-        )}
-        
-        <div className="w-96 shrink-0 flex flex-col">
-          <div className="flex-1 overflow-hidden">
-            <ChatPanel
-              messages={messages}
+          
+          {/* Floating Chat Input - Bottom Center */}
+          <div className="absolute bottom-6 left-1/2 -translate-x-1/2 w-full max-w-2xl px-4 z-30">
+            <SleekChatInput
+              onSend={(message) => handleSendMessageWithAgentB(message)}
               isLoading={isProcessing || isGenerating || isSelectiveEditing || agentBState === 'generating'}
-              onSendMessage={handleSendMessageWithAgentB}
-              onInputTypeSelect={handleChatInputTypeSelect}
-              stagedItems={stagedItems}
-              onClearStagedItems={handleClearStagedItems}
-              isEditMode={isEditMode}
-              currentRenderUrl={currentRenderUrl}
-              onRenderSelect={(url) => {
-                const matchingRender = allRenders.find(r => r.render_url === url);
-                setCurrentRenderUrl(url);
-                if (matchingRender) {
-                  setCurrentRenderId(matchingRender.id);
-                }
-              }}
-              // Agent B props
               agentBEnabled={agentBEnabled}
               onAgentBToggle={setAgentBEnabled}
-              agentBState={agentBState}
-              agentBUnderstanding={agentBUnderstanding}
-              agentBQuestions={agentBQuestions}
-              agentBAnswers={agentBAnswers}
-              agentBProgress={agentBProgress}
-              onAgentBConfirmBrief={handleAgentBConfirmBrief}
-              onAgentBCorrectBrief={handleAgentBCorrectBrief}
-              onAgentBAnswer={handleAgentBAnswer}
-              onAgentBNextQuestion={handleAgentBNextQuestion}
-              onAgentBPreviousQuestion={handleAgentBPreviousQuestion}
-              onAgentBSkipQuestion={handleAgentBSkipQuestion}
-              onAgentBCompleteQuestions={handleAgentBCompleteQuestions}
-              onAgentBGenerate={handleAgentBGenerate}
-              onAgentBEditBrief={handleAgentBEditBrief}
-              onAgentBEditQuestions={handleAgentBEditQuestions}
-              currentQuestionIndex={currentQuestionIndex}
-              userPrompt={agentBUserPrompt}
-              // New render mode
-              wantsNewRender={wantsNewRender}
-              onToggleNewRenderMode={handleToggleNewRenderMode}
+              onLayoutUpload={() => setShowLayoutModal(true)}
+              onRoomPhotoUpload={() => setShowRoomPhotoModal(true)}
+              onStyleRefUpload={() => setShowStyleRefModal(true)}
+              placeholder={agentBEnabled ? "Describe your vision (Agent B will guide you)..." : "Describe your vision..."}
             />
           </div>
-          <AssetsPanel 
-            projectId={currentProjectId} 
-            onCatalogItemSelect={handleCatalogItemSelect}
-            onCustomItemSelect={handleCatalogItemSelect}
-            stagedItemIds={stagedItems.map(i => i.id)}
-          />
         </div>
-      </div>
 
       <UploadDialog
         open={uploadDialogOpen}

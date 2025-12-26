@@ -457,6 +457,64 @@
     @apply hover:border-primary/30 hover:shadow-[0_0_30px_hsl(217_100%_58%/0.15)];
     @apply hover:scale-[1.02];
   }
+
+  /* ========== PREMIUM WORKSPACE ========== */
+
+  /* 16:9 premium container */
+  .aspect-video-premium {
+    aspect-ratio: 16 / 9;
+  }
+
+  /* Sleek chat input */
+  .sleek-chat-input {
+    box-shadow: 
+      0 0 30px hsl(220 25% 0% / 0.5),
+      0 0 60px hsl(217 100% 58% / 0.05);
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  .sleek-chat-input:focus-within {
+    box-shadow: 
+      0 0 0 2px hsl(var(--primary) / 0.2),
+      0 0 40px hsl(var(--primary) / 0.15),
+      0 0 60px hsl(220 25% 0% / 0.5);
+  }
+
+  /* Toolbar item premium */
+  .toolbar-item-premium {
+    position: relative;
+  }
+
+  .toolbar-item-premium::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: 0.75rem;
+    opacity: 0;
+    background: radial-gradient(
+      circle at center,
+      hsl(var(--primary) / 0.15) 0%,
+      transparent 70%
+    );
+    transition: opacity 0.2s;
+  }
+
+  .toolbar-item-premium:hover::after {
+    opacity: 1;
+  }
+
+  /* Mini sidebar */
+  .sidebar-mini {
+    width: 4rem !important;
+  }
+
+  .sidebar-mini .sidebar-content-hidden {
+    display: none;
+  }
+
+  .sidebar-transition {
+    transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
 }
 
 @layer utilities {
