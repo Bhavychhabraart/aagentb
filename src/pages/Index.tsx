@@ -8,7 +8,7 @@ import { ChatPanel, ChatMessage, ChatInputType, AgentBState } from '@/components
 import { AgentBUnderstanding } from '@/components/canvas/AgentBBrief';
 import { AgentBQuestion, AgentBAnswer } from '@/components/canvas/AgentBQuestions';
 import { RenderViewer } from '@/components/canvas/RenderViewer';
-import { PremiumWorkspace, Zone } from '@/components/canvas/PremiumWorkspace';
+import { PremiumWorkspace, Zone, ViewType, viewTypeOptions } from '@/components/canvas/PremiumWorkspace';
 import { SleekChatInput } from '@/components/canvas/SleekChatInput';
 import { CameraData } from '@/components/canvas/CameraPlacement';
 import { UploadDialog } from '@/components/canvas/UploadDialog';
@@ -1857,8 +1857,8 @@ Ready to generate a render! Describe your vision.`;
     setSelectedZoneId(zone?.id || null);
   }, []);
 
-  // Generate a focused render of a zone
-  const handleGenerateZoneView = useCallback(async (zone: Zone) => {
+  // Generate a focused render of a zone with specific view type
+  const handleGenerateZoneView = useCallback(async (zone: Zone, viewType: ViewType = 'detail') => {
     if (!user || !currentProjectId || !currentRenderUrl) {
       toast({ variant: 'destructive', title: 'Error', description: 'Generate a render first to create zone views' });
       return;
@@ -1867,9 +1867,28 @@ Ready to generate a render! Describe your vision.`;
     setIsMulticamGenerating(true);
 
     try {
-      const zonePrompt = `Generate a focused, detailed view of this specific zone: "${zone.name}". Crop and zoom into the area from ${zone.x_start.toFixed(0)}% to ${zone.x_end.toFixed(0)}% horizontally and ${zone.y_start.toFixed(0)}% to ${zone.y_end.toFixed(0)}% vertically. Show this area of the room in detail with proper camera perspective.`;
+      // Get view type label for display
+      const viewLabel = viewTypeOptions.find(v => v.id === viewType)?.label || 'Detail';
+      
+      // Create render record FIRST to save to history
+      const { data: renderRecord, error: renderError } = await supabase
+        .from('renders')
+        .insert({
+          project_id: currentProjectId,
+          user_id: user.id,
+          prompt: `Zone: ${zone.name} - ${viewLabel} view`,
+          status: 'generating',
+          room_upload_id: currentUpload?.id || null,
+          parent_render_id: currentRenderId,
+        })
+        .select()
+        .single();
 
-      await addMessage('user', `🎯 Generating view for zone: ${zone.name}...`, { type: 'text' });
+      if (renderError) throw renderError;
+
+      const zonePrompt = `Generate a ${viewLabel.toLowerCase()} view of this specific zone: "${zone.name}". Focus on the area from ${zone.x_start.toFixed(0)}% to ${zone.x_end.toFixed(0)}% horizontally and ${zone.y_start.toFixed(0)}% to ${zone.y_end.toFixed(0)}% vertically.`;
+
+      await addMessage('user', `🎯 Generating ${viewLabel} view for zone: ${zone.name}...`, { type: 'text' });
 
       const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/edit-render`, {
         method: 'POST',
@@ -1886,6 +1905,8 @@ Ready to generate a render! Describe your vision.`;
             width: zone.x_end - zone.x_start,
             height: zone.y_end - zone.y_start,
           },
+          viewType: viewType,
+          styleRefUrls: styleRefUrls,
         }),
       });
 
@@ -1896,13 +1917,26 @@ Ready to generate a render! Describe your vision.`;
 
       const { imageUrl } = await response.json();
 
-      await addMessage('assistant', `Zone view "${zone.name}" generated!`, {
+      // Update render record with the generated image
+      await supabase
+        .from('renders')
+        .update({ render_url: imageUrl, status: 'completed' })
+        .eq('id', renderRecord.id);
+
+      // Update current render state
+      setCurrentRenderUrl(imageUrl);
+      setCurrentRenderId(renderRecord.id);
+
+      await addMessage('assistant', `${viewLabel} view of "${zone.name}" generated!`, {
         type: 'render',
         imageUrl,
         status: 'ready',
       });
 
-      toast({ title: 'Zone view ready', description: `"${zone.name}" view generated` });
+      // Reload all renders to include the new one in history
+      await loadAllRenders();
+
+      toast({ title: 'Zone view ready', description: `"${zone.name}" ${viewLabel} view generated` });
     } catch (error) {
       console.error('Zone view generation failed:', error);
       const message = error instanceof Error ? error.message : 'Unknown error';
@@ -1911,7 +1945,7 @@ Ready to generate a render! Describe your vision.`;
     } finally {
       setIsMulticamGenerating(false);
     }
-  }, [user, currentProjectId, currentRenderUrl, addMessage, toast]);
+  }, [user, currentProjectId, currentRenderUrl, currentRenderId, currentUpload, styleRefUrls, addMessage, toast, loadAllRenders]);
 
   // =========== CAMERA CRUD OPERATIONS ===========
 

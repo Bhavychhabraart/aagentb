@@ -16,7 +16,12 @@ import {
   Camera,
   X,
   Check,
-  Square
+  Square,
+  Eye,
+  Film,
+  User,
+  ArrowUp,
+  Clapperboard
 } from 'lucide-react';
 import { RenderHistoryCarousel, RenderHistoryItem } from './RenderHistoryCarousel';
 import { CatalogFurnitureItem } from '@/services/catalogService';
@@ -24,6 +29,23 @@ import { CameraView } from './MulticamPanel';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+
+export type ViewType = 'detail' | 'cinematic' | 'eye-level' | 'dramatic' | 'bird-eye';
+
+export interface ViewTypeOption {
+  id: ViewType;
+  icon: React.ComponentType<{ className?: string }>;
+  label: string;
+  description: string;
+}
+
+export const viewTypeOptions: ViewTypeOption[] = [
+  { id: 'detail', icon: Eye, label: 'Detail', description: 'Close-up detailed view' },
+  { id: 'cinematic', icon: Film, label: 'Cinematic', description: 'Dramatic wide-angle shot' },
+  { id: 'eye-level', icon: User, label: 'Eye Level', description: 'Natural standing perspective' },
+  { id: 'dramatic', icon: Clapperboard, label: 'Dramatic', description: 'Low-angle hero shot' },
+  { id: 'bird-eye', icon: ArrowUp, label: 'Bird Eye', description: 'Elevated overview' },
+];
 
 export interface Zone {
   id: string;
@@ -64,7 +86,7 @@ interface PremiumWorkspaceProps {
   onZoneSelect?: (zone: Zone | null) => void;
   onStartZoneDrawing?: () => void;
   onStopZoneDrawing?: () => void;
-  onGenerateZoneView?: (zone: Zone) => void;
+  onGenerateZoneView?: (zone: Zone, viewType: ViewType) => void;
   onToggleZonesPanel?: () => void;
 }
 
@@ -493,7 +515,7 @@ export function PremiumWorkspace({
               </div>
 
               {/* Zones list */}
-              <div className="max-h-64 overflow-y-auto p-2">
+              <div className="max-h-48 overflow-y-auto p-2">
                 {zones.length === 0 ? (
                   <div className="text-center py-6 text-muted-foreground">
                     <Layers className="h-8 w-8 mx-auto mb-2 opacity-50" />
@@ -536,18 +558,6 @@ export function PremiumWorkspace({
                           <Button
                             variant="ghost"
                             size="icon"
-                            className="h-6 w-6"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              onGenerateZoneView?.(zone);
-                            }}
-                            disabled={isGenerating}
-                          >
-                            <Camera className="h-3 w-3" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
                             className="h-6 w-6 hover:text-destructive"
                             onClick={(e) => {
                               e.stopPropagation();
@@ -562,6 +572,47 @@ export function PremiumWorkspace({
                   </div>
                 )}
               </div>
+
+              {/* View Type Selector - appears when zone is selected */}
+              {selectedZoneId && zones.find(z => z.id === selectedZoneId) && (
+                <div className="p-3 border-t border-border/30">
+                  <p className="text-[10px] font-medium text-muted-foreground mb-2 uppercase tracking-wide">
+                    Generate View for "{zones.find(z => z.id === selectedZoneId)?.name}"
+                  </p>
+                  <div className="grid grid-cols-2 gap-1.5">
+                    {viewTypeOptions.map((viewType) => (
+                      <Tooltip key={viewType.id}>
+                        <TooltipTrigger asChild>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="h-9 text-xs justify-start gap-2 hover:bg-primary/10 hover:border-primary/50"
+                            onClick={() => {
+                              const zone = zones.find(z => z.id === selectedZoneId);
+                              if (zone) {
+                                onGenerateZoneView?.(zone, viewType.id);
+                              }
+                            }}
+                            disabled={isGenerating}
+                          >
+                            <viewType.icon className="h-3.5 w-3.5" />
+                            <span>{viewType.label}</span>
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent side="left">
+                          <p className="text-xs">{viewType.description}</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    ))}
+                  </div>
+                  {isGenerating && (
+                    <div className="flex items-center gap-2 mt-2 text-xs text-muted-foreground">
+                      <Loader2 className="h-3 w-3 animate-spin" />
+                      <span>Generating view...</span>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           </div>
         )}
