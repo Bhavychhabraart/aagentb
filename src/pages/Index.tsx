@@ -26,7 +26,6 @@ import { LayoutUploadModal } from '@/components/creation/LayoutUploadModal';
 import { RoomPhotoModal } from '@/components/creation/RoomPhotoModal';
 import { StyleRefModal } from '@/components/creation/StyleRefModal';
 import { ProductPickerModal, ProductItem } from '@/components/creation/ProductPickerModal';
-import { LayoutUploadModal } from '@/components/creation/LayoutUploadModal';
 import {
   getMemorySettings,
   setMemoryEnabled,
@@ -2427,9 +2426,9 @@ Ready to generate a render! Describe your vision.`;
             allRenders={allRenders}
             currentRenderId={currentRenderId}
             onRenderHistorySelect={handleRenderHistorySelect}
-            onSelectiveEdit={handleSelectiveEdit}
+            onSelectiveEdit={() => setIsSelectiveEditing(true)}
             onAIDirectorChange={handleAIDirectorChange}
-            onMulticamGenerate={handleMulticamGenerate}
+            onMulticamGenerate={() => handleMulticamGenerate('perspective')}
             onPositionFurniture={stagedItems.length > 0 && (currentRenderUrl || roomPhotoUrl) ? () => setShowPositioner(true) : undefined}
             onExport={() => setShowExportModal(true)}
             onUndo={handleUndo}
