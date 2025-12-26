@@ -15,7 +15,7 @@ import { UploadDialog } from '@/components/canvas/UploadDialog';
 import { ExportModal } from '@/components/canvas/ExportModal';
 import { OrderFlowModal } from '@/components/canvas/OrderFlowModal';
 import { SidebarProvider } from '@/components/ui/sidebar';
-import { CatalogFurnitureItem } from '@/services/catalogService';
+import { CatalogFurnitureItem, fetchFurnitureCatalog } from '@/services/catalogService';
 import { FurniturePositioner, FurniturePlacement } from '@/components/canvas/FurniturePositioner';
 import { ProjectData } from '@/services/documentService';
 import { SelectionRegion } from '@/components/canvas/SelectionOverlay';
@@ -27,6 +27,10 @@ import { RoomPhotoModal } from '@/components/creation/RoomPhotoModal';
 import { StyleRefModal } from '@/components/creation/StyleRefModal';
 import { ProductPickerModal, ProductItem } from '@/components/creation/ProductPickerModal';
 import { PageTransition } from '@/components/layout/PageTransition';
+import { AIDetectionOverlay, DetectedItem } from '@/components/canvas/AIDetectionOverlay';
+import { FloatingAssetsPanel } from '@/components/canvas/FloatingAssetsPanel';
+import { AutoFurnishPanel } from '@/components/canvas/AutoFurnishPanel';
+import { FullScreenCatalogModal } from '@/components/canvas/FullScreenCatalogModal';
 import {
   getMemorySettings,
   setMemoryEnabled,
@@ -126,6 +130,16 @@ const Index = () => {
   const [userPreferences, setUserPreferences] = useState<UserPreferencesContext | null>(null);
   const [isLearning, setIsLearning] = useState(false);
 
+  // Enhanced tools state
+  const [isMultiSelectMode, setIsMultiSelectMode] = useState(false);
+  const [isAIDetectionActive, setIsAIDetectionActive] = useState(false);
+  const [selectedDetections, setSelectedDetections] = useState<string[]>([]);
+  const [isEraserMode, setIsEraserMode] = useState(false);
+  const [showAutoFurnish, setShowAutoFurnish] = useState(false);
+  const [showAssetsPanel, setShowAssetsPanel] = useState(false);
+  const [showCatalogueModal, setShowCatalogueModal] = useState(false);
+  const [catalogItems, setCatalogItems] = useState<CatalogFurnitureItem[]>([]);
+
   // Load memory settings on user login
   useEffect(() => {
     if (user) {
@@ -135,6 +149,11 @@ const Index = () => {
       getPreferencesContext(user.id).then(setUserPreferences);
     }
   }, [user]);
+
+  // Load catalog items for the full-screen modal
+  useEffect(() => {
+    fetchFurnitureCatalog().then(setCatalogItems);
+  }, []);
 
   // Toggle memory enabled
   const handleMemoryToggle = useCallback(async (enabled: boolean) => {
@@ -1377,6 +1396,109 @@ Ready to generate a render! Describe your vision.`;
     setStagedItems(items);
   };
 
+  // =========== ENHANCED TOOLS HANDLERS ===========
+
+  // Toggle multi-select mode for batch operations
+  const handleToggleMultiSelect = useCallback(() => {
+    setIsMultiSelectMode(prev => !prev);
+    if (!isMultiSelectMode) {
+      setSelectedDetections([]);
+    }
+  }, [isMultiSelectMode]);
+
+  // Handle detection item selection
+  const handleDetectionSelect = useCallback((itemId: string) => {
+    setSelectedDetections(prev =>
+      prev.includes(itemId)
+        ? prev.filter(id => id !== itemId)
+        : [...prev, itemId]
+    );
+  }, []);
+
+  // Handle detection item action (replace, similar, remove)
+  const handleDetectionAction = useCallback(async (
+    item: DetectedItem,
+    action: 'replace' | 'similar' | 'custom' | 'remove'
+  ) => {
+    if (action === 'replace') {
+      setShowCatalogueModal(true);
+      toast({ title: item.label, description: 'Select a replacement from the catalogue' });
+    } else if (action === 'similar') {
+      setShowCatalogueModal(true);
+      toast({ title: 'Find Similar', description: `Looking for items similar to ${item.label}` });
+    } else if (action === 'remove') {
+      // Trigger erase action for the detected item
+      await handleEraserAction(item);
+    }
+  }, [toast]);
+
+  // Handle batch generation for multiple selected items
+  const handleBatchGenerate = useCallback(async (items: DetectedItem[]) => {
+    setShowCatalogueModal(true);
+    toast({ title: `${items.length} items selected`, description: 'Choose replacements from catalogue' });
+  }, [toast]);
+
+  // Handle eraser action - remove element from render
+  const handleEraserAction = useCallback(async (item?: DetectedItem) => {
+    if (!currentRenderUrl) return;
+
+    // If erasing a detected item, create a selection region from its bounding box
+    if (item?.box_2d) {
+      const [ymin, xmin, ymax, xmax] = item.box_2d;
+      const region: SelectionRegion = {
+        x: xmin / 10,
+        y: ymin / 10,
+        width: (xmax - xmin) / 10,
+        height: (ymax - ymin) / 10,
+      };
+
+      // Call selective edit with erase prompt
+      await handleSelectiveEdit(
+        region,
+        `Remove the ${item.label} and fill with appropriate background that matches the room`,
+        undefined,
+        undefined
+      );
+    }
+
+    setIsEraserMode(false);
+    setIsAIDetectionActive(false);
+  }, [currentRenderUrl]);
+
+  // Handle auto-furnish apply
+  const handleAutoFurnishApply = useCallback(async (suggestions: Array<{
+    id: string;
+    type: string;
+    name: string;
+    style: string;
+    position: { x: number; y: number };
+    accepted: boolean;
+  }>) => {
+    if (!currentRenderUrl) return;
+
+    setShowAutoFurnish(false);
+    setIsGenerating(true);
+
+    try {
+      const furnitureList = suggestions.map(s => s.name).join(', ');
+      const prompt = `Add the following furniture in appropriate positions: ${furnitureList}. Match the room's ${suggestions[0]?.style || 'modern'} style.`;
+
+      await editRender(prompt, []);
+
+      toast({ title: 'Auto-furnish applied', description: `Added ${suggestions.length} items` });
+    } catch (error) {
+      console.error('Auto-furnish failed:', error);
+      toast({ variant: 'destructive', title: 'Failed', description: 'Could not apply furniture suggestions' });
+    } finally {
+      setIsGenerating(false);
+    }
+  }, [currentRenderUrl, editRender, toast]);
+
+  // Handle catalog item preview
+  const handleCatalogItemPreview = useCallback((item: CatalogFurnitureItem) => {
+    toast({ title: item.name, description: item.description || item.category });
+  }, [toast]);
+
   // Determine if in edit mode - any render exists means we're in edit mode
   const isEditMode = currentRenderUrl !== null;
 
@@ -2494,6 +2616,60 @@ Ready to generate a render! Describe your vision.`;
             onToggleZonesPanel={() => setShowZonesPanel(!showZonesPanel)}
             generatingZoneName={generatingZoneName}
             generatingViewType={generatingViewType}
+            // Enhanced tools props
+            onToggleMultiSelect={handleToggleMultiSelect}
+            isMultiSelectMode={isMultiSelectMode}
+            onToggleAIDetection={() => setIsAIDetectionActive(prev => !prev)}
+            isAIDetectionActive={isAIDetectionActive}
+            onToggleEraser={() => {
+              setIsEraserMode(prev => !prev);
+              if (!isEraserMode) {
+                setIsAIDetectionActive(true);
+              }
+            }}
+            isEraserMode={isEraserMode}
+            onToggleAutoFurnish={() => setShowAutoFurnish(prev => !prev)}
+            showAutoFurnish={showAutoFurnish}
+            onToggleAssetsPanel={() => setShowAssetsPanel(prev => !prev)}
+            showAssetsPanel={showAssetsPanel}
+            onOpenCatalogue={() => setShowCatalogueModal(true)}
+          />
+
+          {/* AI Detection Overlay */}
+          {isAIDetectionActive && currentRenderUrl && (
+            <AIDetectionOverlay
+              renderUrl={currentRenderUrl}
+              isActive={isAIDetectionActive}
+              onClose={() => {
+                setIsAIDetectionActive(false);
+                setIsEraserMode(false);
+                setSelectedDetections([]);
+              }}
+              isMultiSelectMode={isMultiSelectMode}
+              selectedItems={selectedDetections}
+              onItemSelect={handleDetectionSelect}
+              onItemAction={handleDetectionAction}
+              onBatchGenerate={handleBatchGenerate}
+            />
+          )}
+
+          {/* Floating Assets Panel */}
+          <FloatingAssetsPanel
+            isOpen={showAssetsPanel}
+            onClose={() => setShowAssetsPanel(false)}
+            projectId={currentProjectId || undefined}
+            stagedItems={stagedItems}
+            onAssetClick={(url) => {
+              toast({ title: 'Asset selected', description: 'Reference loaded' });
+            }}
+          />
+
+          {/* Auto-Furnish Panel */}
+          <AutoFurnishPanel
+            isOpen={showAutoFurnish}
+            onClose={() => setShowAutoFurnish(false)}
+            renderUrl={currentRenderUrl}
+            onApply={handleAutoFurnishApply}
           />
           
           {/* Floating Chat Input - Bottom Center */}
@@ -2612,6 +2788,16 @@ Ready to generate a render! Describe your vision.`;
         currentProducts={[]}
         userId={user?.id}
         projectId={currentProjectId || undefined}
+      />
+
+      {/* Full-Screen Catalogue Modal */}
+      <FullScreenCatalogModal
+        isOpen={showCatalogueModal}
+        onClose={() => setShowCatalogueModal(false)}
+        catalogItems={catalogItems}
+        stagedItemIds={stagedItems.map(i => i.id)}
+        onToggleStage={handleCatalogItemSelect}
+        onPreviewItem={handleCatalogItemPreview}
       />
     </div>
   </SidebarProvider>

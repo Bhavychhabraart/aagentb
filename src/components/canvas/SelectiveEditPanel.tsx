@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Send, X, Loader2, Crop, Type, Package, Paintbrush, Upload, Eye } from 'lucide-react';
+import { Send, X, Loader2, Crop, Type, Package, Paintbrush, Upload, Eye, Eraser } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { SelectionRegion } from './SelectionOverlay';
@@ -19,7 +19,7 @@ interface SelectiveEditPanelProps {
   isProcessing: boolean;
 }
 
-type EditMode = 'prompt' | 'catalog' | 'finish' | 'upload';
+type EditMode = 'prompt' | 'catalog' | 'finish' | 'upload' | 'erase';
 
 export function SelectiveEditPanel({ 
   selection, 
@@ -75,6 +75,11 @@ export function SelectiveEditPanel({
         // Pass the first image URL as the primary reference (edge function will receive all via array)
         onSubmit(finalPrompt, undefined, uploadedImageUrls[0]);
       }
+    } else if (editMode === 'erase') {
+      const finalPrompt = additionalInstructions.trim()
+        ? `Remove this element and fill with matching background. ${additionalInstructions.trim()}`
+        : 'Remove this element and fill with matching background that blends naturally with the surroundings';
+      onSubmit(finalPrompt);
     }
   };
 
@@ -99,7 +104,9 @@ export function SelectiveEditPanel({
       ? selectedCatalogItem !== null
       : editMode === 'finish'
         ? selectedFinish !== null
-        : uploadedImageUrls.length > 0;
+        : editMode === 'erase'
+          ? true // Erase is always ready
+          : uploadedImageUrls.length > 0;
 
   return (
     <div className="absolute bottom-[12%] left-1/2 -translate-x-1/2 z-30 w-full max-w-lg px-4">
@@ -194,6 +201,18 @@ export function SelectiveEditPanel({
               <Upload className="h-3 w-3" />
               Upload
             </button>
+            <button
+              onClick={() => setEditMode('erase')}
+              className={cn(
+                "flex-1 flex items-center justify-center gap-1 py-2 px-1.5 rounded-lg text-xs font-medium transition-colors",
+                editMode === 'erase'
+                  ? "bg-destructive text-destructive-foreground"
+                  : "bg-muted text-muted-foreground hover:bg-muted/80"
+              )}
+            >
+              <Eraser className="h-3 w-3" />
+              Erase
+            </button>
           </div>
         </div>
 
@@ -270,6 +289,29 @@ export function SelectiveEditPanel({
               </div>
             </div>
           )}
+
+          {editMode === 'erase' && (
+            <div className="mb-3">
+              <div className="bg-destructive/10 border border-destructive/20 rounded-lg p-4 text-center">
+                <Eraser className="h-8 w-8 text-destructive mx-auto mb-2" />
+                <p className="text-sm font-medium text-foreground">Remove Selected Element</p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  The selected area will be erased and filled with matching background
+                </p>
+              </div>
+              
+              {/* Optional additional instructions */}
+              <div className="mt-3">
+                <Textarea
+                  value={additionalInstructions}
+                  onChange={(e) => setAdditionalInstructions(e.target.value)}
+                  placeholder="Optional: Specify what to fill with (e.g., 'empty floor' or 'plain wall')"
+                  disabled={isProcessing}
+                  className="min-h-[50px] resize-none text-xs"
+                />
+              </div>
+            </div>
+          )}
           
           <div className="flex items-center justify-between">
             <p className="text-xs text-muted-foreground">
@@ -283,9 +325,11 @@ export function SelectiveEditPanel({
                     ? selectedFinish
                       ? `Selected: ${selectedFinish.name}`
                       : 'Select a finish, then click Apply Edit'
-                    : uploadedImageUrls.length > 0
-                      ? `${uploadedImageUrls.length} image(s) ready - click Apply Edit`
-                      : 'Upload image(s), then click Apply Edit'}
+                    : editMode === 'erase'
+                      ? 'Ready to erase - click Apply Edit'
+                      : uploadedImageUrls.length > 0
+                        ? `${uploadedImageUrls.length} image(s) ready - click Apply Edit`
+                        : 'Upload image(s), then click Apply Edit'}
             </p>
             <div className="flex gap-2">
               <Button
