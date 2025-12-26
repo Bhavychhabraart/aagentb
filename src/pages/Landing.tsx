@@ -9,6 +9,7 @@ import { StyleRefModal } from "@/components/creation/StyleRefModal";
 import { ProductPickerModal } from "@/components/creation/ProductPickerModal";
 import { RCPUploadModal } from "@/components/creation/RCPUploadModal";
 import { getMemorySettings, setMemoryEnabled } from "@/services/designMemoryService";
+import { PageTransition } from "@/components/layout/PageTransition";
 
 // Landing page components
 import { Header } from "@/components/landing/Header";
@@ -278,7 +279,7 @@ export default function Landing() {
   };
 
   return (
-    <div className="min-h-screen bg-background relative overflow-hidden">
+    <PageTransition className="min-h-screen bg-background relative overflow-hidden">
       <BackgroundEffects />
       
       <Header user={user} />
@@ -364,6 +365,6 @@ export default function Landing() {
         currentProducts={session.products}
         userId={user?.id}
       />
-    </div>
+    </PageTransition>
   );
 }
