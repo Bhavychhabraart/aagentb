@@ -7,6 +7,7 @@ import { LayoutUploadModal } from "@/components/creation/LayoutUploadModal";
 import { RoomPhotoModal } from "@/components/creation/RoomPhotoModal";
 import { StyleRefModal } from "@/components/creation/StyleRefModal";
 import { ProductPickerModal } from "@/components/creation/ProductPickerModal";
+import { RCPUploadModal } from "@/components/creation/RCPUploadModal";
 import { getMemorySettings, setMemoryEnabled } from "@/services/designMemoryService";
 
 // Landing page components
@@ -26,6 +27,7 @@ interface UploadedItem {
 interface CreationSession {
   layout?: UploadedItem;
   roomPhoto?: UploadedItem;
+  ceilingPlan?: UploadedItem;
   styleRefs: UploadedItem[];
   products: Array<{ name: string; imageUrl?: string }>;
   isProductCollage: boolean;
@@ -45,7 +47,7 @@ export default function Landing() {
   });
 
   const [projectName, setProjectName] = useState("");
-  const [activeModal, setActiveModal] = useState<"layout" | "room" | "style" | "products" | null>(null);
+  const [activeModal, setActiveModal] = useState<"layout" | "room" | "style" | "products" | "rcp" | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [memoryEnabled, setMemoryEnabledState] = useState(true);
   const [agentBModeEnabled, setAgentBModeEnabled] = useState(true);
@@ -135,6 +137,10 @@ export default function Landing() {
 
       if (session.roomPhoto?.file) {
         uploadPromises.push(uploadFile(session.roomPhoto.file, project.id, user.id, "room_photo"));
+      }
+
+      if (session.ceilingPlan?.file) {
+        uploadPromises.push(uploadFile(session.ceilingPlan.file, project.id, user.id, "ceiling_plan"));
       }
 
       for (const styleRef of session.styleRefs) {
@@ -257,11 +263,13 @@ export default function Landing() {
     });
   };
 
-  const handleClearItem = (id: "layout" | "room" | "style" | "products") => {
+  const handleClearItem = (id: "layout" | "room" | "style" | "products" | "rcp") => {
     if (id === "layout") {
       setSession((prev) => ({ ...prev, layout: undefined }));
     } else if (id === "room") {
       setSession((prev) => ({ ...prev, roomPhoto: undefined }));
+    } else if (id === "rcp") {
+      setSession((prev) => ({ ...prev, ceilingPlan: undefined }));
     } else if (id === "style") {
       setSession((prev) => ({ ...prev, styleRefs: [] }));
     } else {
@@ -275,12 +283,13 @@ export default function Landing() {
       
       <Header user={user} />
 
-      <main className="relative z-10 flex flex-col items-center justify-center px-6 pt-12 pb-24">
+      <main className="relative z-10 flex flex-col items-center justify-center px-6 pt-16 pb-24">
         <HeroSection />
 
         <InputCards
           layout={session.layout}
           roomPhoto={session.roomPhoto}
+          ceilingPlan={session.ceilingPlan}
           styleRefs={session.styleRefs}
           products={session.products}
           onCardClick={setActiveModal}
@@ -323,6 +332,16 @@ export default function Landing() {
           setActiveModal(null);
         }}
         currentUpload={session.roomPhoto}
+      />
+
+      <RCPUploadModal
+        open={activeModal === "rcp"}
+        onOpenChange={(open) => !open && setActiveModal(null)}
+        onUpload={(item) => {
+          setSession((prev) => ({ ...prev, ceilingPlan: item }));
+          setActiveModal(null);
+        }}
+        currentUpload={session.ceilingPlan}
       />
 
       <StyleRefModal
