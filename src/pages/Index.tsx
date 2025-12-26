@@ -81,6 +81,8 @@ const Index = () => {
   const [isSelectiveEditing, setIsSelectiveEditing] = useState(false);
   const [isProjectSwitching, setIsProjectSwitching] = useState(false);
   const [isMulticamGenerating, setIsMulticamGenerating] = useState(false);
+  const [generatingZoneName, setGeneratingZoneName] = useState<string | null>(null);
+  const [generatingViewType, setGeneratingViewType] = useState<ViewType | null>(null);
   const [multicamViews, setMulticamViews] = useState<Record<CameraView, string | null>>({
     perspective: null,
     front: null,
@@ -1865,6 +1867,8 @@ Ready to generate a render! Describe your vision.`;
     }
 
     setIsMulticamGenerating(true);
+    setGeneratingZoneName(zone.name);
+    setGeneratingViewType(viewType);
 
     try {
       // Get view type label for display
@@ -1944,6 +1948,8 @@ Ready to generate a render! Describe your vision.`;
       toast({ variant: 'destructive', title: 'Failed', description: message });
     } finally {
       setIsMulticamGenerating(false);
+      setGeneratingZoneName(null);
+      setGeneratingViewType(null);
     }
   }, [user, currentProjectId, currentRenderUrl, currentRenderId, currentUpload, styleRefUrls, addMessage, toast, loadAllRenders]);
 
@@ -2484,6 +2490,8 @@ Ready to generate a render! Describe your vision.`;
             onStopZoneDrawing={() => setIsDrawingZone(false)}
             onGenerateZoneView={handleGenerateZoneView}
             onToggleZonesPanel={() => setShowZonesPanel(!showZonesPanel)}
+            generatingZoneName={generatingZoneName}
+            generatingViewType={generatingViewType}
           />
           
           {/* Floating Chat Input - Bottom Center */}
