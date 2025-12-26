@@ -18,7 +18,8 @@ import { SidebarProvider } from '@/components/ui/sidebar';
 import { CatalogFurnitureItem, fetchFurnitureCatalog } from '@/services/catalogService';
 import { FurniturePositioner, FurniturePlacement } from '@/components/canvas/FurniturePositioner';
 import { ProjectData } from '@/services/documentService';
-import { SelectionRegion } from '@/components/canvas/SelectionOverlay';
+import { SelectionOverlay, SelectionRegion } from '@/components/canvas/SelectionOverlay';
+import { SelectiveEditPanel } from '@/components/canvas/SelectiveEditPanel';
 import { generateSelectionMask } from '@/utils/generateSelectionMask';
 import { RenderHistoryItem } from '@/components/canvas/RenderHistoryCarousel';
 import { CameraView, ZoneRegion } from '@/components/canvas/MulticamPanel';
@@ -139,6 +140,10 @@ const Index = () => {
   const [showAssetsPanel, setShowAssetsPanel] = useState(false);
   const [showCatalogueModal, setShowCatalogueModal] = useState(false);
   const [catalogItems, setCatalogItems] = useState<CatalogFurnitureItem[]>([]);
+  
+  // Selection tool state
+  const [selectionMode, setSelectionMode] = useState(false);
+  const [currentSelection, setCurrentSelection] = useState<SelectionRegion | null>(null);
 
   // Load memory settings on user login
   useEffect(() => {
@@ -1396,6 +1401,40 @@ Ready to generate a render! Describe your vision.`;
     setStagedItems(items);
   };
 
+  // =========== SELECTION TOOL HANDLERS (Part 1 - no dependencies) ===========
+
+  // Enter selection mode
+  const handleEnterSelectionMode = useCallback(() => {
+    // Disable other modes when entering selection
+    setIsAIDetectionActive(false);
+    setIsEraserMode(false);
+    setShowAutoFurnish(false);
+    setSelectionMode(true);
+    setCurrentSelection(null);
+  }, []);
+
+  // Handle selection complete (user finished drawing rectangle)
+  const handleSelectionComplete = useCallback((region: SelectionRegion | null) => {
+    setCurrentSelection(region);
+  }, []);
+
+  // Handle cancel selection
+  const handleSelectiveEditCancel = useCallback(() => {
+    setCurrentSelection(null);
+    setSelectionMode(false);
+  }, []);
+
+  // Keyboard shortcut for escaping selection mode
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && selectionMode) {
+        handleSelectiveEditCancel();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [selectionMode, handleSelectiveEditCancel]);
+
   // =========== ENHANCED TOOLS HANDLERS ===========
 
   // Toggle multi-select mode for batch operations
@@ -1695,6 +1734,20 @@ Ready to generate a render! Describe your vision.`;
       setIsSelectiveEditing(false);
     }
   }, [user, currentProjectId, currentRenderUrl, currentRenderId, currentUpload, addMessage, toast]);
+
+  // Handle selective edit submit (user submitted prompt) - defined after handleSelectiveEdit
+  const handleSelectiveEditSubmit = useCallback((
+    prompt: string,
+    catalogItem?: CatalogFurnitureItem,
+    referenceImageUrl?: string
+  ) => {
+    if (currentSelection) {
+      handleSelectiveEdit(currentSelection, prompt, catalogItem, referenceImageUrl);
+      // Clear selection after submitting
+      setCurrentSelection(null);
+      setSelectionMode(false);
+    }
+  }, [currentSelection, handleSelectiveEdit]);
 
   // Handle render selection from history carousel
   const handleRenderHistorySelect = useCallback((render: RenderHistoryItem) => {
@@ -2590,14 +2643,14 @@ Ready to generate a render! Describe your vision.`;
             allRenders={allRenders}
             currentRenderId={currentRenderId}
             onRenderHistorySelect={handleRenderHistorySelect}
-            onSelectiveEdit={() => setIsSelectiveEditing(true)}
+            onSelectiveEdit={handleEnterSelectionMode}
             onAIDirectorChange={handleAIDirectorChange}
             onMulticamGenerate={() => handleMulticamGenerate('perspective')}
             onPositionFurniture={stagedItems.length > 0 && (currentRenderUrl || roomPhotoUrl) ? () => setShowPositioner(true) : undefined}
             onExport={() => setShowExportModal(true)}
             onUndo={handleUndo}
             canUndo={canUndo}
-            isSelectiveEditing={isSelectiveEditing}
+            isSelectiveEditing={isSelectiveEditing || selectionMode}
             isMulticamGenerating={isMulticamGenerating}
             multicamViews={multicamViews}
             onSetMulticamAsMain={handleSetMulticamAsMain}
@@ -2634,6 +2687,28 @@ Ready to generate a render! Describe your vision.`;
             showAssetsPanel={showAssetsPanel}
             onOpenCatalogue={() => setShowCatalogueModal(true)}
           />
+
+          {/* Selection Overlay - enables drawing selection rectangle */}
+          {selectionMode && (currentRenderUrl || roomPhotoUrl) && !currentSelection && (
+            <div className="absolute inset-0 z-40">
+              <SelectionOverlay
+                imageUrl={currentRenderUrl || roomPhotoUrl || ''}
+                onSelectionComplete={handleSelectionComplete}
+                isActive={selectionMode && !currentSelection}
+              />
+            </div>
+          )}
+
+          {/* Selective Edit Panel - shows after selection is made */}
+          {currentSelection && selectionMode && (currentRenderUrl || roomPhotoUrl) && (
+            <SelectiveEditPanel
+              selection={currentSelection}
+              renderUrl={currentRenderUrl || roomPhotoUrl || ''}
+              onSubmit={handleSelectiveEditSubmit}
+              onCancel={handleSelectiveEditCancel}
+              isProcessing={isSelectiveEditing}
+            />
+          )}
 
           {/* AI Detection Overlay */}
           {isAIDetectionActive && currentRenderUrl && (
