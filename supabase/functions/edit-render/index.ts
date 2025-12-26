@@ -99,7 +99,9 @@ serve(async (req) => {
       maskImageBase64, // NEW: Base64 encoded mask image (white area = edit, black = preserve)
       catalogItem, // For catalog-based selective edit { name, category, description, imageUrl }
       referenceImageUrl, // NEW: Reference image for uploads mode
-      textOnlyEdit = false // NEW: For text-only edits without furniture
+      textOnlyEdit = false, // NEW: For text-only edits without furniture
+      focusRegion, // For zone-focused camera views { x, y, width, height } as percentages
+      viewType = 'detail' // Type of camera view: detail, cinematic, eye-level, dramatic, bird-eye
     } = await req.json();
     
     const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
@@ -123,6 +125,9 @@ serve(async (req) => {
     console.log('Mask image:', maskImageBase64 ? 'provided (base64)' : 'none');
     console.log('Catalog item:', catalogItem ? catalogItem.name : 'none');
     console.log('Reference image:', referenceImageUrl ? 'provided' : 'none');
+    console.log('Focus region:', focusRegion ? `${focusRegion.x}%,${focusRegion.y}% (${focusRegion.width}%×${focusRegion.height}%)` : 'none');
+    console.log('View type:', viewType);
+    console.log('Edit instruction length:', userPrompt?.length || 0);
 
     // Handle TEXT-ONLY EDIT mode (no furniture items, just a prompt)
     if (textOnlyEdit && userPrompt && (!furnitureItems || furnitureItems.length === 0)) {
@@ -196,6 +201,101 @@ Output: The edited room image with the requested changes applied.`;
 
       console.log('Text-only edit completed successfully');
       return new Response(JSON.stringify({ imageUrl, mode: 'text-only-edit' }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    // Handle ZONE FOCUS / CAMERA VIEW mode - for generating focused views of specific regions
+    if (focusRegion && userPrompt && !maskRegion) {
+      console.log('Using ZONE FOCUS mode with viewType:', viewType);
+      
+      const content: Array<{ type: string; text?: string; image_url?: { url: string } }> = [];
+      
+      // Add the current render
+      content.push({ type: 'image_url', image_url: { url: currentRenderUrl } });
+      
+      // Build view-specific camera instructions
+      const viewInstructions: Record<string, string> = {
+        'detail': 'Generate a detailed close-up view, as if moving closer to capture fine details and textures.',
+        'cinematic': 'Generate a cinematic wide-angle view with dramatic depth of field, atmospheric lighting, and professional film composition. Think Hollywood movie still.',
+        'eye-level': 'Generate an eye-level perspective as if standing in the room looking at this area. Natural human viewpoint at approximately 5.5 feet height.',
+        'dramatic': 'Generate a dramatic low-angle hero shot that makes this area look impressive and grand. Emphasize scale and grandeur.',
+        'bird-eye': 'Generate an elevated bird-eye overview looking down at this area from above, showing the spatial arrangement clearly.',
+      };
+      
+      const viewInstruction = viewInstructions[viewType] || viewInstructions['detail'];
+      
+      const zonePrompt = `You are a professional interior photography director. Create a new camera view of this room focusing on a specific zone.
+
+CURRENT ROOM IMAGE: The attached image shows the full room.
+
+FOCUS ZONE (area to feature prominently):
+- Horizontal: ${focusRegion.x.toFixed(0)}% to ${(focusRegion.x + focusRegion.width).toFixed(0)}% from left
+- Vertical: ${focusRegion.y.toFixed(0)}% to ${(focusRegion.y + focusRegion.height).toFixed(0)}% from top
+
+CAMERA STYLE: ${viewInstruction}
+
+ADDITIONAL DIRECTION: ${userPrompt}
+
+CRITICAL REQUIREMENTS:
+1. Generate a NEW photorealistic view that focuses on and features the specified zone area
+2. The zone area should be the PRIMARY subject of the new image
+3. Maintain the exact same room design, furniture, materials, and lighting as the original
+4. The output should feel like a different camera position/angle of the SAME room
+5. Keep photorealistic quality matching or exceeding the original
+6. Output a 16:9 aspect ratio image
+
+Output: A photorealistic interior photograph showing the focused view of the specified zone.`;
+
+      content.push({ type: 'text', text: zonePrompt });
+      
+      // Add style references if available
+      if (styleRefUrls && styleRefUrls.length > 0) {
+        for (const styleUrl of styleRefUrls) {
+          content.push({ type: 'image_url', image_url: { url: styleUrl } });
+        }
+      }
+
+      const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${LOVABLE_API_KEY}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: 'google/gemini-3-pro-image-preview',
+          messages: [{ role: 'user', content }],
+          modalities: ['image', 'text'],
+          generationConfig: { aspectRatio: '16:9' }
+        }),
+      });
+
+      if (!response.ok) {
+        if (response.status === 429) {
+          return new Response(JSON.stringify({ error: 'Rate limit exceeded. Please try again later.' }), {
+            status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+        if (response.status === 402) {
+          return new Response(JSON.stringify({ error: 'Usage limit reached. Please add credits.' }), {
+            status: 402, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+        const errorText = await response.text();
+        console.error('AI gateway error:', response.status, errorText);
+        throw new Error(`AI gateway error: ${errorText}`);
+      }
+
+      const data = await response.json();
+      const imageUrl = data.choices?.[0]?.message?.images?.[0]?.image_url?.url;
+
+      if (!imageUrl) {
+        console.error('No image in zone focus response:', JSON.stringify(data).substring(0, 500));
+        throw new Error('No image generated from zone focus request');
+      }
+
+      console.log('Zone focus view completed successfully:', viewType);
+      return new Response(JSON.stringify({ imageUrl, mode: 'zone-focus', viewType }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
