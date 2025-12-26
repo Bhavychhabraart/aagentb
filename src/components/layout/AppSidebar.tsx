@@ -257,9 +257,6 @@ export function AppSidebar({ currentProjectId, currentRoomId, onProjectSelect, o
         {/* Header */}
         <SidebarHeader className="p-4 border-b border-border/20">
           <div className="flex items-center gap-3">
-            <div className="h-9 w-9 rounded-xl bg-gradient-to-br from-primary/30 to-primary/10 flex items-center justify-center border border-primary/20 shrink-0">
-              <Sparkles className="h-4 w-4 text-primary" />
-            </div>
             {!isCollapsed && (
               <div className="animate-fade-in overflow-hidden">
                 <h1 className="text-base font-semibold text-foreground tracking-tight">Agent B</h1>
