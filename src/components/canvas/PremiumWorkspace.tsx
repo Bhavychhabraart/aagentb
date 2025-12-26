@@ -21,7 +21,14 @@ import {
   Film,
   User,
   ArrowUp,
-  Clapperboard
+  Clapperboard,
+  // New icons for enhanced tools
+  SquareStack,
+  Eraser,
+  ScanSearch,
+  Package,
+  ShoppingCart,
+  GripVertical
 } from 'lucide-react';
 import { RenderHistoryCarousel, RenderHistoryItem } from './RenderHistoryCarousel';
 import { CatalogFurnitureItem } from '@/services/catalogService';
@@ -29,6 +36,7 @@ import { CameraView } from './MulticamPanel';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Separator } from '@/components/ui/separator';
 
 export type ViewType = 'detail' | 'cinematic' | 'eye-level' | 'dramatic' | 'bird-eye';
 
@@ -91,6 +99,18 @@ interface PremiumWorkspaceProps {
   // Zone generation state
   generatingZoneName?: string | null;
   generatingViewType?: ViewType | null;
+  // New enhanced tools
+  onToggleMultiSelect?: () => void;
+  isMultiSelectMode?: boolean;
+  onToggleAIDetection?: () => void;
+  isAIDetectionActive?: boolean;
+  onToggleEraser?: () => void;
+  isEraserMode?: boolean;
+  onToggleAutoFurnish?: () => void;
+  showAutoFurnish?: boolean;
+  onToggleAssetsPanel?: () => void;
+  showAssetsPanel?: boolean;
+  onOpenCatalogue?: () => void;
 }
 
 interface ToolbarItem {
@@ -101,6 +121,7 @@ interface ToolbarItem {
   disabled?: boolean;
   active?: boolean;
   shortcut?: string;
+  group?: string;
 }
 
 export function PremiumWorkspace({
@@ -131,6 +152,18 @@ export function PremiumWorkspace({
   onToggleZonesPanel,
   generatingZoneName,
   generatingViewType,
+  // New enhanced tools
+  onToggleMultiSelect,
+  isMultiSelectMode,
+  onToggleAIDetection,
+  isAIDetectionActive,
+  onToggleEraser,
+  isEraserMode,
+  onToggleAutoFurnish,
+  showAutoFurnish,
+  onToggleAssetsPanel,
+  showAssetsPanel,
+  onOpenCatalogue,
 }: PremiumWorkspaceProps) {
   const [showDirectorInput, setShowDirectorInput] = useState(false);
   const [directorPrompt, setDirectorPrompt] = useState('');
@@ -216,7 +249,8 @@ export function PremiumWorkspace({
     height: `${Math.abs(drawCurrent.y - drawStart.y)}%`,
   } : null;
 
-  const toolbarItems: ToolbarItem[] = [
+  // Tool groups
+  const selectionTools: ToolbarItem[] = [
     {
       id: 'select',
       icon: MousePointer2,
@@ -225,6 +259,30 @@ export function PremiumWorkspace({
       disabled: !renderUrl || isGenerating,
       active: isSelectiveEditing,
       shortcut: 'S',
+      group: 'selection',
+    },
+    {
+      id: 'multiselect',
+      icon: SquareStack,
+      label: 'Multi',
+      onClick: onToggleMultiSelect,
+      disabled: !renderUrl || isGenerating,
+      active: isMultiSelectMode,
+      shortcut: 'M',
+      group: 'selection',
+    },
+  ];
+
+  const editingTools: ToolbarItem[] = [
+    {
+      id: 'eraser',
+      icon: Eraser,
+      label: 'Erase',
+      onClick: onToggleEraser,
+      disabled: !renderUrl || isGenerating,
+      active: isEraserMode,
+      shortcut: 'E',
+      group: 'editing',
     },
     {
       id: 'director',
@@ -234,7 +292,34 @@ export function PremiumWorkspace({
       disabled: !renderUrl || isGenerating,
       active: showDirectorInput,
       shortcut: 'D',
+      group: 'editing',
     },
+  ];
+
+  const aiTools: ToolbarItem[] = [
+    {
+      id: 'detect',
+      icon: ScanSearch,
+      label: 'Detect',
+      onClick: onToggleAIDetection,
+      disabled: !renderUrl || isGenerating,
+      active: isAIDetectionActive,
+      shortcut: 'F',
+      group: 'ai',
+    },
+    {
+      id: 'autofurnish',
+      icon: Sparkles,
+      label: 'Furnish',
+      onClick: onToggleAutoFurnish,
+      disabled: !renderUrl || isGenerating,
+      active: showAutoFurnish,
+      shortcut: 'A',
+      group: 'ai',
+    },
+  ];
+
+  const viewTools: ToolbarItem[] = [
     {
       id: 'views',
       icon: Video,
@@ -243,6 +328,7 @@ export function PremiumWorkspace({
       disabled: !renderUrl || isGenerating,
       active: isMulticamGenerating,
       shortcut: 'V',
+      group: 'view',
     },
     {
       id: 'zones',
@@ -252,7 +338,11 @@ export function PremiumWorkspace({
       disabled: !renderUrl,
       active: showZonesPanel,
       shortcut: 'Z',
+      group: 'view',
     },
+  ];
+
+  const placementTools: ToolbarItem[] = [
     {
       id: 'position',
       icon: Move,
@@ -260,7 +350,31 @@ export function PremiumWorkspace({
       onClick: onPositionFurniture,
       disabled: !onPositionFurniture,
       shortcut: 'P',
+      group: 'placement',
     },
+  ];
+
+  const panelTools: ToolbarItem[] = [
+    {
+      id: 'assets',
+      icon: Package,
+      label: 'Assets',
+      onClick: onToggleAssetsPanel,
+      active: showAssetsPanel,
+      shortcut: 'G',
+      group: 'panels',
+    },
+    {
+      id: 'catalogue',
+      icon: ShoppingCart,
+      label: 'Catalogue',
+      onClick: onOpenCatalogue,
+      shortcut: 'C',
+      group: 'panels',
+    },
+  ];
+
+  const actionTools: ToolbarItem[] = [
     {
       id: 'undo',
       icon: Undo2,
@@ -268,6 +382,7 @@ export function PremiumWorkspace({
       onClick: onUndo,
       disabled: !canUndo,
       shortcut: '⌘Z',
+      group: 'actions',
     },
     {
       id: 'export',
@@ -275,43 +390,81 @@ export function PremiumWorkspace({
       label: 'Export',
       onClick: onExport,
       disabled: !renderUrl,
-      shortcut: 'E',
+      shortcut: 'X',
+      group: 'actions',
     },
   ];
+
+  const renderToolGroup = (tools: ToolbarItem[]) => (
+    <>
+      {tools.map((item) => (
+        <Tooltip key={item.id}>
+          <TooltipTrigger asChild>
+            <button
+              onClick={item.onClick}
+              disabled={item.disabled}
+              className={cn(
+                'toolbar-item-premium',
+                'flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg',
+                'text-muted-foreground transition-all duration-200',
+                'hover:text-foreground hover:bg-primary/10',
+                'disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent',
+                item.active && 'bg-primary/20 text-primary'
+              )}
+            >
+              <item.icon className="h-3.5 w-3.5" />
+              <span className="text-[11px] font-medium hidden lg:inline">{item.label}</span>
+            </button>
+          </TooltipTrigger>
+          <TooltipContent side="bottom" className="flex items-center gap-2">
+            <span>{item.label}</span>
+            {item.shortcut && (
+              <kbd className="kbd text-[10px] px-1.5 py-0.5">{item.shortcut}</kbd>
+            )}
+          </TooltipContent>
+        </Tooltip>
+      ))}
+    </>
+  );
 
   return (
     <TooltipProvider delayDuration={200}>
       <div className="flex-1 flex flex-col bg-gradient-premium relative overflow-hidden">
-        {/* Floating Premium Toolbar */}
+        {/* Floating Premium Toolbar - Reorganized with Groups */}
         <div className="absolute top-6 left-1/2 -translate-x-1/2 z-30 animate-fade-in">
-          <div className="glass-premium rounded-2xl px-2 py-1.5 flex items-center gap-1">
-            {toolbarItems.map((item) => (
-              <Tooltip key={item.id}>
-                <TooltipTrigger asChild>
-                  <button
-                    onClick={item.onClick}
-                    disabled={item.disabled}
-                    className={cn(
-                      'toolbar-item-premium',
-                      'flex items-center gap-2 px-3 py-2 rounded-xl',
-                      'text-muted-foreground transition-all duration-200',
-                      'hover:text-foreground hover:bg-primary/10',
-                      'disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent',
-                      item.active && 'bg-primary/20 text-primary'
-                    )}
-                  >
-                    <item.icon className="h-4 w-4" />
-                    <span className="text-xs font-medium hidden sm:inline">{item.label}</span>
-                  </button>
-                </TooltipTrigger>
-                <TooltipContent side="bottom" className="flex items-center gap-2">
-                  <span>{item.label}</span>
-                  {item.shortcut && (
-                    <kbd className="kbd text-[10px] px-1.5 py-0.5">{item.shortcut}</kbd>
-                  )}
-                </TooltipContent>
-              </Tooltip>
-            ))}
+          <div className="glass-premium rounded-2xl px-2 py-1.5 flex items-center gap-0.5">
+            {/* Selection Tools */}
+            {renderToolGroup(selectionTools)}
+            
+            <Separator orientation="vertical" className="h-6 mx-1 bg-border/30" />
+            
+            {/* Editing Tools */}
+            {renderToolGroup(editingTools)}
+            
+            <Separator orientation="vertical" className="h-6 mx-1 bg-border/30" />
+            
+            {/* AI Tools */}
+            {renderToolGroup(aiTools)}
+            
+            <Separator orientation="vertical" className="h-6 mx-1 bg-border/30" />
+            
+            {/* View Tools */}
+            {renderToolGroup(viewTools)}
+            
+            <Separator orientation="vertical" className="h-6 mx-1 bg-border/30" />
+            
+            {/* Placement Tools */}
+            {renderToolGroup(placementTools)}
+            
+            <Separator orientation="vertical" className="h-6 mx-1 bg-border/30" />
+            
+            {/* Panel Tools */}
+            {renderToolGroup(panelTools)}
+            
+            <Separator orientation="vertical" className="h-6 mx-1 bg-border/30" />
+            
+            {/* Actions */}
+            {renderToolGroup(actionTools)}
           </div>
         </div>
 
