@@ -11,3 +11,6 @@ verify_jwt = false
 
 [functions.edit-furniture]
 verify_jwt = false
+
+[functions.auto-furnish]
+verify_jwt = false
