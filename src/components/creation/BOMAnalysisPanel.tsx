@@ -10,6 +10,8 @@ import {
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 
 interface CustomFurnitureItem {
   id: string;
@@ -141,7 +143,89 @@ export function BOMAnalysisPanel({ item, onClose }: BOMAnalysisPanelProps) {
   };
 
   const exportAsPDF = () => {
-    toast({ title: 'Export', description: 'BOM export feature coming soon!' });
+    const dataToExport = isEditing ? { components: editedComponents, laborCost: editedLaborCost, notes: bomData?.notes || [] } : bomData;
+    if (!dataToExport || !item) return;
+
+    const doc = new jsPDF();
+    const pageWidth = doc.internal.pageSize.getWidth();
+    
+    // Title
+    doc.setFontSize(20);
+    doc.setTextColor(33, 33, 33);
+    doc.text('Bill of Materials', 14, 20);
+    
+    // Item details
+    doc.setFontSize(12);
+    doc.setTextColor(100, 100, 100);
+    doc.text(`Product: ${item.item_name}`, 14, 32);
+    doc.text(`Category: ${item.item_category}`, 14, 40);
+    if (item.item_price) {
+      doc.text(`Listed Price: ₹${item.item_price.toLocaleString('en-IN')}`, 14, 48);
+    }
+    
+    // Date
+    doc.setFontSize(10);
+    doc.text(`Generated: ${new Date().toLocaleDateString('en-IN')}`, pageWidth - 60, 20);
+    
+    // Components table
+    const tableData = dataToExport.components.map(c => [
+      c.component,
+      c.material,
+      c.quantity,
+      `₹${c.estimatedCost.toLocaleString('en-IN')}`
+    ]);
+    
+    // Add labor and total rows
+    tableData.push(['', '', 'Labor Cost', `₹${dataToExport.laborCost.toLocaleString('en-IN')}`]);
+    const total = isEditing ? calculateTotal() : (bomData?.totalEstimate || 0);
+    tableData.push(['', '', 'Total Estimate', `₹${total.toLocaleString('en-IN')}`]);
+    
+    autoTable(doc, {
+      startY: item.item_price ? 56 : 48,
+      head: [['Component', 'Material', 'Quantity', 'Cost']],
+      body: tableData,
+      theme: 'striped',
+      headStyles: { 
+        fillColor: [59, 130, 246],
+        textColor: 255,
+        fontStyle: 'bold'
+      },
+      footStyles: {
+        fontStyle: 'bold'
+      },
+      columnStyles: {
+        3: { halign: 'right' }
+      },
+      didParseCell: (data) => {
+        // Style the total row
+        if (data.row.index === tableData.length - 1) {
+          data.cell.styles.fontStyle = 'bold';
+          data.cell.styles.fillColor = [239, 246, 255];
+        }
+        // Style the labor row
+        if (data.row.index === tableData.length - 2) {
+          data.cell.styles.fillColor = [249, 250, 251];
+        }
+      }
+    });
+    
+    // Notes section
+    if (dataToExport.notes && dataToExport.notes.length > 0) {
+      const finalY = (doc as any).lastAutoTable?.finalY || 100;
+      doc.setFontSize(12);
+      doc.setTextColor(33, 33, 33);
+      doc.text('Notes:', 14, finalY + 15);
+      
+      doc.setFontSize(10);
+      doc.setTextColor(100, 100, 100);
+      dataToExport.notes.forEach((note, index) => {
+        doc.text(`• ${note}`, 18, finalY + 25 + (index * 8));
+      });
+    }
+    
+    // Save
+    doc.save(`BOM-${item.item_name.replace(/\s+/g, '-')}.pdf`);
+    toast({ title: 'Exported', description: 'BOM exported as PDF' });
   };
 
   const exportAsCSV = () => {
