@@ -1,6 +1,25 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Plus, FolderOpen, LogOut, User, MoreHorizontal, Pencil, Trash2, Check, X, LayoutDashboard, Store, Palette, Grid3X3, ChevronDown, ChevronRight } from 'lucide-react';
+import { 
+  Plus, 
+  FolderOpen, 
+  LogOut, 
+  User, 
+  MoreHorizontal, 
+  Pencil, 
+  Trash2, 
+  Check, 
+  X, 
+  LayoutDashboard, 
+  Store, 
+  Palette, 
+  Grid3X3, 
+  ChevronDown, 
+  ChevronRight,
+  Sparkles,
+  PanelLeftClose,
+  PanelLeft
+} from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -27,6 +46,24 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from '@/components/ui/collapsible';
+import {
+  Sidebar,
+  SidebarContent,
+  SidebarHeader,
+  SidebarFooter,
+  SidebarMenu,
+  SidebarMenuItem,
+  SidebarMenuButton,
+  SidebarGroup,
+  SidebarGroupLabel,
+  SidebarGroupContent,
+  useSidebar,
+} from '@/components/ui/sidebar';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -51,6 +88,9 @@ export function AppSidebar({ currentProjectId, currentRoomId, onProjectSelect, o
   const { user, userRole, signOut } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { state, toggleSidebar } = useSidebar();
+  const isCollapsed = state === 'collapsed';
+  
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -190,216 +230,312 @@ export function AppSidebar({ currentProjectId, currentRoomId, onProjectSelect, o
     setProjectToDelete(null);
   };
 
+  const navItems = [
+    {
+      label: userRole === 'vendor' ? 'Vendor Dashboard' : 'Dashboard',
+      icon: userRole === 'vendor' ? Store : LayoutDashboard,
+      onClick: () => navigate(userRole === 'vendor' ? '/vendor' : '/dashboard'),
+    },
+    {
+      label: 'Custom Library',
+      icon: Palette,
+      onClick: () => navigate('/custom-furniture'),
+    },
+    {
+      label: 'Layout Creator',
+      icon: Grid3X3,
+      onClick: () => navigate('/layout-creator'),
+    },
+  ];
+
   return (
     <>
-      <div className="flex flex-col h-full w-64 bg-sidebar border-r border-sidebar-border">
+      <Sidebar 
+        collapsible="icon" 
+        className="sidebar-premium border-r border-border/30"
+      >
         {/* Header */}
-        <div className="p-4 border-b border-sidebar-border">
-          <h1 className="text-lg font-semibold text-sidebar-foreground">Agent B</h1>
-          <p className="text-xs text-muted-foreground mt-0.5">Design Workspace</p>
-        </div>
-
-        {/* Dashboard Link */}
-        <div className="p-3 space-y-2">
-          <Button 
-            onClick={() => navigate(userRole === 'vendor' ? '/vendor' : '/dashboard')}
-            className="w-full justify-start gap-2"
-            variant="ghost"
-          >
-            {userRole === 'vendor' ? <Store className="h-4 w-4" /> : <LayoutDashboard className="h-4 w-4" />}
-            {userRole === 'vendor' ? 'Vendor Dashboard' : 'Dashboard'}
-          </Button>
-          <Button 
-            onClick={() => navigate('/custom-furniture')}
-            className="w-full justify-start gap-2"
-            variant="ghost"
-          >
-            <Palette className="h-4 w-4" />
-            Custom Library
-          </Button>
-          <Button 
-            onClick={() => navigate('/layout-creator')}
-            className="w-full justify-start gap-2"
-            variant="ghost"
-          >
-            <Grid3X3 className="h-4 w-4" />
-            Layout Creator
-          </Button>
-          <Button 
-            onClick={onNewProject}
-            className="w-full justify-start gap-2"
-            variant="secondary"
-          >
-            <Plus className="h-4 w-4" />
-            New Project
-          </Button>
-        </div>
-
-        <Separator className="bg-sidebar-border" />
-
-        {/* Projects List */}
-        <div className="flex-1 overflow-hidden">
-          <div className="px-3 py-2">
-            <h2 className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-              Projects
-            </h2>
-          </div>
-          <ScrollArea className="flex-1 px-2">
-            {loading ? (
-              <div className="space-y-2 p-2">
-                {[...Array(3)].map((_, i) => (
-                  <div key={i} className="h-10 skeleton" />
-                ))}
-              </div>
-            ) : projects.length === 0 ? (
-              <div className="p-4 text-center">
-                <FolderOpen className="h-8 w-8 mx-auto text-muted-foreground mb-2" />
-                <p className="text-sm text-muted-foreground">No projects yet</p>
-              </div>
-            ) : (
-              <div className="space-y-1 p-1">
-                {projects.map((project) => (
-                  <Collapsible
-                    key={project.id}
-                    open={expandedProjects.has(project.id)}
-                    onOpenChange={() => toggleProjectExpanded(project.id)}
-                  >
-                    <div
-                      className={cn(
-                        'group flex items-center gap-1 rounded-md transition-colors',
-                        currentProjectId === project.id
-                          ? 'bg-sidebar-accent'
-                          : 'hover:bg-sidebar-accent/50'
-                      )}
-                    >
-                      {editingId === project.id ? (
-                        <div className="flex-1 flex items-center gap-1 p-1">
-                          <Input
-                            value={editingName}
-                            onChange={(e) => setEditingName(e.target.value)}
-                            onKeyDown={handleKeyDown}
-                            onBlur={saveProjectName}
-                            autoFocus
-                            className="h-8 text-sm"
-                          />
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-7 w-7 shrink-0"
-                            onClick={saveProjectName}
-                          >
-                            <Check className="h-3.5 w-3.5 text-success" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-7 w-7 shrink-0"
-                            onClick={cancelEditing}
-                          >
-                            <X className="h-3.5 w-3.5" />
-                          </Button>
-                        </div>
-                      ) : (
-                        <>
-                          <CollapsibleTrigger asChild>
-                            <button className="p-1.5 hover:bg-sidebar-accent/50 rounded">
-                              {expandedProjects.has(project.id) ? (
-                                <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
-                              ) : (
-                                <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />
-                              )}
-                            </button>
-                          </CollapsibleTrigger>
-                          <button
-                            onClick={() => onProjectSelect(project.id)}
-                            className={cn(
-                              'flex-1 text-left py-2 text-sm transition-colors',
-                              currentProjectId === project.id
-                                ? 'text-sidebar-accent-foreground'
-                                : 'text-sidebar-foreground'
-                            )}
-                          >
-                            <span className="block truncate">{project.name}</span>
-                          </button>
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className={cn(
-                                  'h-7 w-7 shrink-0 mr-1',
-                                  'opacity-0 group-hover:opacity-100 transition-opacity',
-                                  currentProjectId === project.id && 'opacity-100'
-                                )}
-                              >
-                                <MoreHorizontal className="h-4 w-4" />
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end" className="w-40">
-                              <DropdownMenuItem onClick={() => startEditing(project)}>
-                                <Pencil className="h-4 w-4 mr-2" />
-                                Rename
-                              </DropdownMenuItem>
-                              <DropdownMenuSeparator />
-                              <DropdownMenuItem 
-                                onClick={() => confirmDelete(project)}
-                                className="text-destructive focus:text-destructive"
-                              >
-                                <Trash2 className="h-4 w-4 mr-2" />
-                                Delete
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                        </>
-                      )}
-                    </div>
-                    
-                    {/* Rooms under project */}
-                    <CollapsibleContent>
-                      <RoomListPanel
-                        projectId={project.id}
-                        currentRoomId={currentProjectId === project.id ? currentRoomId : null}
-                        onRoomSelect={(roomId) => {
-                          if (currentProjectId !== project.id) {
-                            onProjectSelect(project.id);
-                          }
-                          onRoomSelect(roomId);
-                        }}
-                      />
-                    </CollapsibleContent>
-                  </Collapsible>
-                ))}
+        <SidebarHeader className="p-4 border-b border-border/20">
+          <div className="flex items-center gap-3">
+            <div className="h-9 w-9 rounded-xl bg-gradient-to-br from-primary/30 to-primary/10 flex items-center justify-center border border-primary/20 shrink-0">
+              <Sparkles className="h-4 w-4 text-primary" />
+            </div>
+            {!isCollapsed && (
+              <div className="animate-fade-in overflow-hidden">
+                <h1 className="text-base font-semibold text-foreground tracking-tight">Agent B</h1>
+                <p className="text-[10px] text-muted-foreground uppercase tracking-widest">Design Studio</p>
               </div>
             )}
-          </ScrollArea>
-        </div>
+          </div>
+        </SidebarHeader>
 
-        {/* User Section */}
-        <div className="p-3 border-t border-sidebar-border">
-          <div className="flex items-center gap-3 px-2 py-1.5">
-            <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center">
-              <User className="h-4 w-4 text-primary" />
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-sidebar-foreground truncate">
-                {user?.email?.split('@')[0] || 'User'}
-              </p>
-            </div>
-            <Button 
-              variant="ghost" 
+        {/* Navigation */}
+        <SidebarContent className="px-2 py-3">
+          <SidebarGroup>
+            <SidebarMenu>
+              {navItems.map((item) => (
+                <SidebarMenuItem key={item.label}>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <SidebarMenuButton
+                        onClick={item.onClick}
+                        className="sidebar-nav-item"
+                      >
+                        <item.icon className="h-4 w-4 shrink-0" />
+                        <span className="truncate">{item.label}</span>
+                      </SidebarMenuButton>
+                    </TooltipTrigger>
+                    {isCollapsed && (
+                      <TooltipContent side="right" className="glass-premium">
+                        {item.label}
+                      </TooltipContent>
+                    )}
+                  </Tooltip>
+                </SidebarMenuItem>
+              ))}
+              
+              {/* New Project Button */}
+              <SidebarMenuItem>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <SidebarMenuButton
+                      onClick={onNewProject}
+                      className="sidebar-nav-item bg-primary/10 hover:bg-primary/20 text-primary"
+                    >
+                      <Plus className="h-4 w-4 shrink-0" />
+                      <span className="truncate">New Project</span>
+                    </SidebarMenuButton>
+                  </TooltipTrigger>
+                  {isCollapsed && (
+                    <TooltipContent side="right" className="glass-premium">
+                      New Project
+                    </TooltipContent>
+                  )}
+                </Tooltip>
+              </SidebarMenuItem>
+            </SidebarMenu>
+          </SidebarGroup>
+
+          {/* Collapse Toggle */}
+          <div className={cn(
+            "flex px-2 py-1",
+            isCollapsed ? "justify-center" : "justify-end"
+          )}>
+            <Button
+              variant="ghost"
               size="icon"
-              onClick={handleSignOut}
-              className="h-8 w-8 text-muted-foreground hover:text-foreground"
+              onClick={toggleSidebar}
+              className="h-7 w-7 text-muted-foreground hover:text-foreground hover:bg-primary/10 rounded-lg transition-all duration-200"
             >
-              <LogOut className="h-4 w-4" />
+              {isCollapsed ? (
+                <PanelLeft className="h-4 w-4" />
+              ) : (
+                <PanelLeftClose className="h-4 w-4" />
+              )}
             </Button>
           </div>
-        </div>
-      </div>
+
+          <Separator className="my-2 bg-border/30" />
+
+          {/* Projects Section - Hidden when collapsed */}
+          {!isCollapsed && (
+            <SidebarGroup className="animate-fade-in">
+              <SidebarGroupLabel className="text-[10px] uppercase tracking-widest text-muted-foreground/70 px-2">
+                Projects
+              </SidebarGroupLabel>
+              <SidebarGroupContent>
+                <ScrollArea className="h-[calc(100vh-400px)] px-1">
+                  {loading ? (
+                    <div className="space-y-2 p-2">
+                      {[...Array(3)].map((_, i) => (
+                        <div key={i} className="h-10 rounded-lg bg-muted/30 animate-pulse" />
+                      ))}
+                    </div>
+                  ) : projects.length === 0 ? (
+                    <div className="p-4 text-center">
+                      <FolderOpen className="h-8 w-8 mx-auto text-muted-foreground/50 mb-2" />
+                      <p className="text-xs text-muted-foreground">No projects yet</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-1">
+                      {projects.map((project) => (
+                        <Collapsible
+                          key={project.id}
+                          open={expandedProjects.has(project.id)}
+                          onOpenChange={() => toggleProjectExpanded(project.id)}
+                        >
+                          <div
+                            className={cn(
+                              'group flex items-center gap-1 rounded-lg transition-all duration-200',
+                              currentProjectId === project.id
+                                ? 'bg-primary/15 border-l-2 border-primary'
+                                : 'hover:bg-muted/50'
+                            )}
+                          >
+                            {editingId === project.id ? (
+                              <div className="flex-1 flex items-center gap-1 p-1">
+                                <Input
+                                  value={editingName}
+                                  onChange={(e) => setEditingName(e.target.value)}
+                                  onKeyDown={handleKeyDown}
+                                  onBlur={saveProjectName}
+                                  autoFocus
+                                  className="h-8 text-sm bg-background/50 border-primary/30"
+                                />
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-7 w-7 shrink-0 text-emerald-500"
+                                  onClick={saveProjectName}
+                                >
+                                  <Check className="h-3.5 w-3.5" />
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-7 w-7 shrink-0"
+                                  onClick={cancelEditing}
+                                >
+                                  <X className="h-3.5 w-3.5" />
+                                </Button>
+                              </div>
+                            ) : (
+                              <>
+                                <CollapsibleTrigger asChild>
+                                  <button className="p-1.5 hover:bg-muted/50 rounded-md transition-colors">
+                                    {expandedProjects.has(project.id) ? (
+                                      <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
+                                    ) : (
+                                      <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />
+                                    )}
+                                  </button>
+                                </CollapsibleTrigger>
+                                <button
+                                  onClick={() => onProjectSelect(project.id)}
+                                  className={cn(
+                                    'flex-1 text-left py-2 text-sm transition-colors',
+                                    currentProjectId === project.id
+                                      ? 'text-primary font-medium'
+                                      : 'text-foreground/80 hover:text-foreground'
+                                  )}
+                                >
+                                  <span className="block truncate">{project.name}</span>
+                                </button>
+                                <DropdownMenu>
+                                  <DropdownMenuTrigger asChild>
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      className={cn(
+                                        'h-7 w-7 shrink-0 mr-1',
+                                        'opacity-0 group-hover:opacity-100 transition-opacity',
+                                        currentProjectId === project.id && 'opacity-100'
+                                      )}
+                                    >
+                                      <MoreHorizontal className="h-4 w-4" />
+                                    </Button>
+                                  </DropdownMenuTrigger>
+                                  <DropdownMenuContent align="end" className="w-40 glass-premium">
+                                    <DropdownMenuItem onClick={() => startEditing(project)}>
+                                      <Pencil className="h-4 w-4 mr-2" />
+                                      Rename
+                                    </DropdownMenuItem>
+                                    <DropdownMenuSeparator className="bg-border/30" />
+                                    <DropdownMenuItem 
+                                      onClick={() => confirmDelete(project)}
+                                      className="text-destructive focus:text-destructive"
+                                    >
+                                      <Trash2 className="h-4 w-4 mr-2" />
+                                      Delete
+                                    </DropdownMenuItem>
+                                  </DropdownMenuContent>
+                                </DropdownMenu>
+                              </>
+                            )}
+                          </div>
+                          
+                          {/* Rooms under project */}
+                          <CollapsibleContent className="pl-4">
+                            <RoomListPanel
+                              projectId={project.id}
+                              currentRoomId={currentProjectId === project.id ? currentRoomId : null}
+                              onRoomSelect={(roomId) => {
+                                if (currentProjectId !== project.id) {
+                                  onProjectSelect(project.id);
+                                }
+                                onRoomSelect(roomId);
+                              }}
+                            />
+                          </CollapsibleContent>
+                        </Collapsible>
+                      ))}
+                    </div>
+                  )}
+                </ScrollArea>
+              </SidebarGroupContent>
+            </SidebarGroup>
+          )}
+
+          {/* Collapsed state: Show folder icon */}
+          {isCollapsed && (
+            <div className="flex justify-center py-2">
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-9 w-9 text-muted-foreground hover:text-foreground"
+                    onClick={toggleSidebar}
+                  >
+                    <FolderOpen className="h-4 w-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="right" className="glass-premium">
+                  {projects.length} Projects
+                </TooltipContent>
+              </Tooltip>
+            </div>
+          )}
+        </SidebarContent>
+
+        {/* Footer */}
+        <SidebarFooter className="p-3 border-t border-border/20">
+          <div className={cn(
+            "flex items-center gap-3 transition-all duration-200",
+            isCollapsed ? "justify-center" : "px-2 py-1.5"
+          )}>
+            <div className="h-8 w-8 rounded-full bg-gradient-to-br from-primary/30 to-primary/10 flex items-center justify-center border border-primary/20 shrink-0">
+              <User className="h-4 w-4 text-primary" />
+            </div>
+            {!isCollapsed && (
+              <div className="flex-1 min-w-0 animate-fade-in">
+                <p className="text-sm font-medium text-foreground truncate">
+                  {user?.email?.split('@')[0] || 'User'}
+                </p>
+              </div>
+            )}
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button 
+                  variant="ghost" 
+                  size="icon"
+                  onClick={handleSignOut}
+                  className="h-8 w-8 text-muted-foreground hover:text-foreground hover:bg-destructive/10 shrink-0"
+                >
+                  <LogOut className="h-4 w-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="right" className="glass-premium">
+                Sign Out
+              </TooltipContent>
+            </Tooltip>
+          </div>
+        </SidebarFooter>
+      </Sidebar>
 
       {/* Delete Confirmation Dialog */}
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
-        <AlertDialogContent>
+        <AlertDialogContent className="glass-premium border-border/30">
           <AlertDialogHeader>
             <AlertDialogTitle>Delete project?</AlertDialogTitle>
             <AlertDialogDescription>
@@ -408,7 +544,7 @@ export function AppSidebar({ currentProjectId, currentRoomId, onProjectSelect, o
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogCancel className="border-border/30">Cancel</AlertDialogCancel>
             <AlertDialogAction 
               onClick={deleteProject}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
