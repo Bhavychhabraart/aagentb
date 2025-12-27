@@ -33,6 +33,7 @@ interface AIDetectionOverlayProps {
   replacementItems?: Map<string, ReplacementItem>;
   onApplyFurnish?: () => void;
   onClearAll?: () => void;
+  isFindingSimilar?: boolean;
 }
 
 export function AIDetectionOverlay({
@@ -48,6 +49,7 @@ export function AIDetectionOverlay({
   replacementItems = new Map(),
   onApplyFurnish,
   onClearAll,
+  isFindingSimilar = false,
 }: AIDetectionOverlayProps) {
   const [isDetecting, setIsDetecting] = useState(false);
   const [detectedItems, setDetectedItems] = useState<DetectedItem[]>([]);
@@ -234,6 +236,17 @@ export function AIDetectionOverlay({
           <div className="glass-premium rounded-xl p-6 flex flex-col items-center gap-3">
             <Loader2 className="h-8 w-8 text-primary animate-spin" />
             <span className="text-sm">Analyzing furniture...</span>
+          </div>
+        </div>
+      )}
+
+      {/* Finding similar loading overlay */}
+      {isFindingSimilar && (
+        <div className="absolute inset-0 bg-background/60 backdrop-blur-sm z-50 flex items-center justify-center">
+          <div className="glass-premium rounded-xl p-6 flex flex-col items-center gap-3">
+            <Loader2 className="h-8 w-8 animate-spin text-amber-500" />
+            <p className="text-sm font-medium">Finding similar items...</p>
+            <p className="text-xs text-muted-foreground">Analyzing visual characteristics</p>
           </div>
         </div>
       )}

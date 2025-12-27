@@ -1,5 +1,5 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
-import { X, Search, Loader2, Check, Plus, ShoppingBag, Maximize2 } from 'lucide-react';
+import { X, Search, Loader2, Check, Plus, ShoppingBag, Maximize2, Sparkles } from 'lucide-react';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -17,6 +17,10 @@ interface FullScreenCatalogModalProps {
   title?: string;
   subtitle?: string;
   selectionMode?: boolean; // When true, clicking selects instead of staging
+  initialSearchQuery?: string; // Pre-fill search for similarity mode
+  suggestedCategory?: string; // Pre-select category
+  isLoading?: boolean; // Show loading state
+  similarityBadge?: string; // Show "Similar to: X" badge
 }
 
 const ITEMS_PER_PAGE = 40;
@@ -31,18 +35,24 @@ export function FullScreenCatalogModal({
   title,
   subtitle,
   selectionMode = false,
+  initialSearchQuery = '',
+  suggestedCategory,
+  isLoading = false,
+  similarityBadge,
 }: FullScreenCatalogModalProps) {
-  const [searchQuery, setSearchQuery] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState(initialSearchQuery);
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(suggestedCategory || null);
   const [displayCount, setDisplayCount] = useState(ITEMS_PER_PAGE);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
-  // Reset on open
+  // Reset on open with initial values
   useEffect(() => {
     if (isOpen) {
       setDisplayCount(ITEMS_PER_PAGE);
+      setSearchQuery(initialSearchQuery);
+      setSelectedCategory(suggestedCategory || null);
     }
-  }, [isOpen]);
+  }, [isOpen, initialSearchQuery, suggestedCategory]);
 
   // Reset display count when filters change
   useEffect(() => {
@@ -78,9 +88,18 @@ export function FullScreenCatalogModal({
         <div className="flex items-center justify-between p-4 border-b border-border shrink-0">
           <div className="flex flex-col gap-1">
             <div className="flex items-center gap-3">
-              <ShoppingBag className="h-5 w-5 text-primary" />
+              {similarityBadge ? (
+                <Sparkles className="h-5 w-5 text-amber-500" />
+              ) : (
+                <ShoppingBag className="h-5 w-5 text-primary" />
+              )}
               <h2 className="text-lg font-semibold text-foreground">{title || 'Furniture Catalog'}</h2>
               <Badge variant="secondary">{catalogItems.length} items</Badge>
+              {similarityBadge && (
+                <Badge variant="outline" className="border-amber-500/50 text-amber-500 bg-amber-500/10">
+                  Similar to: {similarityBadge}
+                </Badge>
+              )}
             </div>
             {subtitle && (
               <p className="text-sm text-muted-foreground ml-8">{subtitle}</p>
@@ -158,7 +177,13 @@ export function FullScreenCatalogModal({
           onScroll={handleScroll}
           ref={scrollContainerRef}
         >
-          {filteredItems.length === 0 ? (
+          {isLoading ? (
+            <div className="flex flex-col items-center justify-center h-full text-muted-foreground">
+              <Loader2 className="h-12 w-12 mb-4 animate-spin text-primary" />
+              <p className="text-lg">Finding similar items...</p>
+              <p className="text-sm">Analyzing visual characteristics</p>
+            </div>
+          ) : filteredItems.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-full text-muted-foreground">
               <Search className="h-12 w-12 mb-4 opacity-30" />
               <p className="text-lg">No items found</p>
@@ -173,6 +198,7 @@ export function FullScreenCatalogModal({
                   isStaged={stagedItemIds.includes(item.id)}
                   onToggleStage={() => onToggleStage(item)}
                   onPreview={() => onPreviewItem(item)}
+                  selectionMode={selectionMode}
                 />
               ))}
             </div>
@@ -193,9 +219,10 @@ interface LargeCatalogCardProps {
   isStaged: boolean;
   onToggleStage: () => void;
   onPreview: () => void;
+  selectionMode?: boolean;
 }
 
-function LargeCatalogCard({ item, isStaged, onToggleStage, onPreview }: LargeCatalogCardProps) {
+function LargeCatalogCard({ item, isStaged, onToggleStage, onPreview, selectionMode = false }: LargeCatalogCardProps) {
   return (
     <div className="group relative bg-card rounded-xl border border-border overflow-hidden hover:shadow-lg transition-all hover:border-primary/50">
       {/* Image */}
@@ -237,11 +264,14 @@ function LargeCatalogCard({ item, isStaged, onToggleStage, onPreview }: LargeCat
             </span>
           )}
         </div>
-        {/* Stage button */}
+        {/* Stage/Select button */}
         <Button
           size="sm"
-          variant={isStaged ? "secondary" : "default"}
-          className="w-full gap-1.5"
+          variant={isStaged ? "secondary" : selectionMode ? "outline" : "default"}
+          className={cn(
+            "w-full gap-1.5",
+            selectionMode && !isStaged && "border-amber-500/50 hover:bg-amber-500/10 hover:border-amber-500"
+          )}
           onClick={(e) => {
             e.stopPropagation();
             onToggleStage();
@@ -250,12 +280,16 @@ function LargeCatalogCard({ item, isStaged, onToggleStage, onPreview }: LargeCat
           {isStaged ? (
             <>
               <Check className="h-3.5 w-3.5" />
-              Staged
+              {selectionMode ? 'Selected' : 'Staged'}
             </>
           ) : (
             <>
-              <Plus className="h-3.5 w-3.5" />
-              Add to Stage
+              {selectionMode ? (
+                <Sparkles className="h-3.5 w-3.5" />
+              ) : (
+                <Plus className="h-3.5 w-3.5" />
+              )}
+              {selectionMode ? 'Select as Replacement' : 'Add to Stage'}
             </>
           )}
         </Button>
