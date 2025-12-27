@@ -478,18 +478,42 @@ export function PremiumWorkspace({
                   type="text"
                   value={directorPrompt}
                   onChange={(e) => setDirectorPrompt(e.target.value)}
-                  onKeyDown={(e) => e.key === 'Enter' && handleDirectorSubmit()}
+                  onKeyDown={(e) => e.key === 'Enter' && !isSelectiveEditing && handleDirectorSubmit()}
                   placeholder="Describe how to modify the render..."
                   className="flex-1 bg-transparent border-none outline-none text-sm placeholder:text-muted-foreground/50"
                   autoFocus
+                  disabled={isSelectiveEditing}
                 />
                 <button
                   onClick={handleDirectorSubmit}
-                  disabled={!directorPrompt.trim()}
-                  className="btn-glow px-3 py-1.5 text-xs disabled:opacity-50"
+                  disabled={!directorPrompt.trim() || isSelectiveEditing}
+                  className="btn-glow px-3 py-1.5 text-xs disabled:opacity-50 flex items-center gap-1.5"
                 >
-                  Apply
+                  {isSelectiveEditing ? (
+                    <>
+                      <Loader2 className="h-3 w-3 animate-spin" />
+                      <span>Applying...</span>
+                    </>
+                  ) : (
+                    'Apply'
+                  )}
                 </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Generating Overlay */}
+        {isSelectiveEditing && (
+          <div className="absolute inset-0 bg-background/60 backdrop-blur-sm z-50 flex items-center justify-center">
+            <div className="glass-premium rounded-2xl p-8 flex flex-col items-center gap-4">
+              <div className="relative">
+                <div className="h-16 w-16 rounded-full border-4 border-primary/20" />
+                <div className="absolute inset-0 h-16 w-16 rounded-full border-4 border-primary border-t-transparent animate-spin" />
+              </div>
+              <div className="text-center">
+                <p className="text-lg font-medium">Applying AI Director changes...</p>
+                <p className="text-sm text-muted-foreground mt-1">This may take a moment</p>
               </div>
             </div>
           </div>

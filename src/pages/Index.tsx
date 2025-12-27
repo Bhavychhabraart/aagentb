@@ -2672,7 +2672,17 @@ Ready to generate a render! Describe your vision.`;
             // Enhanced tools props
             onToggleMultiSelect={handleToggleMultiSelect}
             isMultiSelectMode={isMultiSelectMode}
-            onToggleAIDetection={() => setIsAIDetectionActive(prev => !prev)}
+            onToggleAIDetection={() => {
+              if (!currentRenderUrl && !roomPhotoUrl) {
+                toast({
+                  variant: 'destructive',
+                  title: 'No image available',
+                  description: 'Upload a room photo or generate a render first'
+                });
+                return;
+              }
+              setIsAIDetectionActive(prev => !prev);
+            }}
             isAIDetectionActive={isAIDetectionActive}
             onToggleEraser={() => {
               setIsEraserMode(prev => !prev);
@@ -2711,9 +2721,9 @@ Ready to generate a render! Describe your vision.`;
           )}
 
           {/* AI Detection Overlay */}
-          {isAIDetectionActive && currentRenderUrl && (
+          {isAIDetectionActive && (currentRenderUrl || roomPhotoUrl) && (
             <AIDetectionOverlay
-              renderUrl={currentRenderUrl}
+              renderUrl={currentRenderUrl || roomPhotoUrl || ''}
               isActive={isAIDetectionActive}
               onClose={() => {
                 setIsAIDetectionActive(false);
