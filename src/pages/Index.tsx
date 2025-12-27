@@ -141,7 +141,7 @@ const Index = () => {
   const [isEraserMode, setIsEraserMode] = useState(false);
   const [showAutoFurnish, setShowAutoFurnish] = useState(false);
   const [showAssetsPanel, setShowAssetsPanel] = useState(false);
-  const [showCatalogueModal, setShowCatalogueModal] = useState(false);
+  const [showCatalogModal, setShowCatalogModal] = useState(false);
   const [catalogItems, setCatalogItems] = useState<CatalogFurnitureItem[]>([]);
   
   // Detection replacement tracking state
@@ -1469,7 +1469,7 @@ Ready to generate a render! Describe your vision.`;
               size="sm" 
               variant="outline"
               className="h-7 text-xs"
-              onClick={() => setShowCatalogueModal(true)}
+              onClick={() => setShowCatalogModal(true)}
             >
               <Plus className="h-3 w-3 mr-1" />
               Add More
@@ -1598,7 +1598,7 @@ Ready to generate a render! Describe your vision.`;
       setReplacingDetectionId(item.id);
       setReplacingDetectionLabel(item.label);
       setSimilarSearchData(null); // Clear any previous similarity data
-      setShowCatalogueModal(true);
+      setShowCatalogModal(true);
     } else if (action === 'similar') {
       // AI-powered similarity search
       setReplacingDetectionId(item.id);
@@ -1627,7 +1627,7 @@ Ready to generate a render! Describe your vision.`;
             description: `Found ${data.searchTerms?.length || 0} matching keywords` 
           });
         }
-        setShowCatalogueModal(true);
+        setShowCatalogModal(true);
       } catch (error) {
         console.error('Find similar error:', error);
         toast({ 
@@ -1636,7 +1636,7 @@ Ready to generate a render! Describe your vision.`;
           description: 'Showing full catalog instead' 
         });
         setSimilarSearchData(null);
-        setShowCatalogueModal(true);
+        setShowCatalogModal(true);
       } finally {
         setIsFindingSimilar(false);
       }
@@ -1668,7 +1668,7 @@ Ready to generate a render! Describe your vision.`;
         description: `${item.name} will replace ${replacingDetectionLabel}` 
       });
     }
-    setShowCatalogueModal(false);
+    setShowCatalogModal(false);
     setReplacingDetectionId(null);
     setReplacingDetectionLabel('');
   }, [replacingDetectionId, replacingDetectionLabel, toast]);
@@ -1738,8 +1738,8 @@ Ready to generate a render! Describe your vision.`;
 
   // Handle batch generation for multiple selected items
   const handleBatchGenerate = useCallback(async (items: DetectedItem[]) => {
-    setShowCatalogueModal(true);
-    toast({ title: `${items.length} items selected`, description: 'Choose replacements from catalogue' });
+    setShowCatalogModal(true);
+    toast({ title: `${items.length} items selected`, description: 'Choose replacements from catalog' });
   }, [toast]);
 
   // Handle eraser action - remove element from render
@@ -3017,7 +3017,7 @@ Ready to generate a render! Describe your vision.`;
             showAutoFurnish={showAutoFurnish}
             onToggleAssetsPanel={() => setShowAssetsPanel(prev => !prev)}
             showAssetsPanel={showAssetsPanel}
-            onOpenCatalogue={() => setShowCatalogueModal(true)}
+            onOpenCatalog={() => setShowCatalogModal(true)}
             // Selection tool props
             isSelectionMode={selectionMode && !currentSelection}
             onSelectionComplete={handleSelectionComplete}
@@ -3115,7 +3115,7 @@ Ready to generate a render! Describe your vision.`;
                 onProductsPick={() => setShowProductsModal(true)}
                 placeholder={agentBEnabled ? "Describe your vision (Agent B will guide you)..." : "Describe your vision..."}
                 stagedItems={stagedItems}
-                onOpenCatalogue={() => setShowCatalogueModal(true)}
+                onOpenCatalog={() => setShowCatalogModal(true)}
                 uploadedProducts={uploadedProducts}
                 onClearProducts={handleClearProducts}
               />
@@ -3226,11 +3226,11 @@ Ready to generate a render! Describe your vision.`;
         projectId={currentProjectId || undefined}
       />
 
-      {/* Full-Screen Catalogue Modal */}
+      {/* Full-Screen Catalog Modal */}
       <FullScreenCatalogModal
-        isOpen={showCatalogueModal}
+        isOpen={showCatalogModal}
         onClose={() => {
-          setShowCatalogueModal(false);
+          setShowCatalogModal(false);
           setReplacingDetectionId(null);
           setReplacingDetectionLabel('');
           setSimilarSearchData(null);

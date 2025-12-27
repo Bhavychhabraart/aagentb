@@ -27,7 +27,7 @@ interface SleekChatInputProps {
   onProductsPick?: () => void;
   placeholder?: string;
   stagedItems?: CatalogFurnitureItem[];
-  onOpenCatalogue?: () => void;
+  onOpenCatalog?: () => void;
   uploadedProducts?: UploadedProduct[];
   onClearProducts?: () => void;
 }
@@ -43,7 +43,7 @@ export function SleekChatInput({
   onProductsPick,
   placeholder = 'Describe your vision...',
   stagedItems = [],
-  onOpenCatalogue,
+  onOpenCatalog,
   uploadedProducts = [],
   onClearProducts,
 }: SleekChatInputProps) {
@@ -123,9 +123,9 @@ export function SleekChatInput({
                 <Sparkles className="h-3 w-3" />
                 Place these
               </button>
-              {onOpenCatalogue && (
+              {onOpenCatalog && (
                 <button
-                  onClick={onOpenCatalogue}
+                  onClick={onOpenCatalog}
                   className="px-2 py-1 text-xs text-muted-foreground hover:text-foreground hover:bg-muted/50 rounded-lg transition-colors"
                 >
                   Edit
@@ -219,10 +219,10 @@ export function SleekChatInput({
                   Add Style Reference
                 </DropdownMenuItem>
               )}
-              {onOpenCatalogue && (
-                <DropdownMenuItem onClick={onOpenCatalogue} className="gap-2">
+              {onOpenCatalog && (
+                <DropdownMenuItem onClick={onOpenCatalog} className="gap-2">
                   <Package className="h-4 w-4" />
-                  Browse Catalogue
+                  Browse Catalog
                 </DropdownMenuItem>
               )}
               {onProductsPick && (

@@ -31,7 +31,7 @@ interface ProductPickerModalProps {
   projectId?: string;
 }
 
-type MainTab = "moodboard" | "individual" | "catalogue";
+type MainTab = "moodboard" | "individual" | "catalog";
 
 export function ProductPickerModal({
   open,
@@ -56,11 +56,11 @@ export function ProductPickerModal({
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedLibraryIds, setSelectedLibraryIds] = useState<Set<string>>(new Set());
   
-  // Catalogue state (vendor products)
-  const [catalogueItems, setCatalogueItems] = useState<ProductItem[]>([]);
-  const [catalogueLoading, setCatalogueLoading] = useState(false);
-  const [catalogueSearch, setCatalogueSearch] = useState("");
-  const [selectedCatalogueIds, setSelectedCatalogueIds] = useState<Set<string>>(new Set());
+  // Catalog state (vendor products)
+  const [catalogItems, setCatalogItems] = useState<ProductItem[]>([]);
+  const [catalogLoading, setCatalogLoading] = useState(false);
+  const [catalogSearch, setCatalogSearch] = useState("");
+  const [selectedCatalogIds, setSelectedCatalogIds] = useState<Set<string>>(new Set());
 
   // Load library items (user's saved products)
   useEffect(() => {
@@ -93,10 +93,10 @@ export function ProductPickerModal({
     }
   }, [userId, open]);
 
-  // Load catalogue items (vendor products)
+  // Load catalog items (vendor products)
   useEffect(() => {
-    const loadCatalogue = async () => {
-      setCatalogueLoading(true);
+    const loadCatalog = async () => {
+      setCatalogLoading(true);
       try {
         const { data, error } = await supabase
           .from('vendor_products')
@@ -106,20 +106,20 @@ export function ProductPickerModal({
           .limit(50);
         
         if (error) throw error;
-        setCatalogueItems(data?.map(item => ({
+        setCatalogItems(data?.map(item => ({
           id: item.id,
           name: item.name,
           imageUrl: item.image_url || undefined,
         })) || []);
       } catch (error) {
-        console.error('Failed to load catalogue:', error);
+        console.error('Failed to load catalog:', error);
       } finally {
-        setCatalogueLoading(false);
+        setCatalogLoading(false);
       }
     };
     
     if (open) {
-      loadCatalogue();
+      loadCatalog();
     }
   }, [open]);
 
@@ -128,9 +128,9 @@ export function ProductPickerModal({
     !searchQuery || item.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  // Filter catalogue items by search
-  const filteredCatalogueItems = catalogueItems.filter(item =>
-    !catalogueSearch || item.name.toLowerCase().includes(catalogueSearch.toLowerCase())
+  // Filter catalog items by search
+  const filteredCatalogItems = catalogItems.filter(item =>
+    !catalogSearch || item.name.toLowerCase().includes(catalogSearch.toLowerCase())
   );
 
   const handleDrag = useCallback((e: React.DragEvent) => {
@@ -257,14 +257,14 @@ export function ProductPickerModal({
     setSelectedLibraryIds(newSelected);
   };
 
-  const toggleCatalogueItem = (item: ProductItem) => {
-    const newSelected = new Set(selectedCatalogueIds);
+  const toggleCatalogItem = (item: ProductItem) => {
+    const newSelected = new Set(selectedCatalogIds);
     if (item.id && newSelected.has(item.id)) {
       newSelected.delete(item.id);
     } else if (item.id) {
       newSelected.add(item.id);
     }
-    setSelectedCatalogueIds(newSelected);
+    setSelectedCatalogIds(newSelected);
   };
 
   const addSelectedFromLibrary = () => {
@@ -274,10 +274,10 @@ export function ProductPickerModal({
     toast.success(`Added ${itemsToAdd.length} product(s)`);
   };
 
-  const addSelectedFromCatalogue = () => {
-    const itemsToAdd = catalogueItems.filter(item => item.id && selectedCatalogueIds.has(item.id));
+  const addSelectedFromCatalog = () => {
+    const itemsToAdd = catalogItems.filter(item => item.id && selectedCatalogIds.has(item.id));
     setProducts([...products, ...itemsToAdd]);
-    setSelectedCatalogueIds(new Set());
+    setSelectedCatalogIds(new Set());
     toast.success(`Added ${itemsToAdd.length} product(s)`);
   };
 
@@ -370,7 +370,7 @@ export function ProductPickerModal({
         </DialogHeader>
 
         <div className="space-y-4">
-          {/* Main Tabs: Moodboard, Individual Items, Catalogue */}
+          {/* Main Tabs: Moodboard, Individual Items, Catalog */}
           <Tabs value={mainTab} onValueChange={(v) => setMainTab(v as MainTab)}>
             <TabsList className="grid w-full grid-cols-3">
               <TabsTrigger value="moodboard" className="flex items-center gap-1.5 text-xs">
@@ -381,9 +381,9 @@ export function ProductPickerModal({
                 <Grid3X3 className="h-3.5 w-3.5" />
                 Individual
               </TabsTrigger>
-              <TabsTrigger value="catalogue" className="flex items-center gap-1.5 text-xs">
+              <TabsTrigger value="catalog" className="flex items-center gap-1.5 text-xs">
                 <ShoppingBag className="h-3.5 w-3.5" />
-                Catalogue
+                Catalog
               </TabsTrigger>
             </TabsList>
 
@@ -571,36 +571,36 @@ export function ProductPickerModal({
               </Button>
             </TabsContent>
 
-            {/* Catalogue Tab */}
-            <TabsContent value="catalogue" className="mt-4 space-y-4">
+            {/* Catalog Tab */}
+            <TabsContent value="catalog" className="mt-4 space-y-4">
               <div className="text-sm text-muted-foreground bg-muted/50 rounded-lg p-3">
-                <p className="font-medium text-foreground mb-1">Select from Catalogue</p>
-                <p>Browse and select products from our curated vendor catalogue.</p>
+                <p className="font-medium text-foreground mb-1">Select from Catalog</p>
+                <p>Browse and select products from our curated vendor catalog.</p>
               </div>
 
-              {/* Search catalogue */}
+              {/* Search catalog */}
               <div className="relative">
                 <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
-                  placeholder="Search catalogue products..."
-                  value={catalogueSearch}
-                  onChange={(e) => setCatalogueSearch(e.target.value)}
+                  placeholder="Search catalog products..."
+                  value={catalogSearch}
+                  onChange={(e) => setCatalogSearch(e.target.value)}
                   className="pl-9"
                 />
               </div>
 
               {renderProductGrid(
-                filteredCatalogueItems,
-                selectedCatalogueIds,
-                toggleCatalogueItem,
-                catalogueLoading,
-                catalogueItems.length === 0 ? "No catalogue products available" : "No products match your search"
+                filteredCatalogItems,
+                selectedCatalogIds,
+                toggleCatalogItem,
+                catalogLoading,
+                catalogItems.length === 0 ? "No catalog products available" : "No products match your search"
               )}
 
-              {selectedCatalogueIds.size > 0 && (
-                <Button onClick={addSelectedFromCatalogue} className="w-full">
+              {selectedCatalogIds.size > 0 && (
+                <Button onClick={addSelectedFromCatalog} className="w-full">
                   <Plus className="h-4 w-4 mr-2" />
-                  Add {selectedCatalogueIds.size} from Catalogue
+                  Add {selectedCatalogIds.size} from Catalog
                 </Button>
               )}
             </TabsContent>

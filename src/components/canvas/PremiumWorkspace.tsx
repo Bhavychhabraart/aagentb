@@ -110,7 +110,7 @@ interface PremiumWorkspaceProps {
   showAutoFurnish?: boolean;
   onToggleAssetsPanel?: () => void;
   showAssetsPanel?: boolean;
-  onOpenCatalogue?: () => void;
+  onOpenCatalog?: () => void;
   // Selection tool props
   isSelectionMode?: boolean;
   onSelectionComplete?: (region: { x: number; y: number; width: number; height: number } | null) => void;
@@ -166,7 +166,7 @@ export function PremiumWorkspace({
   showAutoFurnish,
   onToggleAssetsPanel,
   showAssetsPanel,
-  onOpenCatalogue,
+  onOpenCatalog,
   stagedItems,
   // Selection tool props
   isSelectionMode,
@@ -379,10 +379,10 @@ export function PremiumWorkspace({
       group: 'panels',
     },
     {
-      id: 'catalogue',
+      id: 'catalog',
       icon: ShoppingCart,
-      label: 'Catalogue',
-      onClick: onOpenCatalogue,
+      label: 'Catalog',
+      onClick: onOpenCatalog,
       shortcut: 'C',
       group: 'panels',
     },
