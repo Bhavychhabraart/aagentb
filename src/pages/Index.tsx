@@ -141,6 +141,12 @@ const Index = () => {
   const [showCatalogueModal, setShowCatalogueModal] = useState(false);
   const [catalogItems, setCatalogItems] = useState<CatalogFurnitureItem[]>([]);
   
+  // Detection replacement tracking state
+  const [detectionReplacements, setDetectionReplacements] = useState<Map<string, CatalogFurnitureItem>>(new Map());
+  const [lockedDetections, setLockedDetections] = useState<Set<string>>(new Set());
+  const [replacingDetectionId, setReplacingDetectionId] = useState<string | null>(null);
+  const [replacingDetectionLabel, setReplacingDetectionLabel] = useState<string>('');
+  
   // Selection tool state
   const [selectionMode, setSelectionMode] = useState(false);
   const [currentSelection, setCurrentSelection] = useState<SelectionRegion | null>(null);
@@ -1454,21 +1460,133 @@ Ready to generate a render! Describe your vision.`;
     );
   }, []);
 
-  // Handle detection item action (replace, similar, remove)
+  // Handle detection item action (replace, similar, remove, lock)
   const handleDetectionAction = useCallback(async (
     item: DetectedItem,
-    action: 'replace' | 'similar' | 'custom' | 'remove'
+    action: 'replace' | 'similar' | 'custom' | 'remove' | 'lock'
   ) => {
-    if (action === 'replace') {
+    if (action === 'lock') {
+      // Toggle locked state
+      setLockedDetections(prev => {
+        const next = new Set(prev);
+        if (next.has(item.id)) {
+          next.delete(item.id);
+          toast({ title: 'Unlocked', description: `${item.label} can now be modified` });
+        } else {
+          next.add(item.id);
+          // Remove from replacements if locking
+          setDetectionReplacements(prevReplacements => {
+            const nextReplacements = new Map(prevReplacements);
+            nextReplacements.delete(item.id);
+            return nextReplacements;
+          });
+          toast({ title: 'Locked', description: `${item.label} will be kept as-is` });
+        }
+        return next;
+      });
+    } else if (action === 'replace') {
+      setReplacingDetectionId(item.id);
+      setReplacingDetectionLabel(item.label);
       setShowCatalogueModal(true);
-      toast({ title: item.label, description: 'Select a replacement from the catalogue' });
     } else if (action === 'similar') {
+      setReplacingDetectionId(item.id);
+      setReplacingDetectionLabel(item.label);
       setShowCatalogueModal(true);
       toast({ title: 'Find Similar', description: `Looking for items similar to ${item.label}` });
+    } else if (action === 'custom') {
+      toast({ title: 'Create Custom', description: `Creating custom ${item.label}` });
+      navigate('/custom-furniture');
     } else if (action === 'remove') {
       // Trigger erase action for the detected item
       await handleEraserAction(item);
     }
+  }, [toast, navigate]);
+
+  // Handle replacement selection from catalog
+  const handleReplacementSelect = useCallback((item: CatalogFurnitureItem) => {
+    if (replacingDetectionId) {
+      setDetectionReplacements(prev => {
+        const next = new Map(prev);
+        next.set(replacingDetectionId, item);
+        return next;
+      });
+      // Remove from locked if selecting replacement
+      setLockedDetections(prev => {
+        const next = new Set(prev);
+        next.delete(replacingDetectionId);
+        return next;
+      });
+      toast({ 
+        title: 'Replacement selected', 
+        description: `${item.name} will replace ${replacingDetectionLabel}` 
+      });
+    }
+    setShowCatalogueModal(false);
+    setReplacingDetectionId(null);
+    setReplacingDetectionLabel('');
+  }, [replacingDetectionId, replacingDetectionLabel, toast]);
+
+  // Handle apply furnish - apply all replacements
+  const handleApplyFurnish = useCallback(async () => {
+    if (!currentRenderUrl || detectionReplacements.size === 0) {
+      toast({ title: 'No changes to apply', description: 'Select replacements first' });
+      return;
+    }
+
+    setIsGenerating(true);
+    setIsAIDetectionActive(false);
+
+    try {
+      // Build prompt for all replacements
+      const replacementDescriptions = Array.from(detectionReplacements.entries()).map(([_, replacement]) => {
+        return replacement.name;
+      });
+
+      const prompt = `Replace the existing furniture with: ${replacementDescriptions.join(', ')}. Keep the room layout, lighting and style consistent.`;
+
+      // Use the edit-render flow with staged items
+      const response = await supabase.functions.invoke('edit-render', {
+        body: {
+          originalUrl: currentRenderUrl,
+          prompt,
+          stagedItems: Array.from(detectionReplacements.values()).map(item => ({
+            id: item.id,
+            name: item.name,
+            category: item.category,
+            imageUrl: item.imageUrl,
+          })),
+        },
+      });
+
+      if (response.error) throw response.error;
+
+      if (response.data?.editedUrl) {
+        setCurrentRenderUrl(response.data.editedUrl);
+        setAllRenderUrls(prev => [...prev, response.data.editedUrl]);
+        toast({ 
+          title: 'Furnish applied!', 
+          description: `Applied ${detectionReplacements.size} replacement${detectionReplacements.size > 1 ? 's' : ''}` 
+        });
+      }
+      
+      // Clear state
+      setDetectionReplacements(new Map());
+      setLockedDetections(new Set());
+      setSelectedDetections([]);
+    } catch (error) {
+      console.error('Furnish failed:', error);
+      toast({ variant: 'destructive', title: 'Failed to apply changes' });
+    } finally {
+      setIsGenerating(false);
+    }
+  }, [currentRenderUrl, detectionReplacements, toast]);
+
+  // Clear all detection selections
+  const handleClearDetectionState = useCallback(() => {
+    setDetectionReplacements(new Map());
+    setLockedDetections(new Set());
+    setSelectedDetections([]);
+    toast({ title: 'Cleared', description: 'All selections cleared' });
   }, [toast]);
 
   // Handle batch generation for multiple selected items
@@ -2735,6 +2853,15 @@ Ready to generate a render! Describe your vision.`;
               onItemSelect={handleDetectionSelect}
               onItemAction={handleDetectionAction}
               onBatchGenerate={handleBatchGenerate}
+              lockedItems={Array.from(lockedDetections)}
+              replacementItems={new Map(
+                Array.from(detectionReplacements.entries()).map(([id, item]) => [
+                  id,
+                  { name: item.name, imageUrl: item.imageUrl }
+                ])
+              )}
+              onApplyFurnish={handleApplyFurnish}
+              onClearAll={handleClearDetectionState}
             />
           )}
 
@@ -2878,11 +3005,18 @@ Ready to generate a render! Describe your vision.`;
       {/* Full-Screen Catalogue Modal */}
       <FullScreenCatalogModal
         isOpen={showCatalogueModal}
-        onClose={() => setShowCatalogueModal(false)}
+        onClose={() => {
+          setShowCatalogueModal(false);
+          setReplacingDetectionId(null);
+          setReplacingDetectionLabel('');
+        }}
         catalogItems={catalogItems}
         stagedItemIds={stagedItems.map(i => i.id)}
-        onToggleStage={handleCatalogItemSelect}
+        onToggleStage={replacingDetectionId ? handleReplacementSelect : handleCatalogItemSelect}
         onPreviewItem={handleCatalogItemPreview}
+        title={replacingDetectionId ? `Select replacement for "${replacingDetectionLabel}"` : undefined}
+        subtitle={replacingDetectionId ? 'Choose a furniture item to replace the detected piece' : undefined}
+        selectionMode={!!replacingDetectionId}
       />
     </div>
   </SidebarProvider>
