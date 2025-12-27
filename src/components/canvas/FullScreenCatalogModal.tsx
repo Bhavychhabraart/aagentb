@@ -209,6 +209,44 @@ export function FullScreenCatalogModal({
             </div>
           )}
         </div>
+
+        {/* Staged Items Summary Bar */}
+        {stagedItemIds.length > 0 && !selectionMode && (
+          <div className="shrink-0 p-4 bg-primary/5 border-t border-border">
+            <div className="flex items-center justify-between max-w-4xl mx-auto">
+              <div className="flex items-center gap-3">
+                <div className="flex -space-x-2">
+                  {catalogItems
+                    .filter(item => stagedItemIds.includes(item.id))
+                    .slice(0, 4)
+                    .map((item) => (
+                      <div
+                        key={item.id}
+                        className="w-8 h-8 rounded-full border-2 border-background overflow-hidden bg-muted"
+                      >
+                        {item.imageUrl ? (
+                          <img src={item.imageUrl} alt={item.name} className="w-full h-full object-cover" />
+                        ) : (
+                          <div className="w-full h-full bg-muted" />
+                        )}
+                      </div>
+                    ))}
+                  {stagedItemIds.length > 4 && (
+                    <div className="w-8 h-8 rounded-full border-2 border-background bg-muted flex items-center justify-center text-xs font-medium">
+                      +{stagedItemIds.length - 4}
+                    </div>
+                  )}
+                </div>
+                <span className="text-sm font-medium">
+                  {stagedItemIds.length} item{stagedItemIds.length !== 1 ? 's' : ''} staged
+                </span>
+              </div>
+              <Button onClick={onClose} className="btn-glow">
+                Done - Position Items
+              </Button>
+            </div>
+          </div>
+        )}
       </DialogContent>
     </Dialog>
   );

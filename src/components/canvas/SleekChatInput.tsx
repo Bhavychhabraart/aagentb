@@ -73,31 +73,48 @@ export function SleekChatInput({
   return (
     <TooltipProvider delayDuration={200}>
       <div className="space-y-2">
-        {/* Staged items indicator */}
+        {/* Staged items indicator with thumbnails */}
         {stagedItems.length > 0 && (
-          <div className="flex items-center gap-2 px-2 animate-fade-in">
-            <div className="flex items-center gap-1.5 px-2.5 py-1 bg-primary/10 rounded-full">
-              <Package className="h-3 w-3 text-primary" />
-              <span className="text-xs font-medium text-primary">
-                {stagedItems.length} item{stagedItems.length !== 1 ? 's' : ''} staged
+          <div className="flex items-center justify-between gap-3 px-3 py-2 bg-primary/10 rounded-xl border border-primary/20 animate-fade-in">
+            <div className="flex items-center gap-3 min-w-0">
+              {/* Thumbnail stack */}
+              <div className="flex -space-x-2 shrink-0">
+                {stagedItems.slice(0, 3).map((item) => (
+                  <div
+                    key={item.id}
+                    className="w-7 h-7 rounded-full border-2 border-background overflow-hidden bg-muted"
+                  >
+                    {item.imageUrl ? (
+                      <img src={item.imageUrl} alt={item.name} className="w-full h-full object-cover" />
+                    ) : (
+                      <div className="w-full h-full bg-muted" />
+                    )}
+                  </div>
+                ))}
+                {stagedItems.length > 3 && (
+                  <div className="w-7 h-7 rounded-full border-2 border-background bg-muted flex items-center justify-center text-[10px] font-medium">
+                    +{stagedItems.length - 3}
+                  </div>
+                )}
+              </div>
+              <span className="text-xs font-medium text-primary truncate">
+                {stagedItems.length} item{stagedItems.length !== 1 ? 's' : ''} ready to place
               </span>
             </div>
-            <div className="flex items-center gap-1">
+            <div className="flex items-center gap-1.5 shrink-0">
               <button
                 onClick={() => handleQuickAction('place')}
-                className="px-2 py-1 text-xs bg-muted/50 hover:bg-muted rounded-full transition-colors"
+                className="px-2.5 py-1 text-xs font-medium bg-primary/20 hover:bg-primary/30 text-primary rounded-lg transition-colors flex items-center gap-1"
               >
-                <span className="flex items-center gap-1">
-                  <Sparkles className="h-3 w-3" />
-                  Place these
-                </span>
+                <Sparkles className="h-3 w-3" />
+                Place these
               </button>
               {onOpenCatalogue && (
                 <button
                   onClick={onOpenCatalogue}
-                  className="px-2 py-1 text-xs text-muted-foreground hover:text-foreground hover:bg-muted/50 rounded-full transition-colors"
+                  className="px-2 py-1 text-xs text-muted-foreground hover:text-foreground hover:bg-muted/50 rounded-lg transition-colors"
                 >
-                  + Add more
+                  Edit
                 </button>
               )}
             </div>

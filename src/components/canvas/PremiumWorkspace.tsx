@@ -167,6 +167,7 @@ export function PremiumWorkspace({
   onToggleAssetsPanel,
   showAssetsPanel,
   onOpenCatalogue,
+  stagedItems,
   // Selection tool props
   isSelectionMode,
   onSelectionComplete,
@@ -352,13 +353,16 @@ export function PremiumWorkspace({
     },
   ];
 
+  const stagedItemsCount = stagedItems?.length || 0;
+
   const placementTools: ToolbarItem[] = [
     {
       id: 'position',
       icon: Move,
-      label: 'Position',
+      label: stagedItemsCount > 0 ? `Position (${stagedItemsCount})` : 'Position',
       onClick: onPositionFurniture,
-      disabled: !onPositionFurniture,
+      disabled: !onPositionFurniture || stagedItemsCount === 0,
+      active: stagedItemsCount > 0,
       shortcut: 'P',
       group: 'placement',
     },
