@@ -35,6 +35,7 @@ import { AutoFurnishPanel } from '@/components/canvas/AutoFurnishPanel';
 import { FullScreenCatalogModal } from '@/components/canvas/FullScreenCatalogModal';
 import { Button } from '@/components/ui/button';
 import { Move, Plus } from 'lucide-react';
+import { cropZoneFromRender } from '@/utils/cropZoneImage';
 import {
   getMemorySettings,
   setMemoryEnabled,
@@ -2353,7 +2354,23 @@ Ready to generate a render! Describe your vision.`;
 
       if (renderError) throw renderError;
 
-      const zonePrompt = `Generate a ${viewLabel.toLowerCase()} view of this specific zone: "${zone.name}". Focus on the area from ${zone.x_start.toFixed(0)}% to ${zone.x_end.toFixed(0)}% horizontally and ${zone.y_start.toFixed(0)}% to ${zone.y_end.toFixed(0)}% vertically.`;
+      // Crop the zone from the current render to provide visual reference
+      await addMessage('user', `🎯 Cropping zone "${zone.name}" for accurate rendering...`, { type: 'text' });
+      
+      let zoneImageBase64: string | null = null;
+      try {
+        zoneImageBase64 = await cropZoneFromRender(currentRenderUrl, {
+          x: zone.x_start,
+          y: zone.y_start,
+          width: zone.x_end - zone.x_start,
+          height: zone.y_end - zone.y_start,
+        });
+        console.log('Zone cropped successfully, sending to AI for accurate reproduction');
+      } catch (cropError) {
+        console.warn('Failed to crop zone, proceeding without visual reference:', cropError);
+      }
+
+      const zonePrompt = `Generate a ${viewLabel.toLowerCase()} view showing EXACTLY the content from the cropped zone image. Zone: "${zone.name}".`;
 
       await addMessage('user', `🎯 Generating ${viewLabel} view for zone: ${zone.name}...`, { type: 'text' });
 
@@ -2372,6 +2389,7 @@ Ready to generate a render! Describe your vision.`;
             width: zone.x_end - zone.x_start,
             height: zone.y_end - zone.y_start,
           },
+          zoneImageBase64: zoneImageBase64, // Pass cropped zone as visual reference
           viewType: viewType,
           styleRefUrls: styleRefUrls,
         }),
