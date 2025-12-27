@@ -1,5 +1,11 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { cn } from '@/lib/utils';
+import { 
+  getContainedImageBounds, 
+  pixelToImagePercentage,
+  imagePercentageToPixel,
+  type ImageBounds 
+} from '@/utils/imageContainBounds';
 
 export interface SelectionRegion {
   x: number;      // % from left (0-100)
@@ -16,32 +22,67 @@ interface SelectionOverlayProps {
 
 export function SelectionOverlay({ imageUrl, onSelectionComplete, isActive }: SelectionOverlayProps) {
   const containerRef = useRef<HTMLDivElement>(null);
+  const imgRef = useRef<HTMLImageElement>(null);
   const [isDrawing, setIsDrawing] = useState(false);
   const [startPoint, setStartPoint] = useState<{ x: number; y: number } | null>(null);
   const [currentSelection, setCurrentSelection] = useState<SelectionRegion | null>(null);
+  const [imageBounds, setImageBounds] = useState<ImageBounds | null>(null);
 
-  // Convert pixel coordinates to percentage
-  const toPercentage = useCallback((clientX: number, clientY: number) => {
-    if (!containerRef.current) return { x: 0, y: 0 };
-    const rect = containerRef.current.getBoundingClientRect();
-    return {
-      x: Math.max(0, Math.min(100, ((clientX - rect.left) / rect.width) * 100)),
-      y: Math.max(0, Math.min(100, ((clientY - rect.top) / rect.height) * 100)),
-    };
+  // Calculate actual image bounds when image loads or container resizes
+  const calculateBounds = useCallback(() => {
+    if (!containerRef.current || !imgRef.current) return;
+    
+    const containerRect = containerRef.current.getBoundingClientRect();
+    const naturalWidth = imgRef.current.naturalWidth;
+    const naturalHeight = imgRef.current.naturalHeight;
+    
+    if (naturalWidth === 0 || naturalHeight === 0) return;
+    
+    const bounds = getContainedImageBounds(
+      containerRect.width,
+      containerRect.height,
+      naturalWidth,
+      naturalHeight
+    );
+    setImageBounds(bounds);
   }, []);
 
+  // Set up ResizeObserver to recalculate bounds on resize
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+    
+    const observer = new ResizeObserver(calculateBounds);
+    observer.observe(container);
+    
+    return () => observer.disconnect();
+  }, [calculateBounds]);
+
+  // Convert pixel coordinates to percentage relative to actual image
+  const toPercentage = useCallback((clientX: number, clientY: number) => {
+    if (!containerRef.current || !imageBounds) return null;
+    
+    const rect = containerRef.current.getBoundingClientRect();
+    return pixelToImagePercentage(clientX, clientY, rect, imageBounds);
+  }, [imageBounds]);
+
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
-    if (!isActive) return;
+    if (!isActive || !imageBounds) return;
     e.preventDefault();
+    
     const point = toPercentage(e.clientX, e.clientY);
+    if (!point) return; // Click was in letterbox area
+    
     setStartPoint(point);
     setIsDrawing(true);
     setCurrentSelection(null);
-  }, [isActive, toPercentage]);
+  }, [isActive, imageBounds, toPercentage]);
 
   const handleMouseMove = useCallback((e: React.MouseEvent) => {
-    if (!isDrawing || !startPoint) return;
+    if (!isDrawing || !startPoint || !imageBounds) return;
+    
     const current = toPercentage(e.clientX, e.clientY);
+    if (!current) return;
     
     const x = Math.min(startPoint.x, current.x);
     const y = Math.min(startPoint.y, current.y);
@@ -49,13 +90,12 @@ export function SelectionOverlay({ imageUrl, onSelectionComplete, isActive }: Se
     const height = Math.abs(current.y - startPoint.y);
     
     setCurrentSelection({ x, y, width, height });
-  }, [isDrawing, startPoint, toPercentage]);
+  }, [isDrawing, startPoint, imageBounds, toPercentage]);
 
   const handleMouseUp = useCallback(() => {
     if (isDrawing && currentSelection && currentSelection.width > 2 && currentSelection.height > 2) {
       onSelectionComplete(currentSelection);
     } else if (isDrawing) {
-      // Too small selection, clear it
       setCurrentSelection(null);
       onSelectionComplete(null);
     }
@@ -72,6 +112,27 @@ export function SelectionOverlay({ imageUrl, onSelectionComplete, isActive }: Se
     }
   }, [isActive]);
 
+  // Calculate pixel positions for rendering overlays
+  const getSelectionStyle = useCallback(() => {
+    if (!currentSelection || !imageBounds) return null;
+    
+    const topLeft = imagePercentageToPixel(currentSelection.x, currentSelection.y, imageBounds);
+    const bottomRight = imagePercentageToPixel(
+      currentSelection.x + currentSelection.width, 
+      currentSelection.y + currentSelection.height, 
+      imageBounds
+    );
+    
+    return {
+      left: topLeft.x,
+      top: topLeft.y,
+      width: bottomRight.x - topLeft.x,
+      height: bottomRight.y - topLeft.y,
+    };
+  }, [currentSelection, imageBounds]);
+
+  const selectionStyle = getSelectionStyle();
+
   return (
     <div 
       ref={containerRef}
@@ -84,35 +145,56 @@ export function SelectionOverlay({ imageUrl, onSelectionComplete, isActive }: Se
       onMouseUp={handleMouseUp}
       onMouseLeave={handleMouseUp}
     >
-      {/* Darkened overlay outside selection */}
-      {currentSelection && (
+      {/* Hidden image to get natural dimensions */}
+      <img
+        ref={imgRef}
+        src={imageUrl}
+        alt=""
+        className="absolute opacity-0 pointer-events-none"
+        onLoad={calculateBounds}
+      />
+
+      {/* Darkened overlay outside selection - positioned relative to actual image */}
+      {selectionStyle && imageBounds && (
         <>
           {/* Top dark region */}
           <div 
-            className="absolute bg-black/50 left-0 right-0 top-0"
-            style={{ height: `${currentSelection.y}%` }}
+            className="absolute bg-black/50"
+            style={{ 
+              left: imageBounds.x,
+              top: imageBounds.y,
+              width: imageBounds.width,
+              height: selectionStyle.top - imageBounds.y
+            }}
           />
           {/* Bottom dark region */}
           <div 
-            className="absolute bg-black/50 left-0 right-0 bottom-0"
-            style={{ height: `${100 - currentSelection.y - currentSelection.height}%` }}
+            className="absolute bg-black/50"
+            style={{ 
+              left: imageBounds.x,
+              top: selectionStyle.top + selectionStyle.height,
+              width: imageBounds.width,
+              height: (imageBounds.y + imageBounds.height) - (selectionStyle.top + selectionStyle.height)
+            }}
           />
           {/* Left dark region */}
           <div 
-            className="absolute bg-black/50 left-0"
+            className="absolute bg-black/50"
             style={{ 
-              top: `${currentSelection.y}%`,
-              height: `${currentSelection.height}%`,
-              width: `${currentSelection.x}%`
+              left: imageBounds.x,
+              top: selectionStyle.top,
+              width: selectionStyle.left - imageBounds.x,
+              height: selectionStyle.height
             }}
           />
           {/* Right dark region */}
           <div 
-            className="absolute bg-black/50 right-0"
+            className="absolute bg-black/50"
             style={{ 
-              top: `${currentSelection.y}%`,
-              height: `${currentSelection.height}%`,
-              width: `${100 - currentSelection.x - currentSelection.width}%`
+              left: selectionStyle.left + selectionStyle.width,
+              top: selectionStyle.top,
+              width: (imageBounds.x + imageBounds.width) - (selectionStyle.left + selectionStyle.width),
+              height: selectionStyle.height
             }}
           />
           
@@ -124,10 +206,10 @@ export function SelectionOverlay({ imageUrl, onSelectionComplete, isActive }: Se
               isDrawing && "animate-pulse"
             )}
             style={{
-              left: `${currentSelection.x}%`,
-              top: `${currentSelection.y}%`,
-              width: `${currentSelection.width}%`,
-              height: `${currentSelection.height}%`,
+              left: selectionStyle.left,
+              top: selectionStyle.top,
+              width: selectionStyle.width,
+              height: selectionStyle.height,
             }}
           >
             {/* Corner handles */}
@@ -138,7 +220,7 @@ export function SelectionOverlay({ imageUrl, onSelectionComplete, isActive }: Se
             
             {/* Dimension label */}
             <div className="absolute -bottom-8 left-1/2 -translate-x-1/2 px-2 py-1 bg-primary text-primary-foreground text-xs font-mono rounded whitespace-nowrap">
-              {Math.round(currentSelection.width)}% × {Math.round(currentSelection.height)}%
+              {Math.round(currentSelection!.width)}% × {Math.round(currentSelection!.height)}%
             </div>
           </div>
         </>

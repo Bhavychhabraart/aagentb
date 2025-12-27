@@ -1,8 +1,14 @@
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 import { Square, X, Check, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
+import { 
+  getContainedImageBounds, 
+  pixelToImagePercentage,
+  imagePercentageToPixel,
+  type ImageBounds 
+} from '@/utils/imageContainBounds';
 
 export interface Zone {
   id: string;
@@ -36,34 +42,70 @@ export function ZoneSelector({
   onDrawingChange,
 }: ZoneSelectorProps) {
   const containerRef = useRef<HTMLDivElement>(null);
+  const imgRef = useRef<HTMLImageElement>(null);
   const [drawStart, setDrawStart] = useState<{ x: number; y: number } | null>(null);
   const [drawCurrent, setDrawCurrent] = useState<{ x: number; y: number } | null>(null);
   const [newZoneName, setNewZoneName] = useState('');
   const [showNameInput, setShowNameInput] = useState(false);
   const [pendingZone, setPendingZone] = useState<Omit<Zone, 'id' | 'name'> | null>(null);
+  const [imageBounds, setImageBounds] = useState<ImageBounds | null>(null);
 
-  const getPercentageCoords = useCallback((clientX: number, clientY: number) => {
-    if (!containerRef.current) return { x: 0, y: 0 };
-    const rect = containerRef.current.getBoundingClientRect();
-    return {
-      x: Math.max(0, Math.min(100, ((clientX - rect.left) / rect.width) * 100)),
-      y: Math.max(0, Math.min(100, ((clientY - rect.top) / rect.height) * 100)),
-    };
+  // Calculate actual image bounds
+  const calculateBounds = useCallback(() => {
+    if (!containerRef.current || !imgRef.current) return;
+    
+    const containerRect = containerRef.current.getBoundingClientRect();
+    const naturalWidth = imgRef.current.naturalWidth;
+    const naturalHeight = imgRef.current.naturalHeight;
+    
+    if (naturalWidth === 0 || naturalHeight === 0) return;
+    
+    const bounds = getContainedImageBounds(
+      containerRect.width,
+      containerRect.height,
+      naturalWidth,
+      naturalHeight
+    );
+    setImageBounds(bounds);
   }, []);
 
+  // Set up ResizeObserver
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+    
+    const observer = new ResizeObserver(calculateBounds);
+    observer.observe(container);
+    
+    return () => observer.disconnect();
+  }, [calculateBounds]);
+
+  const getPercentageCoords = useCallback((clientX: number, clientY: number) => {
+    if (!containerRef.current || !imageBounds) return null;
+    
+    const rect = containerRef.current.getBoundingClientRect();
+    return pixelToImagePercentage(clientX, clientY, rect, imageBounds);
+  }, [imageBounds]);
+
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
-    if (!isDrawing) return;
+    if (!isDrawing || !imageBounds) return;
     e.preventDefault();
+    
     const coords = getPercentageCoords(e.clientX, e.clientY);
+    if (!coords) return; // Click was in letterbox area
+    
     setDrawStart(coords);
     setDrawCurrent(coords);
-  }, [isDrawing, getPercentageCoords]);
+  }, [isDrawing, imageBounds, getPercentageCoords]);
 
   const handleMouseMove = useCallback((e: React.MouseEvent) => {
-    if (!isDrawing || !drawStart) return;
+    if (!isDrawing || !drawStart || !imageBounds) return;
+    
     const coords = getPercentageCoords(e.clientX, e.clientY);
-    setDrawCurrent(coords);
-  }, [isDrawing, drawStart, getPercentageCoords]);
+    if (coords) {
+      setDrawCurrent(coords);
+    }
+  }, [isDrawing, drawStart, imageBounds, getPercentageCoords]);
 
   const handleMouseUp = useCallback(() => {
     if (!isDrawing || !drawStart || !drawCurrent) return;
@@ -103,13 +145,38 @@ export function ZoneSelector({
     setNewZoneName('');
   };
 
-  // Calculate current draw rectangle
-  const currentRect = drawStart && drawCurrent ? {
-    left: `${Math.min(drawStart.x, drawCurrent.x)}%`,
-    top: `${Math.min(drawStart.y, drawCurrent.y)}%`,
-    width: `${Math.abs(drawCurrent.x - drawStart.x)}%`,
-    height: `${Math.abs(drawCurrent.y - drawStart.y)}%`,
-  } : null;
+  // Calculate pixel style for a zone from percentage coordinates
+  const getZoneStyle = useCallback((zone: { x_start: number; y_start: number; x_end: number; y_end: number }) => {
+    if (!imageBounds) return null;
+    
+    const topLeft = imagePercentageToPixel(zone.x_start, zone.y_start, imageBounds);
+    const bottomRight = imagePercentageToPixel(zone.x_end, zone.y_end, imageBounds);
+    
+    return {
+      left: topLeft.x,
+      top: topLeft.y,
+      width: bottomRight.x - topLeft.x,
+      height: bottomRight.y - topLeft.y,
+    };
+  }, [imageBounds]);
+
+  // Calculate current draw rectangle in pixels
+  const currentRect = drawStart && drawCurrent && imageBounds ? (() => {
+    const x1 = Math.min(drawStart.x, drawCurrent.x);
+    const y1 = Math.min(drawStart.y, drawCurrent.y);
+    const x2 = Math.max(drawStart.x, drawCurrent.x);
+    const y2 = Math.max(drawStart.y, drawCurrent.y);
+    
+    const topLeft = imagePercentageToPixel(x1, y1, imageBounds);
+    const bottomRight = imagePercentageToPixel(x2, y2, imageBounds);
+    
+    return {
+      left: topLeft.x,
+      top: topLeft.y,
+      width: bottomRight.x - topLeft.x,
+      height: bottomRight.y - topLeft.y,
+    };
+  })() : null;
 
   return (
     <div className="relative w-full h-full">
@@ -125,64 +192,66 @@ export function ZoneSelector({
         onMouseLeave={handleMouseUp}
       >
         <img
+          ref={imgRef}
           src={imageUrl}
           alt="Room render"
           className="w-full h-full object-contain"
           draggable={false}
+          onLoad={calculateBounds}
         />
 
         {/* Existing zones */}
-        {zones.map((zone) => (
-          <div
-            key={zone.id}
-            className={cn(
-              "absolute border-2 transition-all cursor-pointer group",
-              selectedZoneId === zone.id
-                ? "border-primary bg-primary/20"
-                : "border-amber-500/70 bg-amber-500/10 hover:border-amber-400 hover:bg-amber-500/20"
-            )}
-            style={{
-              left: `${zone.x_start}%`,
-              top: `${zone.y_start}%`,
-              width: `${zone.x_end - zone.x_start}%`,
-              height: `${zone.y_end - zone.y_start}%`,
-            }}
-            onClick={(e) => {
-              e.stopPropagation();
-              onZoneSelect(zone);
-            }}
-          >
-            {/* Zone label */}
-            <div className="absolute top-1 left-1 px-2 py-0.5 bg-black/70 rounded text-xs text-white font-medium">
-              {zone.name}
-            </div>
-            {/* Delete button */}
-            <Button
-              variant="ghost"
-              size="icon"
-              className="absolute top-1 right-1 h-5 w-5 bg-black/70 hover:bg-red-600 text-white opacity-0 group-hover:opacity-100 transition-opacity"
+        {zones.map((zone) => {
+          const style = getZoneStyle(zone);
+          if (!style) return null;
+          
+          return (
+            <div
+              key={zone.id}
+              className={cn(
+                "absolute border-2 transition-all cursor-pointer group",
+                selectedZoneId === zone.id
+                  ? "border-primary bg-primary/20"
+                  : "border-amber-500/70 bg-amber-500/10 hover:border-amber-400 hover:bg-amber-500/20"
+              )}
+              style={style}
               onClick={(e) => {
                 e.stopPropagation();
-                onZoneDelete(zone.id);
+                onZoneSelect(zone);
               }}
             >
-              <Trash2 className="h-3 w-3" />
-            </Button>
-          </div>
-        ))}
+              {/* Zone label */}
+              <div className="absolute top-1 left-1 px-2 py-0.5 bg-black/70 rounded text-xs text-white font-medium">
+                {zone.name}
+              </div>
+              {/* Delete button */}
+              <Button
+                variant="ghost"
+                size="icon"
+                className="absolute top-1 right-1 h-5 w-5 bg-black/70 hover:bg-red-600 text-white opacity-0 group-hover:opacity-100 transition-opacity"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onZoneDelete(zone.id);
+                }}
+              >
+                <Trash2 className="h-3 w-3" />
+              </Button>
+            </div>
+          );
+        })}
 
         {/* Pending zone being drawn */}
-        {pendingZone && (
-          <div
-            className="absolute border-2 border-dashed border-green-500 bg-green-500/20"
-            style={{
-              left: `${pendingZone.x_start}%`,
-              top: `${pendingZone.y_start}%`,
-              width: `${pendingZone.x_end - pendingZone.x_start}%`,
-              height: `${pendingZone.y_end - pendingZone.y_start}%`,
-            }}
-          />
-        )}
+        {pendingZone && (() => {
+          const style = getZoneStyle(pendingZone);
+          if (!style) return null;
+          
+          return (
+            <div
+              className="absolute border-2 border-dashed border-green-500 bg-green-500/20"
+              style={style}
+            />
+          );
+        })()}
 
         {/* Current drawing rectangle */}
         {currentRect && (
