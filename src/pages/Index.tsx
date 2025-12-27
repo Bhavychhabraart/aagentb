@@ -839,6 +839,33 @@ Ready to generate a render! Describe your vision.`;
       // Fetch project references for layout and style consistency
       const references = await fetchProjectReferences(currentProjectId);
 
+      // NEW: Analyze layout for 111% accuracy mode if layout exists
+      let layoutAnalysis = null;
+      if (references.layoutUrl) {
+        try {
+          await addMessage('assistant', 'Analyzing layout for precise positioning...', { type: 'text', status: 'pending' });
+          
+          const analysisResponse = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/analyze-layout`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+            },
+            body: JSON.stringify({ layoutImageUrl: references.layoutUrl }),
+          });
+          
+          if (analysisResponse.ok) {
+            const analysisData = await analysisResponse.json();
+            layoutAnalysis = analysisData.analysis;
+            console.log('Layout analysis complete for edit:', layoutAnalysis?.roomShape, layoutAnalysis?.dimensions);
+          } else {
+            console.warn('Layout analysis failed for edit, proceeding without:', await analysisResponse.text());
+          }
+        } catch (analysisError) {
+          console.warn('Layout analysis error for edit, proceeding without:', analysisError);
+        }
+      }
+
       // Create render record with parent reference
       const { data: renderRecord, error: renderError } = await supabase
         .from('renders')
@@ -860,9 +887,11 @@ Ready to generate a render! Describe your vision.`;
       const furnitureNames = furnitureItems.map(i => i.name).join(', ');
       
       await addMessage('assistant', 
-        hasFurniture 
-          ? `Editing render: replacing furniture with ${furnitureNames}...`
-          : `Editing render: "${content}"...`, 
+        layoutAnalysis
+          ? `Layout analyzed: ${layoutAnalysis.roomShape} room. Editing with 111% accuracy...`
+          : (hasFurniture 
+            ? `Editing render: replacing furniture with ${furnitureNames}...`
+            : `Editing render: "${content}"...`), 
         { type: 'text', status: 'pending' }
       );
 
@@ -887,6 +916,8 @@ Ready to generate a render! Describe your vision.`;
           styleRefUrls: references.styleRefUrls,
           // NEW: Signal text-only edit mode when no furniture
           textOnlyEdit: !hasFurniture,
+          // NEW: Pass layout analysis for 111% accuracy mode
+          layoutAnalysis,
         }),
       });
 
@@ -962,6 +993,33 @@ Ready to generate a render! Describe your vision.`;
         productCount: allProducts.length,
       });
 
+      // NEW: Analyze layout for 111% accuracy mode if layout exists
+      let layoutAnalysis = null;
+      if (references.layoutUrl) {
+        try {
+          await addMessage('assistant', 'Analyzing layout for precise positioning...', { type: 'text', status: 'pending' });
+          
+          const analysisResponse = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/analyze-layout`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+            },
+            body: JSON.stringify({ layoutImageUrl: references.layoutUrl }),
+          });
+          
+          if (analysisResponse.ok) {
+            const analysisData = await analysisResponse.json();
+            layoutAnalysis = analysisData.analysis;
+            console.log('Layout analysis complete:', layoutAnalysis?.roomShape, layoutAnalysis?.dimensions);
+          } else {
+            console.warn('Layout analysis failed, proceeding without:', await analysisResponse.text());
+          }
+        } catch (analysisError) {
+          console.warn('Layout analysis error, proceeding without:', analysisError);
+        }
+      }
+
       // Build enhanced prompt with furniture context
       let enhancedPrompt = content;
       if (allProducts.length > 0) {
@@ -988,14 +1046,17 @@ Ready to generate a render! Describe your vision.`;
 
       const refInfo = [
         references.layoutUrl ? 'layout' : null,
+        layoutAnalysis ? '111% accuracy' : null,
         references.roomPhotoUrl ? 'room photo' : null,
         references.styleRefUrls.length > 0 ? `${references.styleRefUrls.length} style ref${references.styleRefUrls.length > 1 ? 's' : ''}` : null,
         allProducts.length > 0 ? `${allProducts.length} product${allProducts.length > 1 ? 's' : ''}` : null,
       ].filter(Boolean).join(', ');
 
-      await addMessage('assistant', allProducts.length > 0 
-        ? `Generating your render with ${allProducts.length} product${allProducts.length > 1 ? 's' : ''}${refInfo ? ` using ${refInfo}` : ''}...`
-        : `Generating your render${refInfo ? ` using ${refInfo}` : ''}...`, 
+      await addMessage('assistant', layoutAnalysis 
+        ? `Layout analyzed: ${layoutAnalysis.roomShape} room (${layoutAnalysis.dimensions?.width}×${layoutAnalysis.dimensions?.depth}ft). Generating precise render...`
+        : (allProducts.length > 0 
+          ? `Generating your render with ${allProducts.length} product${allProducts.length > 1 ? 's' : ''}${refInfo ? ` using ${refInfo}` : ''}...`
+          : `Generating your render${refInfo ? ` using ${refInfo}` : ''}...`), 
         { type: 'text', status: 'pending' }
       );
 
@@ -1012,6 +1073,8 @@ Ready to generate a render! Describe your vision.`;
           roomPhotoUrl: references.roomPhotoUrl,
           styleRefUrls: references.styleRefUrls,
           furnitureItems: allProducts,
+          // NEW: Pass layout analysis for 111% accuracy mode
+          layoutAnalysis,
         }),
       });
 

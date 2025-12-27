@@ -85,15 +85,15 @@ serve(async (req) => {
 
     console.log('Analyzing layout:', layoutImageUrl.substring(0, 100) + '...');
 
-    const analysisPrompt = `You are an expert architectural floor plan analyzer. Analyze this 2D floor plan image and extract precise structural data.
+    const analysisPrompt = `You are an expert architectural floor plan analyzer with millimeter-level precision. Analyze this 2D floor plan image and extract EXACT structural data for 3D render generation.
 
 TASK: Parse this floor plan and output a JSON object with the following structure:
 
 {
   "roomShape": "rectangular" | "L-shaped" | "square" | "irregular",
   "dimensions": {
-    "width": <number in feet>,
-    "depth": <number in feet>,
+    "width": <number in feet - EXACT measurement>,
+    "depth": <number in feet - EXACT measurement>,
     "height": 9,
     "unit": "feet"
   },
@@ -101,17 +101,17 @@ TASK: Parse this floor plan and output a JSON object with the following structur
   "walls": [
     {
       "position": "north" | "south" | "east" | "west",
-      "length": <feet>,
+      "length": <feet - EXACT>,
       "features": [
-        { "type": "window" | "door" | "opening", "positionPercent": <0-100>, "widthPercent": <0-100> }
+        { "type": "window" | "door" | "opening", "positionPercent": <0-100 PRECISE>, "widthPercent": <0-100 PRECISE> }
       ]
     }
   ],
   "windows": [
     {
       "wall": "north" | "south" | "east" | "west",
-      "positionPercent": <0-100 from left edge of wall>,
-      "widthPercent": <percentage of wall width>,
+      "positionPercent": <0-100 from LEFT edge of wall - EXACT center position>,
+      "widthPercent": <EXACT percentage of wall width>,
       "heightPercent": 60,
       "type": "standard" | "floor-to-ceiling" | "bay"
     }
@@ -119,8 +119,8 @@ TASK: Parse this floor plan and output a JSON object with the following structur
   "doors": [
     {
       "wall": "north" | "south" | "east" | "west",
-      "positionPercent": <0-100>,
-      "widthPercent": <percentage>,
+      "positionPercent": <0-100 EXACT center position>,
+      "widthPercent": <EXACT percentage>,
       "type": "single" | "double" | "sliding",
       "swingDirection": "inward" | "outward" | "left" | "right"
     }
@@ -129,29 +129,44 @@ TASK: Parse this floor plan and output a JSON object with the following structur
     {
       "name": "seating_area",
       "label": "Primary Seating",
-      "xStart": <0-100>,
-      "xEnd": <0-100>,
-      "yStart": <0-100>,
-      "yEnd": <0-100>,
+      "xStart": <0-100 EXACT left edge>,
+      "xEnd": <0-100 EXACT right edge>,
+      "yStart": <0-100 EXACT top edge>,
+      "yEnd": <0-100 EXACT bottom edge>,
       "suggestedItems": ["sofa", "coffee table", "armchair"]
     }
   ],
   "cameraRecommendation": {
     "position": "southeast" | "southwest" | "northeast" | "northwest",
     "angle": <degrees from north, 0-360>,
-    "height": "eye-level",
-    "fov": "wide" | "standard"
+    "height": "elevated",
+    "fov": "wide"
   },
   "gridOverlay": "<ASCII art grid showing room layout with zones marked>"
 }
 
+PRECISION REQUIREMENTS (111% ACCURACY MODE):
+1. All position percentages MUST be within 2% accuracy of visual placement in the floor plan
+2. Measure horizontal positions from the LEFT edge (0%) to RIGHT edge (100%)
+3. Measure vertical positions from the TOP (0% = north) to BOTTOM (100% = south)
+4. Furniture zones should encompass the EXACT footprint shown, not estimated areas
+5. Window/door positions are measured to their CENTER point
+6. Use pixel-level analysis - count pixels if necessary to determine exact percentages
+
+VALIDATION RULES:
+1. Total window/door widthPercent on any single wall CANNOT exceed 100%
+2. Furniture zones CANNOT overlap (check xStart/xEnd and yStart/yEnd ranges)
+3. Room dimensions should be realistic: 8-40ft typical for residential
+4. All percentages must be between 0 and 100
+5. If furniture is shown in the layout, create zones that EXACTLY match the furniture footprints
+
 ANALYSIS RULES:
 1. ORIENTATION: Assume the top of the floor plan is NORTH
-2. MEASUREMENTS: If dimensions are shown, use them. Otherwise estimate based on standard furniture sizes shown
-3. POSITIONS: All positions are percentages (0-100) from the LEFT edge of each wall
-4. FURNITURE ZONES: Identify logical zones based on furniture placement shown or room function
-5. CAMERA: Recommend the best camera angle for a 3D render (usually a corner view)
-6. Be PRECISE - this data will be used to generate accurate 3D renders
+2. MEASUREMENTS: If dimensions are shown, use them EXACTLY. Otherwise estimate based on standard furniture sizes (sofa=7ft, dining table=4ft, bed=6.5ft)
+3. POSITIONS: All positions are percentages (0-100) from the LEFT edge of each wall for horizontal, TOP for vertical
+4. FURNITURE ZONES: Trace the EXACT boundary of each furniture piece or grouping shown
+5. CAMERA: For isometric renders, recommend corner views (southeast/southwest preferred for typical living rooms)
+6. Be MILLIMETER PRECISE - this data controls exact 3D render placement
 
 OUTPUT: Return ONLY the JSON object, no other text.`;
 
