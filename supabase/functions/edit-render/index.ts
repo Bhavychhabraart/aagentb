@@ -101,7 +101,8 @@ serve(async (req) => {
       referenceImageUrl, // NEW: Reference image for uploads mode
       textOnlyEdit = false, // NEW: For text-only edits without furniture
       focusRegion, // For zone-focused camera views { x, y, width, height } as percentages
-      viewType = 'detail' // Type of camera view: detail, cinematic, eye-level, dramatic, bird-eye
+      viewType = 'detail', // Type of camera view: detail, cinematic, eye-level, dramatic, bird-eye
+      zoneImageBase64, // NEW: Cropped zone image for accurate zone reproduction
     } = await req.json();
     
     const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
@@ -208,26 +209,86 @@ Output: The edited room image with the requested changes applied.`;
     // Handle ZONE FOCUS / CAMERA VIEW mode - for generating focused views of specific regions
     if (focusRegion && userPrompt && !maskRegion) {
       console.log('Using ZONE FOCUS mode with viewType:', viewType);
+      console.log('Zone image provided:', zoneImageBase64 ? 'yes (base64)' : 'no');
       
       const content: Array<{ type: string; text?: string; image_url?: { url: string } }> = [];
+      let imageIndex = 1;
       
-      // Add the current render
+      // IMAGE 1: Full room render (for context)
       content.push({ type: 'image_url', image_url: { url: currentRenderUrl } });
+      const fullRoomIndex = imageIndex++;
+      
+      // IMAGE 2: Cropped zone image (the EXACT content to reproduce) - if provided
+      let zoneIndex: number | null = null;
+      if (zoneImageBase64) {
+        content.push({ type: 'image_url', image_url: { url: zoneImageBase64 } });
+        zoneIndex = imageIndex++;
+        console.log('Added cropped zone image as IMAGE', zoneIndex);
+      }
       
       // Build view-specific camera instructions
       const viewInstructions: Record<string, string> = {
-        'detail': 'Generate a detailed close-up view, as if moving closer to capture fine details and textures.',
-        'cinematic': 'Generate a cinematic wide-angle view with dramatic depth of field, atmospheric lighting, and professional film composition. Think Hollywood movie still.',
-        'eye-level': 'Generate an eye-level perspective as if standing in the room looking at this area. Natural human viewpoint at approximately 5.5 feet height.',
-        'dramatic': 'Generate a dramatic low-angle hero shot that makes this area look impressive and grand. Emphasize scale and grandeur.',
-        'bird-eye': 'Generate an elevated bird-eye overview looking down at this area from above, showing the spatial arrangement clearly.',
+        'detail': 'Create a detailed close-up view that shows the fine details and textures clearly.',
+        'cinematic': 'Create a cinematic view with dramatic depth of field and atmospheric lighting.',
+        'eye-level': 'Create an eye-level perspective as if standing in the room looking at this area.',
+        'dramatic': 'Create a dramatic low-angle hero shot emphasizing scale and grandeur.',
+        'bird-eye': 'Create an elevated bird-eye view looking down at this area from above.',
       };
       
       const viewInstruction = viewInstructions[viewType] || viewInstructions['detail'];
       
-      const zonePrompt = `You are a professional interior photography director. Create a new camera view of this room focusing on a specific zone.
+      // Build prompt based on whether we have the cropped zone image
+      let zonePrompt: string;
+      
+      if (zoneIndex) {
+        // We have the cropped zone - use it as the primary reference
+        zonePrompt = `You are a precise interior visualization specialist. Create an enhanced detailed view of a specific zone.
 
-CURRENT ROOM IMAGE: The attached image shows the full room.
+IMAGES PROVIDED:
+- IMAGE ${fullRoomIndex}: Full room render (for overall context and style reference)
+- IMAGE ${zoneIndex}: CROPPED ZONE IMAGE - THIS IS THE EXACT CONTENT YOU MUST REPRODUCE
+
+YOUR TASK:
+Create a ${viewInstruction.toLowerCase()} This view must show the EXACT same content as IMAGE ${zoneIndex}.
+
+═══════════════════════════════════════════════════════════════
+CRITICAL REQUIREMENTS - READ CAREFULLY:
+═══════════════════════════════════════════════════════════════
+
+1. CONTENT ACCURACY (HIGHEST PRIORITY):
+   - The output MUST show the EXACT SAME furniture, objects, and elements as IMAGE ${zoneIndex}
+   - Do NOT add any new furniture or objects
+   - Do NOT remove any furniture or objects
+   - Do NOT change the position or arrangement of anything
+   - This is a DETAILED VIEW of existing content, NOT a new creation
+
+2. VISUAL FIDELITY:
+   - Maintain the EXACT same wall colors and textures
+   - Keep the EXACT same floor materials and patterns
+   - Preserve the EXACT same lighting conditions
+   - Match all material textures and finishes precisely
+
+3. STYLE CONSISTENCY:
+   - The result must look like a zoomed-in photograph of IMAGE ${zoneIndex}
+   - Enhanced detail and resolution, but SAME content
+   - Same photorealistic quality as the original
+
+4. OUTPUT:
+   - Generate a 16:9 aspect ratio image
+   - Higher detail/resolution than the cropped zone
+   - Photorealistic interior photograph
+
+ADDITIONAL DIRECTION: ${userPrompt}
+
+═══════════════════════════════════════════════════════════════
+REMEMBER: You are REPRODUCING and ENHANCING what's in IMAGE ${zoneIndex}.
+You are NOT creating anything new. Just showing the same content in more detail.
+═══════════════════════════════════════════════════════════════`;
+      } else {
+        // Fallback: No cropped zone image, use coordinate-based approach
+        zonePrompt = `You are a professional interior photography director. Create a new camera view of this room focusing on a specific zone.
+
+CURRENT ROOM IMAGE (IMAGE ${fullRoomIndex}): The attached image shows the full room.
 
 FOCUS ZONE (area to feature prominently):
 - Horizontal: ${focusRegion.x.toFixed(0)}% to ${(focusRegion.x + focusRegion.width).toFixed(0)}% from left
@@ -246,6 +307,7 @@ CRITICAL REQUIREMENTS:
 6. Output a 16:9 aspect ratio image
 
 Output: A photorealistic interior photograph showing the focused view of the specified zone.`;
+      }
 
       content.push({ type: 'text', text: zonePrompt });
       
@@ -294,7 +356,7 @@ Output: A photorealistic interior photograph showing the focused view of the spe
         throw new Error('No image generated from zone focus request');
       }
 
-      console.log('Zone focus view completed successfully:', viewType);
+      console.log('Zone focus view completed successfully:', viewType, zoneIndex ? '(with zone image reference)' : '(coordinates only)');
       return new Response(JSON.stringify({ imageUrl, mode: 'zone-focus', viewType }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
