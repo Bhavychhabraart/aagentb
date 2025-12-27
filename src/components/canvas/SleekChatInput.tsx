@@ -160,6 +160,12 @@ export function SleekChatInput({
                   Browse Catalogue
                 </DropdownMenuItem>
               )}
+              {onProductsPick && (
+                <DropdownMenuItem onClick={onProductsPick} className="gap-2">
+                  <Sparkles className="h-4 w-4" />
+                  Add Products
+                </DropdownMenuItem>
+              )}
             </DropdownMenuContent>
           </DropdownMenu>
 
