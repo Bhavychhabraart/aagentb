@@ -147,6 +147,14 @@ const Index = () => {
   const [replacingDetectionId, setReplacingDetectionId] = useState<string | null>(null);
   const [replacingDetectionLabel, setReplacingDetectionLabel] = useState<string>('');
   
+  // Find similar AI state
+  const [isFindingSimilar, setIsFindingSimilar] = useState(false);
+  const [similarSearchData, setSimilarSearchData] = useState<{
+    searchTerms: string[];
+    category: string;
+    itemLabel: string;
+  } | null>(null);
+  
   // Selection tool state
   const [selectionMode, setSelectionMode] = useState(false);
   const [currentSelection, setCurrentSelection] = useState<SelectionRegion | null>(null);
@@ -1487,12 +1495,49 @@ Ready to generate a render! Describe your vision.`;
     } else if (action === 'replace') {
       setReplacingDetectionId(item.id);
       setReplacingDetectionLabel(item.label);
+      setSimilarSearchData(null); // Clear any previous similarity data
       setShowCatalogueModal(true);
     } else if (action === 'similar') {
+      // AI-powered similarity search
       setReplacingDetectionId(item.id);
       setReplacingDetectionLabel(item.label);
-      setShowCatalogueModal(true);
-      toast({ title: 'Find Similar', description: `Looking for items similar to ${item.label}` });
+      setIsFindingSimilar(true);
+      
+      try {
+        const { data, error } = await supabase.functions.invoke('find-similar-furniture', {
+          body: { 
+            roomImageUrl: currentRenderUrl || roomPhotoUrl,
+            itemLabel: item.label,
+            boundingBox: item.box_2d
+          },
+        });
+
+        if (error) throw error;
+
+        if (data?.success) {
+          setSimilarSearchData({
+            searchTerms: data.searchTerms || [],
+            category: data.category || '',
+            itemLabel: item.label,
+          });
+          toast({ 
+            title: 'Similar items found', 
+            description: `Found ${data.searchTerms?.length || 0} matching keywords` 
+          });
+        }
+        setShowCatalogueModal(true);
+      } catch (error) {
+        console.error('Find similar error:', error);
+        toast({ 
+          variant: 'destructive', 
+          title: 'Could not find similar items', 
+          description: 'Showing full catalog instead' 
+        });
+        setSimilarSearchData(null);
+        setShowCatalogueModal(true);
+      } finally {
+        setIsFindingSimilar(false);
+      }
     } else if (action === 'custom') {
       toast({ title: 'Create Custom', description: `Creating custom ${item.label}` });
       navigate('/custom-furniture');
@@ -1622,7 +1667,7 @@ Ready to generate a render! Describe your vision.`;
     setIsAIDetectionActive(false);
   }, [currentRenderUrl]);
 
-  // Handle auto-furnish apply
+  // Handle auto-furnish apply - match suggestions to catalog items
   const handleAutoFurnishApply = useCallback(async (suggestions: Array<{
     id: string;
     type: string;
@@ -1637,19 +1682,68 @@ Ready to generate a render! Describe your vision.`;
     setIsGenerating(true);
 
     try {
-      const furnitureList = suggestions.map(s => s.name).join(', ');
-      const prompt = `Add the following furniture in appropriate positions: ${furnitureList}. Match the room's ${suggestions[0]?.style || 'modern'} style.`;
+      // Match suggestions to actual catalog items
+      const matchedItems: CatalogFurnitureItem[] = [];
+      const unmatchedNames: string[] = [];
+      
+      for (const suggestion of suggestions) {
+        // Try to find a matching catalog item by name or category
+        const match = catalogItems.find(item => 
+          item.name.toLowerCase().includes(suggestion.name.toLowerCase()) ||
+          suggestion.name.toLowerCase().includes(item.name.toLowerCase()) ||
+          (item.category.toLowerCase() === suggestion.type.toLowerCase() && 
+           item.name.toLowerCase().includes(suggestion.style.toLowerCase()))
+        );
+        
+        if (match) {
+          matchedItems.push(match);
+        } else {
+          unmatchedNames.push(suggestion.name);
+        }
+      }
 
-      await editRender(prompt, []);
+      // Build prompt with matched items
+      const allFurniture = suggestions.map(s => s.name);
+      const prompt = `Add the following furniture in appropriate positions: ${allFurniture.join(', ')}. Match the room's ${suggestions[0]?.style || 'modern'} style. Integrate seamlessly with existing elements.`;
 
-      toast({ title: 'Auto-furnish applied', description: `Added ${suggestions.length} items` });
+      // Call edit-render with actual catalog item images for better results
+      const response = await supabase.functions.invoke('edit-render', {
+        body: {
+          originalUrl: currentRenderUrl,
+          prompt,
+          stagedItems: matchedItems.map(item => ({
+            id: item.id,
+            name: item.name,
+            category: item.category,
+            imageUrl: item.imageUrl,
+          })),
+        },
+      });
+
+      if (response.error) throw response.error;
+
+      if (response.data?.editedUrl) {
+        setCurrentRenderUrl(response.data.editedUrl);
+        setAllRenderUrls(prev => [...prev, response.data.editedUrl]);
+        
+        // Add matched items to staged items
+        const newStagedItems = matchedItems.filter(m => !stagedItems.some(s => s.id === m.id));
+        if (newStagedItems.length > 0) {
+          setStagedItems(prev => [...prev, ...newStagedItems]);
+        }
+        
+        toast({ 
+          title: 'Auto-furnish applied', 
+          description: `Added ${suggestions.length} items${matchedItems.length > 0 ? ` (${matchedItems.length} matched to catalog)` : ''}` 
+        });
+      }
     } catch (error) {
       console.error('Auto-furnish failed:', error);
       toast({ variant: 'destructive', title: 'Failed', description: 'Could not apply furniture suggestions' });
     } finally {
       setIsGenerating(false);
     }
-  }, [currentRenderUrl, editRender, toast]);
+  }, [currentRenderUrl, catalogItems, stagedItems, toast]);
 
   // Handle catalog item preview
   const handleCatalogItemPreview = useCallback((item: CatalogFurnitureItem) => {
@@ -2862,6 +2956,7 @@ Ready to generate a render! Describe your vision.`;
               )}
               onApplyFurnish={handleApplyFurnish}
               onClearAll={handleClearDetectionState}
+              isFindingSimilar={isFindingSimilar}
             />
           )}
 
@@ -3009,14 +3104,27 @@ Ready to generate a render! Describe your vision.`;
           setShowCatalogueModal(false);
           setReplacingDetectionId(null);
           setReplacingDetectionLabel('');
+          setSimilarSearchData(null);
         }}
         catalogItems={catalogItems}
         stagedItemIds={stagedItems.map(i => i.id)}
         onToggleStage={replacingDetectionId ? handleReplacementSelect : handleCatalogItemSelect}
         onPreviewItem={handleCatalogItemPreview}
-        title={replacingDetectionId ? `Select replacement for "${replacingDetectionLabel}"` : undefined}
-        subtitle={replacingDetectionId ? 'Choose a furniture item to replace the detected piece' : undefined}
+        title={replacingDetectionId 
+          ? similarSearchData 
+            ? `Similar to "${replacingDetectionLabel}"`
+            : `Select replacement for "${replacingDetectionLabel}"`
+          : undefined}
+        subtitle={replacingDetectionId 
+          ? similarSearchData 
+            ? 'AI found these items based on visual characteristics'
+            : 'Choose a furniture item to replace the detected piece' 
+          : undefined}
         selectionMode={!!replacingDetectionId}
+        initialSearchQuery={similarSearchData?.searchTerms?.[0] || ''}
+        suggestedCategory={similarSearchData?.category || undefined}
+        similarityBadge={similarSearchData?.itemLabel}
+        isLoading={isFindingSimilar}
       />
     </div>
   </SidebarProvider>

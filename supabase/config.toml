@@ -17,3 +17,6 @@ verify_jwt = false
 
 [functions.detect-furniture]
 verify_jwt = false
+
+[functions.find-similar-furniture]
+verify_jwt = false
