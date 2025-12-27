@@ -111,16 +111,40 @@ ASPECT RATIO: ${analysis.aspectRatio}
     spec += '\n';
   }
 
-  // Camera specification
+  // Camera specification - FORCE ISOMETRIC VIEW for initial renders
   spec += `═══════════════════════════════════════════════════════════════
-                    CAMERA POSITION & ANGLE
+                    CAMERA POSITION & ANGLE (ISOMETRIC - MANDATORY)
 ═══════════════════════════════════════════════════════════════
 
-VIEWING FROM: ${cameraRecommendation.position.toUpperCase()} corner
-CAMERA HEIGHT: ${cameraRecommendation.height === 'eye-level' ? '5ft (eye level)' : cameraRecommendation.height === 'elevated' ? '8ft (elevated)' : '3ft (low angle)'}
-LOOKING TOWARD: ${getOppositeCorner(cameraRecommendation.position)}
-FIELD OF VIEW: ${cameraRecommendation.fov.toUpperCase()}
-ANGLE FROM NORTH: ${cameraRecommendation.angle}°
+⚠️ MANDATORY ISOMETRIC CAMERA VIEW - DO NOT DEVIATE ⚠️
+
+CAMERA TYPE: ISOMETRIC (45° elevated corner view)
+CAMERA HEIGHT: 8-10ft equivalent (elevated, looking down at ~45°)
+VIEWING FROM: Southeast corner (elevated position)
+LOOKING TOWARD: Northwest (center of room)
+FIELD OF VIEW: Wide (capture entire room)
+PERSPECTIVE: Near-orthographic (minimal distortion, parallel lines stay parallel)
+
+ISOMETRIC VIEW REQUIREMENTS:
+1. Camera elevated at 45° above ground plane
+2. Corner view showing THREE surfaces: floor + two adjacent walls
+3. Looking diagonally into the room from elevated corner
+4. All vertical lines remain vertical (no extreme perspective)
+5. Full room visibility - entire room in frame
+
+Visual Reference (Isometric Corner View):
+     ╱‾‾‾‾‾‾‾‾╲
+    ╱   CEILING  ╲
+   ╱______________╲
+   ╲      |      ╱
+    ╲ WALL | WALL╱
+     ╲____|____╱
+         FLOOR
+
+DO NOT render from:
+✗ Eye-level perspective (too flat, no room overview)
+✗ Bird's-eye/top-down view (no wall visibility)
+✗ Front-facing flat view (no depth perception)
 
 `;
 
@@ -248,6 +272,41 @@ serve(async (req) => {
     let structuredPrompt = `Role: Expert Interior Architect and 3D Visualizer with PIXEL-PERFECT architectural accuracy.
 Task: Generate a photorealistic interior design render that EXACTLY matches the floor plan specifications.
 
+=== MANDATORY CAMERA POSITION: ISOMETRIC VIEW ===
+
+⚠️ HIGHEST PRIORITY CAMERA DIRECTIVE - DO NOT DEVIATE ⚠️
+
+The render MUST be generated from an ISOMETRIC camera angle:
+
+1. CAMERA HEIGHT: Elevated position - approximately 45° above the ground plane (8-10ft equivalent)
+2. CAMERA ANGLE: 30-45° corner view showing THREE surfaces:
+   - The floor plane (visible from above)
+   - Two adjacent walls (creating the classic isometric "corner" view)
+3. VIEWING DIRECTION: Looking diagonally into the room from an elevated corner (southeast to northwest)
+4. NO EXTREME PERSPECTIVE: Maintain near-parallel lines (minimal vanishing point distortion)
+5. FULL ROOM VISIBILITY: The ENTIRE room must be visible in the frame
+
+Visual Reference (Isometric Corner View):
+     ╱‾‾‾‾‾‾‾‾╲
+    ╱   CEILING  ╲
+   ╱______________╲
+   ╲      |      ╱
+    ╲ WALL | WALL╱
+     ╲____|____╱
+         FLOOR
+
+This isometric angle provides:
+✓ Clear view of floor layout and furniture placement
+✓ Visibility of wall treatments and décor
+✓ Professional architectural visualization standard
+✓ Best overview for interior design presentation
+
+DO NOT render from:
+✗ Eye-level perspective (too flat, missing room overview)
+✗ Bird's-eye/top-down view (no wall visibility)
+✗ Front-facing flat view (no depth perception)
+✗ Low angle view (distorted proportions)
+
 `;
 
     // Add ARCHITECTURAL CONSTRAINTS if layout analysis is provided
@@ -369,19 +428,21 @@ ${prompt}
 
 1. Photorealistic quality - professional architectural visualization
 2. 16:9 LANDSCAPE aspect ratio (wide cinematic format)
-3. Dramatic, realistic lighting with natural shadows
-4. High-end interior design aesthetic
-5. All reference images must be respected in order of priority: Layout > Style > Room Photo > Furniture
-${layoutAnalysis ? '6. VERIFY all architectural constraints are met before finalizing' : ''}
+3. **ISOMETRIC CAMERA ANGLE** - elevated 45° corner view showing floor + two walls (MANDATORY)
+4. Dramatic, realistic lighting with natural shadows
+5. High-end interior design aesthetic
+6. All reference images must be respected in order of priority: Layout > Style > Room Photo > Furniture
+${layoutAnalysis ? '7. VERIFY all architectural constraints are met before finalizing' : ''}
 
 ⚠️ QUALITY CHECK: 
-After generation, the render will be compared against the floor plan specifications.
+After generation, the render will be compared against specifications.
+- ISOMETRIC VIEW: Must be 45° elevated corner view (NOT eye-level, NOT top-down)
 - Window count and positions will be verified
 - Door locations will be checked
 - Room proportions will be measured
 - Furniture zones will be validated
 ANY discrepancies will require regeneration.
-The goal is 111% architectural accuracy.
+The goal is 111% architectural accuracy with ISOMETRIC perspective.
 
 Output: ONLY the final image.`;
 
