@@ -3011,6 +3011,7 @@ Ready to generate a render! Describe your vision.`;
                 onLayoutUpload={() => setShowLayoutModal(true)}
                 onRoomPhotoUpload={() => setShowRoomPhotoModal(true)}
                 onStyleRefUpload={() => setShowStyleRefModal(true)}
+                onProductsPick={() => setShowProductsModal(true)}
                 placeholder={agentBEnabled ? "Describe your vision (Agent B will guide you)..." : "Describe your vision..."}
                 stagedItems={stagedItems}
                 onOpenCatalogue={() => setShowCatalogueModal(true)}

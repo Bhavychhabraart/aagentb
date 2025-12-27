@@ -150,29 +150,46 @@ export function ProductPickerModal({
     }
 
     if (!file.type.startsWith("image/")) {
-      toast.error("Please upload an image file");
+      toast.error("Please upload an image file (JPG, PNG, WebP, etc.)");
+      return null;
+    }
+
+    // Validate file size (max 5MB)
+    const maxSize = 5 * 1024 * 1024;
+    if (file.size > maxSize) {
+      toast.error("Image too large. Maximum size is 5MB");
       return null;
     }
 
     setIsUploading(true);
     try {
-      const fileExt = file.name.split(".").pop();
+      const fileExt = file.name.split(".").pop()?.toLowerCase() || 'jpg';
       const fileName = `${userId}/${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
+
+      console.log('Uploading to products bucket:', fileName, 'Size:', file.size);
 
       const { error: uploadError } = await supabase.storage
         .from("products")
-        .upload(fileName, file);
+        .upload(fileName, file, {
+          cacheControl: '3600',
+          upsert: false
+        });
 
-      if (uploadError) throw uploadError;
+      if (uploadError) {
+        console.error('Storage upload error:', uploadError);
+        throw uploadError;
+      }
 
       const { data: { publicUrl } } = supabase.storage
         .from("products")
         .getPublicUrl(fileName);
 
+      console.log('Upload successful:', publicUrl);
       return publicUrl;
-    } catch (error) {
-      console.error("Upload error:", error);
-      toast.error("Failed to upload image");
+    } catch (error: any) {
+      console.error("Upload error details:", error);
+      const errorMessage = error?.message || error?.error_description || "Failed to upload image";
+      toast.error(errorMessage);
       return null;
     } finally {
       setIsUploading(false);
