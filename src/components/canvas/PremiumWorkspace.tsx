@@ -111,6 +111,9 @@ interface PremiumWorkspaceProps {
   onToggleAssetsPanel?: () => void;
   showAssetsPanel?: boolean;
   onOpenCatalogue?: () => void;
+  // Selection tool props
+  isSelectionMode?: boolean;
+  onSelectionComplete?: (region: { x: number; y: number; width: number; height: number } | null) => void;
 }
 
 interface ToolbarItem {
@@ -164,6 +167,9 @@ export function PremiumWorkspace({
   onToggleAssetsPanel,
   showAssetsPanel,
   onOpenCatalogue,
+  // Selection tool props
+  isSelectionMode,
+  onSelectionComplete,
 }: PremiumWorkspaceProps) {
   const [showDirectorInput, setShowDirectorInput] = useState(false);
   const [directorPrompt, setDirectorPrompt] = useState('');
@@ -175,6 +181,10 @@ export function PremiumWorkspace({
   const [pendingZone, setPendingZone] = useState<Omit<Zone, 'id' | 'name'> | null>(null);
   const [newZoneName, setNewZoneName] = useState('');
   const [showNameInput, setShowNameInput] = useState(false);
+  
+  // Selection tool state (internal)
+  const [selectionStart, setSelectionStart] = useState<{ x: number; y: number } | null>(null);
+  const [selectionCurrent, setSelectionCurrent] = useState<{ x: number; y: number } | null>(null);
 
   const handleDirectorSubmit = () => {
     if (directorPrompt.trim() && onAIDirectorChange) {
@@ -546,8 +556,80 @@ export function PremiumWorkspace({
                       draggable={false}
                     />
                     
+                    {/* Selection overlay - rendered inside image container for proper positioning */}
+                    {isSelectionMode && onSelectionComplete && (
+                      <div 
+                        className="absolute inset-0 z-30 cursor-crosshair"
+                        onMouseDown={(e) => {
+                          e.stopPropagation();
+                          const rect = e.currentTarget.getBoundingClientRect();
+                          const x = ((e.clientX - rect.left) / rect.width) * 100;
+                          const y = ((e.clientY - rect.top) / rect.height) * 100;
+                          setSelectionStart({ x, y });
+                          setSelectionCurrent({ x, y });
+                        }}
+                        onMouseMove={(e) => {
+                          if (!selectionStart) return;
+                          const rect = e.currentTarget.getBoundingClientRect();
+                          const x = Math.max(0, Math.min(100, ((e.clientX - rect.left) / rect.width) * 100));
+                          const y = Math.max(0, Math.min(100, ((e.clientY - rect.top) / rect.height) * 100));
+                          setSelectionCurrent({ x, y });
+                        }}
+                        onMouseUp={() => {
+                          if (selectionStart && selectionCurrent) {
+                            const x = Math.min(selectionStart.x, selectionCurrent.x);
+                            const y = Math.min(selectionStart.y, selectionCurrent.y);
+                            const width = Math.abs(selectionCurrent.x - selectionStart.x);
+                            const height = Math.abs(selectionCurrent.y - selectionStart.y);
+                            if (width > 2 && height > 2) {
+                              onSelectionComplete({ x, y, width, height });
+                            }
+                          }
+                          setSelectionStart(null);
+                          setSelectionCurrent(null);
+                        }}
+                        onMouseLeave={() => {
+                          setSelectionStart(null);
+                          setSelectionCurrent(null);
+                        }}
+                      >
+                        {/* Darkened overlay when drawing */}
+                        {selectionStart && selectionCurrent && (
+                          <>
+                            {/* Selection rectangle */}
+                            <div 
+                              className="absolute border-2 border-primary border-dashed bg-primary/10 animate-pulse"
+                              style={{
+                                left: `${Math.min(selectionStart.x, selectionCurrent.x)}%`,
+                                top: `${Math.min(selectionStart.y, selectionCurrent.y)}%`,
+                                width: `${Math.abs(selectionCurrent.x - selectionStart.x)}%`,
+                                height: `${Math.abs(selectionCurrent.y - selectionStart.y)}%`,
+                              }}
+                            >
+                              <div className="absolute -top-1.5 -left-1.5 w-3 h-3 bg-primary rounded-full border-2 border-background" />
+                              <div className="absolute -top-1.5 -right-1.5 w-3 h-3 bg-primary rounded-full border-2 border-background" />
+                              <div className="absolute -bottom-1.5 -left-1.5 w-3 h-3 bg-primary rounded-full border-2 border-background" />
+                              <div className="absolute -bottom-1.5 -right-1.5 w-3 h-3 bg-primary rounded-full border-2 border-background" />
+                              <div className="absolute -bottom-8 left-1/2 -translate-x-1/2 px-2 py-1 bg-primary text-primary-foreground text-xs font-mono rounded whitespace-nowrap">
+                                {Math.round(Math.abs(selectionCurrent.x - selectionStart.x))}% × {Math.round(Math.abs(selectionCurrent.y - selectionStart.y))}%
+                              </div>
+                            </div>
+                          </>
+                        )}
+                        
+                        {/* Instruction hint when no selection */}
+                        {!selectionStart && (
+                          <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                            <div className="bg-black/70 backdrop-blur-sm px-4 py-2 rounded-lg border border-border/50">
+                              <p className="text-sm text-muted-foreground">Click and drag to select an area to edit</p>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                    
                     {/* Zone overlays */}
-                    {zones.length > 0 && !isDrawingZone && (
+                    {zones.length > 0 && !isDrawingZone && !isSelectionMode && (
                       <div className="absolute inset-0 pointer-events-none">
                         {zones.map((zone) => (
                           <div

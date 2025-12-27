@@ -10,6 +10,7 @@ import { AgentBQuestion, AgentBAnswer } from '@/components/canvas/AgentBQuestion
 import { RenderViewer } from '@/components/canvas/RenderViewer';
 import { PremiumWorkspace, Zone, ViewType, viewTypeOptions } from '@/components/canvas/PremiumWorkspace';
 import { SleekChatInput } from '@/components/canvas/SleekChatInput';
+import { StagedItemsDock } from '@/components/canvas/StagedItemsDock';
 import { CameraData } from '@/components/canvas/CameraPlacement';
 import { UploadDialog } from '@/components/canvas/UploadDialog';
 import { ExportModal } from '@/components/canvas/ExportModal';
@@ -18,7 +19,7 @@ import { SidebarProvider } from '@/components/ui/sidebar';
 import { CatalogFurnitureItem, fetchFurnitureCatalog } from '@/services/catalogService';
 import { FurniturePositioner, FurniturePlacement } from '@/components/canvas/FurniturePositioner';
 import { ProjectData } from '@/services/documentService';
-import { SelectionOverlay, SelectionRegion } from '@/components/canvas/SelectionOverlay';
+import { SelectionRegion } from '@/components/canvas/SelectionOverlay';
 import { SelectiveEditPanel } from '@/components/canvas/SelectiveEditPanel';
 import { generateSelectionMask } from '@/utils/generateSelectionMask';
 import { RenderHistoryItem } from '@/components/canvas/RenderHistoryCarousel';
@@ -32,6 +33,8 @@ import { AIDetectionOverlay, DetectedItem } from '@/components/canvas/AIDetectio
 import { FloatingAssetsPanel } from '@/components/canvas/FloatingAssetsPanel';
 import { AutoFurnishPanel } from '@/components/canvas/AutoFurnishPanel';
 import { FullScreenCatalogModal } from '@/components/canvas/FullScreenCatalogModal';
+import { Button } from '@/components/ui/button';
+import { Move, Plus } from 'lucide-react';
 import {
   getMemorySettings,
   setMemoryEnabled,
@@ -1359,6 +1362,10 @@ Ready to generate a render! Describe your vision.`;
         .eq('catalog_item_id', item.id);
       
       setStagedItems(prev => prev.filter(i => i.id !== item.id));
+      toast({ 
+        title: 'Item removed', 
+        description: `${item.name} unstaged` 
+      });
     } else {
       // Add to DB
       await supabase
@@ -1375,8 +1382,37 @@ Ready to generate a render! Describe your vision.`;
         });
       
       setStagedItems(prev => [...prev, item]);
+      
+      // Show toast with action buttons
+      toast({
+        title: `${item.name} staged`,
+        description: 'Ready to place in your design',
+        action: (
+          <div className="flex gap-2">
+            <Button 
+              size="sm" 
+              variant="outline"
+              className="h-7 text-xs"
+              onClick={() => setShowPositioner(true)}
+              disabled={!currentRenderUrl && !roomPhotoUrl}
+            >
+              <Move className="h-3 w-3 mr-1" />
+              Position
+            </Button>
+            <Button 
+              size="sm" 
+              variant="outline"
+              className="h-7 text-xs"
+              onClick={() => setShowCatalogueModal(true)}
+            >
+              <Plus className="h-3 w-3 mr-1" />
+              Add More
+            </Button>
+          </div>
+        ),
+      });
     }
-  }, [user, currentProjectId, stagedItems]);
+  }, [user, currentProjectId, stagedItems, currentRenderUrl, roomPhotoUrl, toast]);
 
   const handleClearStagedItems = useCallback(async () => {
     if (!currentProjectId) return;
@@ -2835,7 +2871,7 @@ Ready to generate a render! Describe your vision.`;
             onExport={() => setShowExportModal(true)}
             onUndo={handleUndo}
             canUndo={canUndo}
-            isSelectiveEditing={isSelectiveEditing || selectionMode}
+            isSelectiveEditing={isSelectiveEditing}
             isMulticamGenerating={isMulticamGenerating}
             multicamViews={multicamViews}
             onSetMulticamAsMain={handleSetMulticamAsMain}
@@ -2881,18 +2917,12 @@ Ready to generate a render! Describe your vision.`;
             onToggleAssetsPanel={() => setShowAssetsPanel(prev => !prev)}
             showAssetsPanel={showAssetsPanel}
             onOpenCatalogue={() => setShowCatalogueModal(true)}
+            // Selection tool props
+            isSelectionMode={selectionMode && !currentSelection}
+            onSelectionComplete={handleSelectionComplete}
           />
 
-          {/* Selection Overlay - enables drawing selection rectangle */}
-          {selectionMode && (currentRenderUrl || roomPhotoUrl) && !currentSelection && (
-            <div className="absolute inset-0 z-40">
-              <SelectionOverlay
-                imageUrl={currentRenderUrl || roomPhotoUrl || ''}
-                onSelectionComplete={handleSelectionComplete}
-                isActive={selectionMode && !currentSelection}
-              />
-            </div>
-          )}
+          {/* Selection is now handled inside PremiumWorkspace */}
 
           {/* Selective Edit Panel - shows after selection is made */}
           {currentSelection && selectionMode && (currentRenderUrl || roomPhotoUrl) && (
@@ -2953,6 +2983,20 @@ Ready to generate a render! Describe your vision.`;
             onApply={handleAutoFurnishApply}
           />
           
+          {/* Staged Items Dock */}
+          <StagedItemsDock
+            stagedItems={stagedItems}
+            onPositionFurniture={() => setShowPositioner(true)}
+            onGenerateWithItems={() => {
+              const itemNames = stagedItems.slice(0, 3).map(i => i.name).join(', ');
+              handleSendMessageWithAgentB(`Generate a render with ${itemNames} placed naturally in the room`);
+            }}
+            onClearAll={handleClearStagedItems}
+            onRemoveItem={handleCatalogItemSelect}
+            canPosition={!!(currentRenderUrl || roomPhotoUrl)}
+            isGenerating={isGenerating}
+          />
+          
           {/* Floating Chat Input - Bottom Center */}
           <div className="absolute bottom-6 left-1/2 -translate-x-1/2 w-full max-w-2xl px-4 z-30">
             <SleekChatInput
@@ -2964,6 +3008,8 @@ Ready to generate a render! Describe your vision.`;
               onRoomPhotoUpload={() => setShowRoomPhotoModal(true)}
               onStyleRefUpload={() => setShowStyleRefModal(true)}
               placeholder={agentBEnabled ? "Describe your vision (Agent B will guide you)..." : "Describe your vision..."}
+              stagedItems={stagedItems}
+              onOpenCatalogue={() => setShowCatalogueModal(true)}
             />
           </div>
         </div>
