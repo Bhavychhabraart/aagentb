@@ -31,7 +31,7 @@ export function RenderHistoryCarousel({
   if (renders.length === 0) return null;
 
   return (
-    <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-20 w-full max-w-2xl px-4">
+    <div className="absolute bottom-24 left-1/2 -translate-x-1/2 z-20 w-full max-w-2xl px-4">
       <div className="glass-premium rounded-xl border border-border/20 p-3">
         <div className="flex items-center justify-between mb-2 px-1">
           <div className="flex items-center gap-2">
