@@ -148,6 +148,9 @@ const Index = () => {
   const [detectionReplacements, setDetectionReplacements] = useState<Map<string, CatalogFurnitureItem>>(new Map());
   const [lockedDetections, setLockedDetections] = useState<Set<string>>(new Set());
   const [replacingDetectionId, setReplacingDetectionId] = useState<string | null>(null);
+  
+  // Uploaded products state - tracks recently uploaded products for display
+  const [uploadedProducts, setUploadedProducts] = useState<Array<{ id: string; name: string; imageUrl: string }>>([]);
   const [replacingDetectionLabel, setReplacingDetectionLabel] = useState<string>('');
   
   // Find similar AI state
@@ -2790,26 +2793,61 @@ Ready to generate a render! Describe your vision.`;
     }
     
     try {
+      const savedProducts: Array<{ id: string; name: string; imageUrl: string }> = [];
+      
       for (const product of products) {
         if (!product.id) {
           // New product - save to database
-          await supabase.from('product_items').insert({
+          const { data, error } = await supabase.from('product_items').insert({
             project_id: currentProjectId,
             user_id: user.id,
             name: product.name,
             image_url: product.imageUrl,
+          }).select().single();
+          
+          if (!error && data) {
+            savedProducts.push({
+              id: data.id,
+              name: data.name,
+              imageUrl: data.image_url || '',
+            });
+          }
+        } else {
+          // Existing product
+          savedProducts.push({
+            id: product.id,
+            name: product.name,
+            imageUrl: product.imageUrl || '',
           });
         }
       }
       
+      // Update uploaded products state for display in chat input
+      setUploadedProducts(prev => [...savedProducts, ...prev].slice(0, 10));
+      
       await addMessage('user', `Added ${products.length} product${products.length > 1 ? 's' : ''} to project`, { type: 'upload' });
-      toast({ title: 'Products added' });
+      toast({ 
+        title: 'Products added!',
+        description: 'Use "Generate with my products" to include them in your render.',
+      });
       setShowProductsModal(false);
     } catch (error) {
       console.error('Products save failed:', error);
       toast({ variant: 'destructive', title: 'Failed to save products', description: 'Please try again' });
     }
   }, [user, currentProjectId, addMessage, toast]);
+  
+  // Handle using products in render
+  const handleUseProducts = useCallback(() => {
+    if (uploadedProducts.length === 0) return;
+    // This will be triggered when user clicks "Use in Render"
+    // Pre-fill message will happen in SleekChatInput
+  }, [uploadedProducts]);
+  
+  // Clear uploaded products
+  const handleClearProducts = useCallback(() => {
+    setUploadedProducts([]);
+  }, []);
 
   // Check if undo is possible
   const canUndo = (() => {
@@ -3015,6 +3053,8 @@ Ready to generate a render! Describe your vision.`;
                 placeholder={agentBEnabled ? "Describe your vision (Agent B will guide you)..." : "Describe your vision..."}
                 stagedItems={stagedItems}
                 onOpenCatalogue={() => setShowCatalogueModal(true)}
+                uploadedProducts={uploadedProducts}
+                onClearProducts={handleClearProducts}
               />
             </div>
           </div>

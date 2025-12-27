@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { cn } from '@/lib/utils';
-import { Send, Plus, Brain, Loader2, Image, Layout, Palette, Package, Sparkles } from 'lucide-react';
+import { Send, Plus, Brain, Loader2, Image, Layout, Palette, Package, Sparkles, X, Wand2 } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import {
   DropdownMenu,
@@ -9,6 +9,12 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { CatalogFurnitureItem } from '@/services/catalogService';
+
+interface UploadedProduct {
+  id: string;
+  name: string;
+  imageUrl: string;
+}
 
 interface SleekChatInputProps {
   onSend: (message: string) => void;
@@ -22,6 +28,8 @@ interface SleekChatInputProps {
   placeholder?: string;
   stagedItems?: CatalogFurnitureItem[];
   onOpenCatalogue?: () => void;
+  uploadedProducts?: UploadedProduct[];
+  onClearProducts?: () => void;
 }
 
 export function SleekChatInput({
@@ -36,6 +44,8 @@ export function SleekChatInput({
   placeholder = 'Describe your vision...',
   stagedItems = [],
   onOpenCatalogue,
+  uploadedProducts = [],
+  onClearProducts,
 }: SleekChatInputProps) {
   const [message, setMessage] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
@@ -66,6 +76,10 @@ export function SleekChatInput({
       setMessage(`Place ${itemNames}${suffix} in the room naturally`);
     } else if (action === 'generate') {
       setMessage(`Generate a render with the ${stagedItems.length} staged furniture items`);
+    } else if (action === 'use-products') {
+      const productNames = uploadedProducts.slice(0, 2).map(p => p.name).join(', ');
+      const suffix = uploadedProducts.length > 2 ? ` and ${uploadedProducts.length - 2} more` : '';
+      setMessage(`Generate a room design featuring ${productNames}${suffix}`);
     }
     inputRef.current?.focus();
   };
@@ -115,6 +129,57 @@ export function SleekChatInput({
                   className="px-2 py-1 text-xs text-muted-foreground hover:text-foreground hover:bg-muted/50 rounded-lg transition-colors"
                 >
                   Edit
+                </button>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Uploaded products indicator */}
+        {uploadedProducts.length > 0 && (
+          <div className="flex items-center justify-between gap-3 px-3 py-2 bg-amber-500/10 rounded-xl border border-amber-500/20 animate-fade-in">
+            <div className="flex items-center gap-3 min-w-0">
+              {/* Thumbnail stack */}
+              <div className="flex -space-x-2 shrink-0">
+                {uploadedProducts.slice(0, 3).map((product) => (
+                  <div
+                    key={product.id}
+                    className="w-7 h-7 rounded-full border-2 border-background overflow-hidden bg-muted"
+                  >
+                    {product.imageUrl ? (
+                      <img src={product.imageUrl} alt={product.name} className="w-full h-full object-cover" />
+                    ) : (
+                      <div className="w-full h-full bg-muted flex items-center justify-center">
+                        <Package className="h-3 w-3 text-muted-foreground" />
+                      </div>
+                    )}
+                  </div>
+                ))}
+                {uploadedProducts.length > 3 && (
+                  <div className="w-7 h-7 rounded-full border-2 border-background bg-muted flex items-center justify-center text-[10px] font-medium">
+                    +{uploadedProducts.length - 3}
+                  </div>
+                )}
+              </div>
+              <span className="text-xs font-medium text-amber-600 dark:text-amber-400 truncate">
+                {uploadedProducts.length} product{uploadedProducts.length !== 1 ? 's' : ''} ready
+              </span>
+            </div>
+            <div className="flex items-center gap-1.5 shrink-0">
+              <button
+                onClick={() => handleQuickAction('use-products')}
+                className="px-2.5 py-1 text-xs font-medium bg-amber-500/20 hover:bg-amber-500/30 text-amber-600 dark:text-amber-400 rounded-lg transition-colors flex items-center gap-1"
+              >
+                <Wand2 className="h-3 w-3" />
+                Use in render
+              </button>
+              {onClearProducts && (
+                <button
+                  onClick={onClearProducts}
+                  className="p-1 text-muted-foreground hover:text-foreground hover:bg-muted/50 rounded-lg transition-colors"
+                  title="Clear products"
+                >
+                  <X className="h-3.5 w-3.5" />
                 </button>
               )}
             </div>

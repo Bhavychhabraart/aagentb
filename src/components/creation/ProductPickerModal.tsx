@@ -11,7 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Package, X, Plus, Link2, Upload, Loader2, Image as ImageIcon, Library, Search, Check, Layers, Grid3X3, ShoppingBag } from "lucide-react";
+import { Package, X, Plus, Link2, Upload, Loader2, Image as ImageIcon, Library, Search, Check, Layers, Grid3X3, ShoppingBag, Sparkles } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -233,11 +233,14 @@ export function ProductPickerModal({
       return;
     }
 
-    setProducts([...products, { name: newProductName.trim(), imageUrl }]);
+    const newProduct = { name: newProductName.trim(), imageUrl };
+    setProducts([...products, newProduct]);
     setNewProductName("");
     setNewProductUrl("");
     setUploadedImageUrl(null);
-    toast.success("Product added");
+    toast.success("Product added! Click 'Confirm & Use' to include in your render.", {
+      duration: 3000,
+    });
   };
 
   const removeProduct = (index: number) => {
@@ -648,8 +651,9 @@ export function ProductPickerModal({
             <Button variant="outline" onClick={() => onOpenChange(false)}>
               Cancel
             </Button>
-            <Button onClick={handleConfirm} disabled={products.length === 0}>
-              Save ({products.length})
+            <Button onClick={handleConfirm} disabled={products.length === 0} className="gap-2">
+              <Sparkles className="h-4 w-4" />
+              Confirm & Use ({products.length})
             </Button>
           </div>
         </div>
