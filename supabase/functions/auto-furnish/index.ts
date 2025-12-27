@@ -5,12 +5,18 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-interface FurnitureSuggestion {
-  type: string;
+interface CatalogItem {
+  id: string;
   name: string;
-  style: string;
+  category: string;
+  price?: number;
+  imageUrl?: string;
+}
+
+interface FurnitureSuggestion {
+  catalog_id: string;
+  reason: string;
   position: { x: number; y: number };
-  reasoning: string;
 }
 
 serve(async (req) => {
@@ -19,7 +25,7 @@ serve(async (req) => {
   }
 
   try {
-    const { roomImageUrl, preferences } = await req.json();
+    const { roomImageUrl, preferences, catalogItems } = await req.json();
     
     const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
     
@@ -31,35 +37,46 @@ serve(async (req) => {
       throw new Error('Room image URL is required');
     }
 
-    console.log('Analyzing room for auto-furnishing...');
+    if (!catalogItems || !Array.isArray(catalogItems) || catalogItems.length === 0) {
+      throw new Error('Catalog items are required');
+    }
+
+    console.log('Analyzing room for auto-furnishing with', catalogItems.length, 'catalog items...');
+
+    // Build catalog reference for the AI
+    const catalogReference = catalogItems.slice(0, 50).map((item: CatalogItem) => 
+      `ID: "${item.id}" | Name: "${item.name}" | Category: "${item.category}" | Price: $${item.price || 0}`
+    ).join('\n');
 
     const content = [
       { type: 'image_url', image_url: { url: roomImageUrl } },
       {
         type: 'text',
-        text: `Analyze this interior room image and suggest furniture to add or improve the space.
+        text: `Analyze this interior room image and select furniture from the provided catalog to add or improve the space.
 
-Consider:
-1. The room's current style and aesthetic
-2. Available empty spaces
-3. Functional needs (seating, storage, lighting, etc.)
-4. Design harmony and balance
-5. Traffic flow and ergonomics
+AVAILABLE CATALOG ITEMS (select ONLY from these):
+${catalogReference}
+
+Instructions:
+1. Analyze the room's current style, empty spaces, and functional needs
+2. Select 4-6 items from the catalog above that would enhance this room
+3. For each selection, provide the EXACT catalog ID and explain why it fits
 
 ${preferences ? `User preferences: ${preferences}` : ''}
 
-Return a JSON object with:
-- "detected_style": The overall design style (e.g., "Modern Minimalist", "Scandinavian", "Industrial")
-- "suggestions": An array of furniture suggestions, each with:
-  - "type": Category (e.g., "Seating", "Table", "Lighting", "Decor")
-  - "name": Specific item name (e.g., "Velvet Accent Chair", "Round Coffee Table")
-  - "style": Style that matches the room (e.g., "Mid-Century Modern")
-  - "position": Approximate position as {x, y} percentages where it should go
-  - "reasoning": Brief explanation why this piece would work
+Return ONLY valid JSON in this exact format:
+{
+  "detected_style": "The overall design style (e.g., Modern Minimalist, Scandinavian)",
+  "suggestions": [
+    {
+      "catalog_id": "exact-id-from-catalog-above",
+      "reason": "Brief explanation why this item fits the room",
+      "position": {"x": 50, "y": 50}
+    }
+  ]
+}
 
-Limit to 5-8 most impactful suggestions.
-
-Return ONLY valid JSON, no markdown or explanation.`
+CRITICAL: The catalog_id MUST exactly match one of the IDs provided above. Do not invent new IDs.`
       }
     ];
 
@@ -117,9 +134,18 @@ Return ONLY valid JSON, no markdown or explanation.`
       result = { suggestions: [], detected_style: 'Unknown' };
     }
 
-    console.log('Auto-furnish suggestions:', result.suggestions?.length || 0);
+    // Validate catalog IDs - filter out any that don't exist in catalog
+    const validCatalogIds = new Set(catalogItems.map((item: CatalogItem) => item.id));
+    const validSuggestions = (result.suggestions || []).filter((s: FurnitureSuggestion) => 
+      validCatalogIds.has(s.catalog_id)
+    );
 
-    return new Response(JSON.stringify(result), {
+    console.log('Auto-furnish suggestions:', validSuggestions.length, 'valid out of', result.suggestions?.length || 0);
+
+    return new Response(JSON.stringify({
+      detected_style: result.detected_style || 'Contemporary',
+      suggestions: validSuggestions,
+    }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   } catch (error) {
