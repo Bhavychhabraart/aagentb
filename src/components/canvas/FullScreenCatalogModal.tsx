@@ -14,6 +14,9 @@ interface FullScreenCatalogModalProps {
   stagedItemIds: string[];
   onToggleStage: (item: CatalogFurnitureItem) => void;
   onPreviewItem: (item: CatalogFurnitureItem) => void;
+  title?: string;
+  subtitle?: string;
+  selectionMode?: boolean; // When true, clicking selects instead of staging
 }
 
 const ITEMS_PER_PAGE = 40;
@@ -25,6 +28,9 @@ export function FullScreenCatalogModal({
   stagedItemIds,
   onToggleStage,
   onPreviewItem,
+  title,
+  subtitle,
+  selectionMode = false,
 }: FullScreenCatalogModalProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
@@ -70,10 +76,15 @@ export function FullScreenCatalogModal({
       <DialogContent className="max-w-6xl w-[95vw] h-[90vh] p-0 overflow-hidden bg-background border-border flex flex-col">
         {/* Header */}
         <div className="flex items-center justify-between p-4 border-b border-border shrink-0">
-          <div className="flex items-center gap-3">
-            <ShoppingBag className="h-5 w-5 text-primary" />
-            <h2 className="text-lg font-semibold text-foreground">Furniture Catalog</h2>
-            <Badge variant="secondary">{catalogItems.length} items</Badge>
+          <div className="flex flex-col gap-1">
+            <div className="flex items-center gap-3">
+              <ShoppingBag className="h-5 w-5 text-primary" />
+              <h2 className="text-lg font-semibold text-foreground">{title || 'Furniture Catalog'}</h2>
+              <Badge variant="secondary">{catalogItems.length} items</Badge>
+            </div>
+            {subtitle && (
+              <p className="text-sm text-muted-foreground ml-8">{subtitle}</p>
+            )}
           </div>
           <Button variant="ghost" size="icon" onClick={onClose}>
             <X className="h-5 w-5" />

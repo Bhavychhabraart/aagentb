@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react';
 import { cn } from '@/lib/utils';
-import { Loader2, ScanSearch, X, RefreshCw } from 'lucide-react';
+import { Loader2, ScanSearch, X, RefreshCw, Sparkles, RotateCcw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { DetectionActionMenu } from './DetectionActionMenu';
+import { CatalogFurnitureItem } from '@/services/catalogService';
 
 export interface DetectedItem {
   id: string;
@@ -14,6 +15,11 @@ export interface DetectedItem {
   box_2d?: [number, number, number, number]; // [ymin, xmin, ymax, xmax] in 0-1000 space
 }
 
+interface ReplacementItem {
+  name: string;
+  imageUrl?: string;
+}
+
 interface AIDetectionOverlayProps {
   renderUrl: string;
   isActive: boolean;
@@ -21,8 +27,12 @@ interface AIDetectionOverlayProps {
   isMultiSelectMode: boolean;
   selectedItems: string[];
   onItemSelect: (itemId: string) => void;
-  onItemAction: (item: DetectedItem, action: 'replace' | 'similar' | 'custom' | 'remove') => void;
+  onItemAction: (item: DetectedItem, action: 'replace' | 'similar' | 'custom' | 'remove' | 'lock') => void;
   onBatchGenerate: (items: DetectedItem[]) => void;
+  lockedItems?: string[];
+  replacementItems?: Map<string, ReplacementItem>;
+  onApplyFurnish?: () => void;
+  onClearAll?: () => void;
 }
 
 export function AIDetectionOverlay({
@@ -34,6 +44,10 @@ export function AIDetectionOverlay({
   onItemSelect,
   onItemAction,
   onBatchGenerate,
+  lockedItems = [],
+  replacementItems = new Map(),
+  onApplyFurnish,
+  onClearAll,
 }: AIDetectionOverlayProps) {
   const [isDetecting, setIsDetecting] = useState(false);
   const [detectedItems, setDetectedItems] = useState<DetectedItem[]>([]);
@@ -109,7 +123,12 @@ export function AIDetectionOverlay({
     }
   };
 
+  // Expose detected items for parent component
+  const getDetectedItemById = (id: string) => detectedItems.find(item => item.id === id);
+
   if (!isActive) return null;
+
+  const hasChanges = replacementItems.size > 0 || lockedItems.length > 0;
 
   return (
     <div className="absolute inset-0 z-20">
@@ -180,6 +199,35 @@ export function AIDetectionOverlay({
         </div>
       )}
 
+      {/* Furnish Action Bar - shows when replacements or locked items exist */}
+      {hasChanges && !isMultiSelectMode && (
+        <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-30">
+          <div className="glass-premium rounded-xl px-4 py-3 flex items-center gap-4">
+            <div className="text-sm flex items-center gap-3">
+              {replacementItems.size > 0 && (
+                <span>
+                  <span className="text-amber-500 font-medium">{replacementItems.size}</span>
+                  <span className="text-muted-foreground"> replacement{replacementItems.size > 1 ? 's' : ''}</span>
+                </span>
+              )}
+              {lockedItems.length > 0 && (
+                <span className="text-green-500">
+                  <span className="font-medium">{lockedItems.length}</span> locked
+                </span>
+              )}
+            </div>
+            <Button onClick={onApplyFurnish} className="btn-glow">
+              <Sparkles className="h-4 w-4 mr-2" />
+              Apply Furnish
+            </Button>
+            <Button variant="ghost" size="sm" onClick={onClearAll}>
+              <RotateCcw className="h-3 w-3 mr-1" />
+              Clear All
+            </Button>
+          </div>
+        </div>
+      )}
+
       {/* Detection overlay with loading */}
       {isDetecting && (
         <div className="absolute inset-0 bg-background/50 backdrop-blur-sm flex items-center justify-center">
@@ -195,6 +243,9 @@ export function AIDetectionOverlay({
         const style = getBoxStyle(item);
         const isHovered = hoveredItem === item.id;
         const isSelected = selectedItems.includes(item.id);
+        const isLocked = lockedItems.includes(item.id);
+        const hasReplacement = replacementItems.has(item.id);
+        const replacement = replacementItems.get(item.id);
 
         return (
           <div key={item.id}>
@@ -202,11 +253,15 @@ export function AIDetectionOverlay({
             <div
               className={cn(
                 'absolute border-2 rounded-sm cursor-pointer transition-all duration-200',
-                isSelected
-                  ? 'border-primary bg-primary/20 shadow-lg shadow-primary/20'
-                  : isHovered
-                    ? 'border-primary/80 bg-primary/10'
-                    : 'border-cyan-400/60 hover:border-cyan-400'
+                isLocked
+                  ? 'border-green-500 bg-green-500/20 shadow-lg shadow-green-500/20' // GREEN for locked
+                  : hasReplacement
+                    ? 'border-amber-500 bg-amber-500/15 shadow-lg shadow-amber-500/20' // AMBER for replacement
+                    : isSelected
+                      ? 'border-primary bg-primary/20 shadow-lg shadow-primary/20'
+                      : isHovered
+                        ? 'border-primary/80 bg-primary/10'
+                        : 'border-cyan-400/60 hover:border-cyan-400'
               )}
               style={style}
               onMouseEnter={() => setHoveredItem(item.id)}
@@ -217,15 +272,20 @@ export function AIDetectionOverlay({
               <div
                 className={cn(
                   'absolute -top-6 left-0 px-2 py-0.5 rounded text-[10px] font-medium whitespace-nowrap transition-all',
-                  isSelected
-                    ? 'bg-primary text-primary-foreground'
-                    : isHovered
-                      ? 'bg-cyan-500 text-white'
-                      : 'bg-cyan-400/80 text-white'
+                  isLocked
+                    ? 'bg-green-500 text-white'
+                    : hasReplacement
+                      ? 'bg-amber-500 text-white'
+                      : isSelected
+                        ? 'bg-primary text-primary-foreground'
+                        : isHovered
+                          ? 'bg-cyan-500 text-white'
+                          : 'bg-cyan-400/80 text-white'
                 )}
               >
-                {item.label}
-                {isMultiSelectMode && (
+                {hasReplacement ? `→ ${replacement?.name}` : item.label}
+                {isLocked && ' ✓'}
+                {isMultiSelectMode && !isLocked && (
                   <span className="ml-1 opacity-70">
                     {isSelected ? '✓' : '○'}
                   </span>
@@ -233,7 +293,12 @@ export function AIDetectionOverlay({
               </div>
 
               {/* Center dot indicator */}
-              <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-2 h-2 rounded-full bg-cyan-400 shadow-lg" />
+              <div 
+                className={cn(
+                  'absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-2 h-2 rounded-full shadow-lg',
+                  isLocked ? 'bg-green-500' : hasReplacement ? 'bg-amber-500' : 'bg-cyan-400'
+                )}
+              />
             </div>
 
             {/* Action menu */}
@@ -241,6 +306,7 @@ export function AIDetectionOverlay({
               <DetectionActionMenu
                 item={item}
                 style={style}
+                isLocked={isLocked}
                 onAction={(action) => {
                   onItemAction(item, action);
                   setActiveMenuId(null);

@@ -1,12 +1,13 @@
-import { Package, Search, PenTool, Trash2, X } from 'lucide-react';
+import { Package, Search, PenTool, Trash2, X, Lock } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { DetectedItem } from './AIDetectionOverlay';
 
 interface DetectionActionMenuProps {
   item: DetectedItem;
   style: { left: string; top: string; width: string; height: string };
-  onAction: (action: 'replace' | 'similar' | 'custom' | 'remove') => void;
+  onAction: (action: 'replace' | 'similar' | 'custom' | 'remove' | 'lock') => void;
   onClose: () => void;
+  isLocked?: boolean;
 }
 
 export function DetectionActionMenu({
@@ -14,8 +15,15 @@ export function DetectionActionMenu({
   style,
   onAction,
   onClose,
+  isLocked = false,
 }: DetectionActionMenuProps) {
   const actions = [
+    { 
+      id: 'lock' as const, 
+      icon: Lock, 
+      label: isLocked ? 'Unlock Item' : 'Keep (Lock)', 
+      className: isLocked ? 'text-green-500 bg-green-500/10' : 'text-green-500 hover:bg-green-500/10' 
+    },
     { id: 'replace' as const, icon: Package, label: 'Replace from Catalogue' },
     { id: 'similar' as const, icon: Search, label: 'Find Similar' },
     { id: 'custom' as const, icon: PenTool, label: 'Create Custom' },
