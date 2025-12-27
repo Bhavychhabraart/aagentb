@@ -1667,51 +1667,24 @@ Ready to generate a render! Describe your vision.`;
     setIsAIDetectionActive(false);
   }, [currentRenderUrl]);
 
-  // Handle auto-furnish apply - match suggestions to catalog items
-  const handleAutoFurnishApply = useCallback(async (suggestions: Array<{
-    id: string;
-    type: string;
-    name: string;
-    style: string;
-    position: { x: number; y: number };
-    accepted: boolean;
-  }>) => {
-    if (!currentRenderUrl) return;
+  // Handle auto-furnish apply - receive actual catalog items from panel
+  const handleAutoFurnishApply = useCallback(async (selectedItems: CatalogFurnitureItem[]) => {
+    if (!currentRenderUrl || selectedItems.length === 0) return;
 
     setShowAutoFurnish(false);
     setIsGenerating(true);
 
     try {
-      // Match suggestions to actual catalog items
-      const matchedItems: CatalogFurnitureItem[] = [];
-      const unmatchedNames: string[] = [];
-      
-      for (const suggestion of suggestions) {
-        // Try to find a matching catalog item by name or category
-        const match = catalogItems.find(item => 
-          item.name.toLowerCase().includes(suggestion.name.toLowerCase()) ||
-          suggestion.name.toLowerCase().includes(item.name.toLowerCase()) ||
-          (item.category.toLowerCase() === suggestion.type.toLowerCase() && 
-           item.name.toLowerCase().includes(suggestion.style.toLowerCase()))
-        );
-        
-        if (match) {
-          matchedItems.push(match);
-        } else {
-          unmatchedNames.push(suggestion.name);
-        }
-      }
+      // Build prompt with actual catalog item names
+      const furnitureNames = selectedItems.map(item => item.name).join(', ');
+      const prompt = `Add the following furniture in appropriate positions: ${furnitureNames}. Integrate seamlessly with the room's existing style and elements.`;
 
-      // Build prompt with matched items
-      const allFurniture = suggestions.map(s => s.name);
-      const prompt = `Add the following furniture in appropriate positions: ${allFurniture.join(', ')}. Match the room's ${suggestions[0]?.style || 'modern'} style. Integrate seamlessly with existing elements.`;
-
-      // Call edit-render with actual catalog item images for better results
+      // Call edit-render with actual catalog item images
       const response = await supabase.functions.invoke('edit-render', {
         body: {
           originalUrl: currentRenderUrl,
           prompt,
-          stagedItems: matchedItems.map(item => ({
+          stagedItems: selectedItems.map(item => ({
             id: item.id,
             name: item.name,
             category: item.category,
@@ -1726,15 +1699,15 @@ Ready to generate a render! Describe your vision.`;
         setCurrentRenderUrl(response.data.editedUrl);
         setAllRenderUrls(prev => [...prev, response.data.editedUrl]);
         
-        // Add matched items to staged items
-        const newStagedItems = matchedItems.filter(m => !stagedItems.some(s => s.id === m.id));
+        // Add selected items to staged items
+        const newStagedItems = selectedItems.filter(item => !stagedItems.some(s => s.id === item.id));
         if (newStagedItems.length > 0) {
           setStagedItems(prev => [...prev, ...newStagedItems]);
         }
         
         toast({ 
           title: 'Auto-furnish applied', 
-          description: `Added ${suggestions.length} items${matchedItems.length > 0 ? ` (${matchedItems.length} matched to catalog)` : ''}` 
+          description: `Added ${selectedItems.length} catalog items` 
         });
       }
     } catch (error) {
@@ -1743,7 +1716,7 @@ Ready to generate a render! Describe your vision.`;
     } finally {
       setIsGenerating(false);
     }
-  }, [currentRenderUrl, catalogItems, stagedItems, toast]);
+  }, [currentRenderUrl, stagedItems, toast]);
 
   // Handle catalog item preview
   const handleCatalogItemPreview = useCallback((item: CatalogFurnitureItem) => {
@@ -2976,6 +2949,7 @@ Ready to generate a render! Describe your vision.`;
             isOpen={showAutoFurnish}
             onClose={() => setShowAutoFurnish(false)}
             renderUrl={currentRenderUrl}
+            catalogItems={catalogItems}
             onApply={handleAutoFurnishApply}
           />
           
