@@ -2983,34 +2983,39 @@ Ready to generate a render! Describe your vision.`;
             onApply={handleAutoFurnishApply}
           />
           
-          {/* Staged Items Dock */}
-          <StagedItemsDock
-            stagedItems={stagedItems}
-            onPositionFurniture={() => setShowPositioner(true)}
-            onGenerateWithItems={() => {
-              const itemNames = stagedItems.slice(0, 3).map(i => i.name).join(', ');
-              handleSendMessageWithAgentB(`Generate a render with ${itemNames} placed naturally in the room`);
-            }}
-            onClearAll={handleClearStagedItems}
-            onRemoveItem={handleCatalogItemSelect}
-            canPosition={!!(currentRenderUrl || roomPhotoUrl)}
-            isGenerating={isGenerating}
-          />
-          
-          {/* Floating Chat Input - Bottom Center */}
-          <div className="absolute bottom-6 left-1/2 -translate-x-1/2 w-full max-w-2xl px-4 z-30">
-            <SleekChatInput
-              onSend={(message) => handleSendMessageWithAgentB(message)}
-              isLoading={isProcessing || isGenerating || isSelectiveEditing || agentBState === 'generating'}
-              agentBEnabled={agentBEnabled}
-              onAgentBToggle={setAgentBEnabled}
-              onLayoutUpload={() => setShowLayoutModal(true)}
-              onRoomPhotoUpload={() => setShowRoomPhotoModal(true)}
-              onStyleRefUpload={() => setShowStyleRefModal(true)}
-              placeholder={agentBEnabled ? "Describe your vision (Agent B will guide you)..." : "Describe your vision..."}
-              stagedItems={stagedItems}
-              onOpenCatalogue={() => setShowCatalogueModal(true)}
-            />
+          {/* Bottom Controls Container - Staged Items Dock + Chat Input */}
+          <div className="absolute bottom-0 left-0 right-0 z-20 pointer-events-none flex flex-col items-center pb-6 px-4 gap-3">
+            {/* Staged Items Dock */}
+            <div className="pointer-events-auto w-full flex justify-center">
+              <StagedItemsDock
+                stagedItems={stagedItems}
+                onPositionFurniture={() => setShowPositioner(true)}
+                onGenerateWithItems={() => {
+                  const itemNames = stagedItems.slice(0, 3).map(i => i.name).join(', ');
+                  handleSendMessageWithAgentB(`Generate a render with ${itemNames} placed naturally in the room`);
+                }}
+                onClearAll={handleClearStagedItems}
+                onRemoveItem={handleCatalogItemSelect}
+                canPosition={!!(currentRenderUrl || roomPhotoUrl)}
+                isGenerating={isGenerating}
+              />
+            </div>
+            
+            {/* Floating Chat Input */}
+            <div className="pointer-events-auto w-full max-w-2xl">
+              <SleekChatInput
+                onSend={(message) => handleSendMessageWithAgentB(message)}
+                isLoading={isProcessing || isGenerating || isSelectiveEditing || agentBState === 'generating'}
+                agentBEnabled={agentBEnabled}
+                onAgentBToggle={setAgentBEnabled}
+                onLayoutUpload={() => setShowLayoutModal(true)}
+                onRoomPhotoUpload={() => setShowRoomPhotoModal(true)}
+                onStyleRefUpload={() => setShowStyleRefModal(true)}
+                placeholder={agentBEnabled ? "Describe your vision (Agent B will guide you)..." : "Describe your vision..."}
+                stagedItems={stagedItems}
+                onOpenCatalogue={() => setShowCatalogueModal(true)}
+              />
+            </div>
           </div>
         </div>
 
