@@ -2151,17 +2151,19 @@ Ready to generate a render! Describe your vision.`;
   }, [user, currentProjectId, currentRenderUrl, currentRenderId, currentUpload, addMessage, toast]);
 
   // Handle Multicam view generation (with optional zone focus)
+  // IMPORTANT: Passes furniture items and style references for CONSISTENT rendering across views
   const handleMulticamGenerate = useCallback(async (view: CameraView, customPrompt?: string, zone?: ZoneRegion) => {
     if (!user || !currentProjectId || !currentRenderUrl) return;
 
     setIsMulticamGenerating(true);
     
+    // Camera-specific prompts with STRICT consistency requirements
     const viewPrompts: Record<CameraView, string> = {
-      perspective: 'Render this room from a 3/4 perspective angle, showing depth and dimension',
-      front: 'Render this room from a straight-on front view, facing the main focal wall',
-      side: 'Render this room from a side view, showing the profile of the space',
-      top: "Render this room from a bird's eye top-down view, showing the floor plan layout",
-      custom: customPrompt || 'Render this room from a custom camera angle',
+      perspective: 'CRITICAL: Render this EXACT same room from a 3/4 perspective angle. MAINTAIN all furniture items EXACTLY as they appear - same colors, same positions, same products. Only change the camera angle to a 3/4 perspective view showing depth and dimension.',
+      front: 'CRITICAL: Render this EXACT same room from a straight-on front view. MAINTAIN all furniture items EXACTLY as they appear - same colors, same positions, same products. Only change the camera angle to face the main focal wall directly.',
+      side: 'CRITICAL: Render this EXACT same room from a side view. MAINTAIN all furniture items EXACTLY as they appear - same colors, same positions, same products. Only change the camera angle to show the profile of the space from the side.',
+      top: "CRITICAL: Render this EXACT same room from a bird's eye top-down view. MAINTAIN all furniture items EXACTLY as they appear - same colors, same positions, same products. Only change the camera angle to an overhead view showing the floor plan layout.",
+      custom: customPrompt || 'Render this room from a custom camera angle while MAINTAINING all furniture items EXACTLY as they appear.',
     };
 
     // Build zone-specific prompt if zone is provided
@@ -2171,9 +2173,31 @@ Ready to generate a render! Describe your vision.`;
       prompt = zoneDesc + prompt;
     }
 
+    // Add strict consistency requirements to the prompt
+    const consistencyPrompt = `
+
+ABSOLUTE REQUIREMENTS FOR CONSISTENCY:
+1. ALL furniture items MUST appear EXACTLY as in the reference image
+2. Product COLORS must be IDENTICAL - no color shifts, no "improvements"
+3. Product POSITIONS must be the SAME relative to each other
+4. Do NOT add new furniture or remove existing furniture
+5. Do NOT change materials, textures, or finishes
+6. The ONLY change allowed is the camera angle/viewpoint
+7. This is the SAME room, SAME moment in time, just a different camera position
+
+` + prompt;
+
     try {
       const zoneLabel = zone ? ' (zone focus)' : '';
       await addMessage('user', `📷 Generating ${view} view${zoneLabel}...`, { type: 'text' });
+
+      // Build furniture items with images for reference
+      const furnitureForConsistency = stagedItems.map(item => ({
+        name: item.name,
+        category: item.category,
+        description: item.description,
+        imageUrl: item.imageUrl,
+      }));
 
       const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/edit-render`, {
         method: 'POST',
@@ -2183,7 +2207,11 @@ Ready to generate a render! Describe your vision.`;
         },
         body: JSON.stringify({
           currentRenderUrl: currentRenderUrl,
-          userPrompt: prompt,
+          userPrompt: consistencyPrompt,
+          // Pass furniture items for visual reference and consistency
+          furnitureItems: furnitureForConsistency.length > 0 ? furnitureForConsistency : undefined,
+          // Pass style references for consistent aesthetic
+          styleRefUrls: styleRefUrls.length > 0 ? styleRefUrls : undefined,
           // Pass zone as a crop/focus region if provided
           focusRegion: zone ? {
             x: zone.x_start,
@@ -2191,6 +2219,8 @@ Ready to generate a render! Describe your vision.`;
             width: zone.x_end - zone.x_start,
             height: zone.y_end - zone.y_start,
           } : undefined,
+          // Indicate this is a multicam view for consistency handling
+          viewType: view === 'top' ? 'bird-eye' : view === 'perspective' ? 'cinematic' : 'eye-level',
         }),
       });
 
@@ -2218,7 +2248,7 @@ Ready to generate a render! Describe your vision.`;
     } finally {
       setIsMulticamGenerating(false);
     }
-  }, [user, currentProjectId, currentRenderUrl, addMessage, toast]);
+  }, [user, currentProjectId, currentRenderUrl, stagedItems, styleRefUrls, addMessage, toast]);
 
   // Handle setting a multicam view as main render
   const handleSetMulticamAsMain = useCallback((imageUrl: string) => {

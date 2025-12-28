@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Camera, Eye, ArrowUp, ArrowRight, Box, Loader2, X, Download, Presentation, Check, Edit2, Layers, Plus } from 'lucide-react';
+import { Camera, Eye, ArrowUp, ArrowRight, Box, Loader2, X, Download, Presentation, Check, Edit2, Layers, Plus, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
@@ -7,7 +7,6 @@ import { useToast } from '@/hooks/use-toast';
 import pptxgen from 'pptxgenjs';
 import { supabase } from '@/integrations/supabase/client';
 import { Zone } from './ZoneSelector';
-
 export type CameraView = 'perspective' | 'front' | 'side' | 'top' | 'custom';
 
 export interface ZoneRegion {
@@ -308,19 +307,34 @@ export function MulticamPanel({
                         className="w-full h-full object-cover cursor-pointer hover:opacity-90 transition-opacity"
                         onClick={() => onSelectView(view.id, generatedViews[view.id]!)}
                       />
-                      {/* Set as Main overlay */}
-                      {onSetAsMain && (
-                        <div 
-                          className="absolute inset-0 bg-black/60 opacity-0 hover:opacity-100 transition-opacity flex flex-col items-center justify-center gap-1 cursor-pointer"
+                      {/* Hover overlay with Set as Main and Regenerate options */}
+                      <div 
+                        className="absolute inset-0 bg-black/60 opacity-0 hover:opacity-100 transition-opacity flex flex-col items-center justify-center gap-2"
+                      >
+                        {onSetAsMain && (
+                          <button
+                            className="flex items-center gap-1 text-[10px] text-white hover:text-primary transition-colors"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleSetAsMain(view.id, generatedViews[view.id]!);
+                            }}
+                          >
+                            <Check className="h-3 w-3" />
+                            Set as Main
+                          </button>
+                        )}
+                        <button
+                          className="flex items-center gap-1 text-[10px] text-white hover:text-amber-400 transition-colors"
                           onClick={(e) => {
                             e.stopPropagation();
-                            handleSetAsMain(view.id, generatedViews[view.id]!);
+                            setShowCustomInput(true);
                           }}
+                          disabled={isGenerating}
                         >
-                          <Check className="h-4 w-4 text-white" />
-                          <span className="text-[10px] text-white">Set as Main</span>
-                        </div>
-                      )}
+                          <RefreshCw className="h-3 w-3" />
+                          Regenerate
+                        </button>
+                      </div>
                     </>
                   ) : showCustomInput ? (
                     <div className="absolute inset-0 p-2 flex flex-col gap-1">
@@ -354,7 +368,16 @@ export function MulticamPanel({
                 <div className="p-1.5 flex items-center justify-between">
                   <span className="text-[10px] font-medium">{view.label}</span>
                   {hasImage && !isCurrentlyGenerating && (
-                    <span className="text-[8px] text-primary">✓</span>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-5 w-5"
+                      onClick={() => setShowCustomInput(true)}
+                      disabled={isGenerating}
+                      title="Regenerate custom view"
+                    >
+                      <RefreshCw className="h-3 w-3" />
+                    </Button>
                   )}
                 </div>
               </div>
@@ -381,19 +404,34 @@ export function MulticamPanel({
                       className="w-full h-full object-cover cursor-pointer hover:opacity-90 transition-opacity"
                       onClick={() => onSelectView(view.id, generatedViews[view.id]!)}
                     />
-                    {/* Set as Main overlay */}
-                    {onSetAsMain && (
-                      <div 
-                        className="absolute inset-0 bg-black/60 opacity-0 hover:opacity-100 transition-opacity flex flex-col items-center justify-center gap-1 cursor-pointer"
+                    {/* Hover overlay with Set as Main and Regenerate options */}
+                    <div 
+                      className="absolute inset-0 bg-black/60 opacity-0 hover:opacity-100 transition-opacity flex flex-col items-center justify-center gap-2"
+                    >
+                      {onSetAsMain && (
+                        <button
+                          className="flex items-center gap-1 text-[10px] text-white hover:text-primary transition-colors"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleSetAsMain(view.id, generatedViews[view.id]!);
+                          }}
+                        >
+                          <Check className="h-3 w-3" />
+                          Set as Main
+                        </button>
+                      )}
+                      <button
+                        className="flex items-center gap-1 text-[10px] text-white hover:text-amber-400 transition-colors"
                         onClick={(e) => {
                           e.stopPropagation();
-                          handleSetAsMain(view.id, generatedViews[view.id]!);
+                          handleGenerate(view.id);
                         }}
+                        disabled={isGenerating}
                       >
-                        <Check className="h-4 w-4 text-white" />
-                        <span className="text-[10px] text-white">Set as Main</span>
-                      </div>
-                    )}
+                        <RefreshCw className={cn("h-3 w-3", isCurrentlyGenerating && "animate-spin")} />
+                        Regenerate
+                      </button>
+                    </div>
                   </>
                 ) : (
                   <div className="absolute inset-0 flex flex-col items-center justify-center gap-1">
@@ -429,7 +467,16 @@ export function MulticamPanel({
                   <Loader2 className="h-3 w-3 animate-spin text-primary" />
                 )}
                 {hasImage && !isCurrentlyGenerating && (
-                  <span className="text-[8px] text-primary">✓</span>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-5 w-5"
+                    onClick={() => handleGenerate(view.id)}
+                    disabled={isGenerating}
+                    title="Regenerate this view"
+                  >
+                    <RefreshCw className="h-3 w-3" />
+                  </Button>
                 )}
               </div>
             </div>
