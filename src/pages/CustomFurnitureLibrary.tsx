@@ -322,7 +322,134 @@ export default function CustomFurnitureLibrary() {
           <div className="flex items-center justify-center py-20">
             <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
           </div>
+        ) : activeTab === 'materials' ? (
+          /* Materials Tab Content */
+          materials.length === 0 ? (
+            <div className="text-center py-20">
+              <Palette className="h-16 w-16 mx-auto text-muted-foreground/50 mb-4" />
+              <h2 className="text-xl font-semibold text-foreground mb-2">No custom materials yet</h2>
+              <p className="text-muted-foreground mb-6">
+                Upload your first custom material texture
+              </p>
+              <Button onClick={() => setMaterialUploaderOpen(true)} className="gap-2">
+                <Upload className="h-4 w-4" />
+                Upload Material
+              </Button>
+            </div>
+          ) : viewMode === 'grid' ? (
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+              {materials.map(material => (
+                <Card key={material.id} className="group overflow-hidden hover:ring-2 hover:ring-primary/50 transition-all">
+                  <div className="aspect-square relative overflow-hidden bg-muted">
+                    <img
+                      src={material.image_url}
+                      alt={material.name}
+                      className="w-full h-full object-cover"
+                    />
+                    {material.is_public && (
+                      <Badge className="absolute top-2 right-2 gap-1" variant="secondary">
+                        <Globe className="h-3 w-3" />
+                        Public
+                      </Badge>
+                    )}
+                    {material.color_hex && (
+                      <div 
+                        className="absolute bottom-2 left-2 w-6 h-6 rounded-full border-2 border-white shadow-md"
+                        style={{ backgroundColor: material.color_hex }}
+                      />
+                    )}
+                  </div>
+                  <CardContent className="p-3">
+                    <h3 className="font-medium text-sm truncate">{material.name}</h3>
+                    <p className="text-xs text-muted-foreground">{material.category}</p>
+                    {material.subcategory && (
+                      <p className="text-xs text-muted-foreground/70">{material.subcategory}</p>
+                    )}
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {materials.map(material => (
+                <Card key={material.id} className="flex items-center gap-4 p-4 hover:ring-2 hover:ring-primary/50 transition-all">
+                  <div className="w-16 h-16 rounded-lg overflow-hidden bg-muted flex-shrink-0">
+                    <img
+                      src={material.image_url}
+                      alt={material.name}
+                      className="w-full h-full object-cover"
+                    />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <h3 className="font-medium truncate">{material.name}</h3>
+                      {material.is_public && (
+                        <Badge variant="secondary" className="gap-1">
+                          <Globe className="h-3 w-3" />
+                          Public
+                        </Badge>
+                      )}
+                    </div>
+                    <p className="text-sm text-muted-foreground">{material.category}{material.subcategory ? ` / ${material.subcategory}` : ''}</p>
+                    {material.description && (
+                      <p className="text-xs text-muted-foreground/70 truncate">{material.description}</p>
+                    )}
+                  </div>
+                  {material.color_hex && (
+                    <div 
+                      className="w-8 h-8 rounded-full border-2 border-border flex-shrink-0"
+                      style={{ backgroundColor: material.color_hex }}
+                    />
+                  )}
+                </Card>
+              ))}
+            </div>
+          )
+        ) : activeTab === 'shared' ? (
+          /* Shared Tab Content */
+          sharedItems.length === 0 ? (
+            <div className="text-center py-20">
+              <Share2 className="h-16 w-16 mx-auto text-muted-foreground/50 mb-4" />
+              <h2 className="text-xl font-semibold text-foreground mb-2">No shared products</h2>
+              <p className="text-muted-foreground mb-6">
+                Products shared publicly by the community will appear here
+              </p>
+            </div>
+          ) : viewMode === 'grid' ? (
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+              {sharedItems.map(item => (
+                <FurnitureCard 
+                  key={item.id} 
+                  item={item}
+                  onView={() => setViewingItem(item)}
+                  onEdit={() => {}}
+                  onEditImage={() => {}}
+                  onDelete={() => {}}
+                  onBOM={() => {}}
+                  onVendorRequest={() => {}}
+                  onShare={() => {}}
+                />
+              ))}
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {sharedItems.map(item => (
+                <FurnitureListItem
+                  key={item.id}
+                  item={item}
+                  onView={() => setViewingItem(item)}
+                  onEdit={() => {}}
+                  onEditImage={() => {}}
+                  onDelete={() => {}}
+                  onBOM={() => {}}
+                  onVendorRequest={() => {}}
+                  onShare={() => {}}
+                />
+              ))}
+            </div>
+          )
         ) : filteredItems.length === 0 ? (
+          /* Products Tab - Empty State */
           <div className="text-center py-20">
             <Package className="h-16 w-16 mx-auto text-muted-foreground/50 mb-4" />
             <h2 className="text-xl font-semibold text-foreground mb-2">
@@ -341,6 +468,7 @@ export default function CustomFurnitureLibrary() {
             )}
           </div>
         ) : viewMode === 'grid' ? (
+          /* Products Tab - Grid View */
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
             {filteredItems.map(item => (
               <FurnitureCard 
@@ -357,6 +485,7 @@ export default function CustomFurnitureLibrary() {
             ))}
           </div>
         ) : (
+          /* Products Tab - List View */
           <div className="space-y-3">
             {filteredItems.map(item => (
               <FurnitureListItem
