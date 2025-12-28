@@ -29,6 +29,7 @@ interface CreationSession {
   layout?: UploadedItem;
   roomPhoto?: UploadedItem;
   ceilingPlan?: UploadedItem;
+  wallCeilingPlan?: UploadedItem;
   styleRefs: UploadedItem[];
   products: Array<{ name: string; imageUrl?: string }>;
   isProductCollage: boolean;
@@ -48,7 +49,7 @@ export default function Landing() {
   });
 
   const [projectName, setProjectName] = useState("");
-  const [activeModal, setActiveModal] = useState<"layout" | "room" | "style" | "products" | "rcp" | null>(null);
+  const [activeModal, setActiveModal] = useState<"layout" | "room" | "style" | "products" | "rcp" | "wall-plan" | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [memoryEnabled, setMemoryEnabledState] = useState(true);
   const [agentBModeEnabled, setAgentBModeEnabled] = useState(true);
@@ -142,6 +143,10 @@ export default function Landing() {
 
       if (session.ceilingPlan?.file) {
         uploadPromises.push(uploadFile(session.ceilingPlan.file, project.id, user.id, "ceiling_plan"));
+      }
+
+      if (session.wallCeilingPlan?.file) {
+        uploadPromises.push(uploadFile(session.wallCeilingPlan.file, project.id, user.id, "wall_ceiling_plan"));
       }
 
       for (const styleRef of session.styleRefs) {
@@ -264,13 +269,15 @@ export default function Landing() {
     });
   };
 
-  const handleClearItem = (id: "layout" | "room" | "style" | "products" | "rcp") => {
+  const handleClearItem = (id: "layout" | "room" | "style" | "products" | "rcp" | "wall-plan") => {
     if (id === "layout") {
       setSession((prev) => ({ ...prev, layout: undefined }));
     } else if (id === "room") {
       setSession((prev) => ({ ...prev, roomPhoto: undefined }));
     } else if (id === "rcp") {
       setSession((prev) => ({ ...prev, ceilingPlan: undefined }));
+    } else if (id === "wall-plan") {
+      setSession((prev) => ({ ...prev, wallCeilingPlan: undefined }));
     } else if (id === "style") {
       setSession((prev) => ({ ...prev, styleRefs: [] }));
     } else {
@@ -291,6 +298,7 @@ export default function Landing() {
           layout={session.layout}
           roomPhoto={session.roomPhoto}
           ceilingPlan={session.ceilingPlan}
+          wallCeilingPlan={session.wallCeilingPlan}
           styleRefs={session.styleRefs}
           products={session.products}
           onCardClick={setActiveModal}
@@ -343,6 +351,16 @@ export default function Landing() {
           setActiveModal(null);
         }}
         currentUpload={session.ceilingPlan}
+      />
+
+      <RCPUploadModal
+        open={activeModal === "wall-plan"}
+        onOpenChange={(open) => !open && setActiveModal(null)}
+        onUpload={(item) => {
+          setSession((prev) => ({ ...prev, wallCeilingPlan: item }));
+          setActiveModal(null);
+        }}
+        currentUpload={session.wallCeilingPlan}
       />
 
       <StyleRefModal

@@ -26,7 +26,7 @@ export function PromptSection({
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: 0.5, duration: 0.4 }}
-      className="w-full max-w-xl"
+      className="w-full max-w-2xl"
     >
       <div className="relative glass-premium rounded-xl overflow-hidden border border-border/30">
         {/* Project Name + Prompt in row on larger screens */}
@@ -37,11 +37,11 @@ export function PromptSection({
             onChange={(e) => onProjectNameChange(e.target.value)}
             placeholder="Project name"
             className={cn(
-              "flex-shrink-0 px-4 py-3 bg-transparent",
-              "text-sm font-medium text-foreground",
+              "flex-shrink-0 px-5 py-4 bg-transparent",
+              "text-base font-medium text-foreground",
               "placeholder:text-muted-foreground/50",
               "focus:outline-none border-b sm:border-b-0 sm:border-r border-border/20",
-              "sm:w-40"
+              "sm:w-48"
             )}
           />
           
@@ -51,11 +51,11 @@ export function PromptSection({
               onChange={(e) => onPromptChange(e.target.value)}
               placeholder="Describe your dream space..."
               className={cn(
-                "min-h-[80px] px-4 py-3 pr-14 resize-none",
+                "min-h-[100px] px-5 py-4 pr-16 resize-none",
                 "bg-transparent border-0",
                 "text-foreground placeholder:text-muted-foreground/40",
                 "focus-visible:ring-0 focus-visible:ring-offset-0",
-                "text-sm leading-relaxed"
+                "text-base leading-relaxed"
               )}
             />
             
@@ -64,7 +64,7 @@ export function PromptSection({
               onClick={onGenerate}
               disabled={isGenerating}
               className={cn(
-                "absolute bottom-3 right-3 h-9 w-9 rounded-lg",
+                "absolute bottom-4 right-4 h-11 w-11 rounded-lg",
                 "bg-primary hover:bg-primary/90",
                 "shadow-[0_0_20px_hsl(217_100%_58%/0.3)]",
                 "transition-all duration-200",
@@ -72,14 +72,14 @@ export function PromptSection({
                 "disabled:opacity-50"
               )}
             >
-              {isGenerating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+              {isGenerating ? <Loader2 className="w-5 h-5 animate-spin" /> : <Send className="w-5 h-5" />}
             </Button>
           </div>
         </div>
       </div>
       
-      <p className="text-center text-[10px] text-muted-foreground/40 mt-2">
-        <kbd className="kbd text-[10px]">⌘</kbd> + <kbd className="kbd text-[10px]">Enter</kbd>
+      <p className="text-center text-xs text-muted-foreground/40 mt-3">
+        <kbd className="kbd text-xs">⌘</kbd> + <kbd className="kbd text-xs">Enter</kbd>
       </p>
     </motion.div>
   );
