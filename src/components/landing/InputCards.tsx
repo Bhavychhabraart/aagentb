@@ -80,13 +80,13 @@ export function InputCards({
   ];
 
   return (
-    <div className="w-full max-w-4xl space-y-5 mb-5">
+    <div className="w-full max-w-5xl space-y-8 mb-8">
       {/* Primary Inputs - Larger Cards */}
       <motion.div
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.2, duration: 0.4 }}
-        className="grid grid-cols-2 gap-5"
+        className="grid grid-cols-2 gap-6"
       >
         {primaryInputs.map((card, index) => (
           <motion.button
@@ -109,7 +109,7 @@ export function InputCards({
             
             {/* Card content */}
             <div className={cn(
-              "relative flex items-center gap-5 p-6 rounded-2xl",
+              "relative flex items-center gap-6 p-8 rounded-2xl",
               "bg-background/95 backdrop-blur-sm",
               "transition-all duration-300"
             )}>
@@ -125,27 +125,27 @@ export function InputCards({
               {card.hasContent && (
                 <button
                   onClick={(e) => { e.stopPropagation(); onClear(card.id); }}
-                  className="absolute top-3 right-3 p-1.5 rounded-full bg-background/90 border border-border opacity-0 group-hover:opacity-100 transition-all hover:bg-destructive hover:border-destructive hover:text-destructive-foreground z-10"
+                  className="absolute top-4 right-4 p-2 rounded-full bg-background/90 border border-border opacity-0 group-hover:opacity-100 transition-all hover:bg-destructive hover:border-destructive hover:text-destructive-foreground z-10"
                 >
-                  <X className="w-3.5 h-3.5" />
+                  <X className="w-4 h-4" />
                 </button>
               )}
               
               {/* Icon */}
               <div className={cn(
-                "relative p-4 rounded-xl transition-all duration-300 shrink-0",
+                "relative p-5 rounded-xl transition-all duration-300 shrink-0",
                 card.hasContent ? "bg-primary/20" : "bg-muted/40 group-hover:bg-primary/10"
               )}>
                 <card.icon className={cn(
-                  "w-8 h-8 transition-colors",
+                  "w-10 h-10 transition-colors",
                   card.hasContent ? "text-primary" : "text-muted-foreground group-hover:text-primary"
                 )} />
               </div>
               
               {/* Text */}
               <div className="relative text-left">
-                <span className="block text-base font-semibold text-foreground">{card.title}</span>
-                <span className="block text-sm text-muted-foreground">
+                <span className="block text-lg font-semibold text-foreground">{card.title}</span>
+                <span className="block text-base text-muted-foreground">
                   {card.hasContent ? "Uploaded ✓" : card.description}
                 </span>
               </div>
@@ -159,7 +159,7 @@ export function InputCards({
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ delay: 0.35, duration: 0.3 }}
-        className="flex flex-wrap justify-center gap-3"
+        className="flex flex-wrap justify-center gap-4"
       >
         {secondaryInputs.map((pill, index) => (
           <motion.button
@@ -171,35 +171,35 @@ export function InputCards({
             whileTap={{ scale: 0.97 }}
             onClick={() => onCardClick(pill.id)}
             className={cn(
-              "group relative flex items-center gap-2.5 px-5 py-2.5 rounded-full",
+              "group relative flex items-center gap-3 px-6 py-3 rounded-full",
               "glass-premium border transition-all duration-200",
               pill.hasContent ? "border-primary/40 bg-primary/5" : "border-border/40 hover:border-primary/30"
             )}
           >
             <pill.icon className={cn(
-              "w-4 h-4 transition-colors",
+              "w-5 h-5 transition-colors",
               pill.hasContent ? "text-primary" : "text-muted-foreground group-hover:text-primary"
             )} />
             
             <span className={cn(
-              "text-sm font-medium transition-colors",
+              "text-base font-medium transition-colors",
               pill.hasContent ? "text-foreground" : "text-muted-foreground group-hover:text-foreground"
             )}>
               {pill.label}
             </span>
             
             {pill.hasContent ? (
-              <span className="flex items-center gap-1.5">
-                <span className="text-sm text-primary">{pill.count || "✓"}</span>
+              <span className="flex items-center gap-2">
+                <span className="text-base text-primary">{pill.count || "✓"}</span>
                 <button
                   onClick={(e) => { e.stopPropagation(); onClear(pill.id); }}
-                  className="p-0.5 rounded-full opacity-0 group-hover:opacity-100 hover:bg-destructive/20 transition-all"
+                  className="p-1 rounded-full opacity-0 group-hover:opacity-100 hover:bg-destructive/20 transition-all"
                 >
-                  <X className="w-3 h-3 text-muted-foreground hover:text-destructive" />
+                  <X className="w-4 h-4 text-muted-foreground hover:text-destructive" />
                 </button>
               </span>
             ) : (
-              <Plus className="w-3 h-3 text-muted-foreground group-hover:text-primary" />
+              <Plus className="w-4 h-4 text-muted-foreground group-hover:text-primary" />
             )}
           </motion.button>
         ))}
