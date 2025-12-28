@@ -2,13 +2,15 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
   ArrowLeft, Search, Filter, Plus, Eye, Edit, Trash2, 
-  FileText, Send, Loader2, Package, Grid3X3, List, X, Wand2
+  FileText, Send, Loader2, Package, Grid3X3, List, X, Wand2,
+  Share2, Link2, Globe, Upload, Palette
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { 
   AlertDialog, 
   AlertDialogAction, 
@@ -26,6 +28,8 @@ import { cn } from '@/lib/utils';
 import { BOMAnalysisPanel } from '@/components/creation/BOMAnalysisPanel';
 import { VendorRequestModal } from '@/components/creation/VendorRequestModal';
 import { ProductImageEditor } from '@/components/creation/ProductImageEditor';
+import { ShareProductModal } from '@/components/library/ShareProductModal';
+import { CustomMaterialUploader } from '@/components/library/CustomMaterialUploader';
 
 interface CustomFurnitureItem {
   id: string;
@@ -36,6 +40,21 @@ interface CustomFurnitureItem {
   item_image_url: string | null;
   item_price: number | null;
   project_id: string;
+  created_at: string;
+  is_public?: boolean;
+  share_token?: string | null;
+}
+
+interface CustomMaterial {
+  id: string;
+  name: string;
+  category: string;
+  subcategory: string | null;
+  description: string | null;
+  image_url: string;
+  color_hex: string | null;
+  is_public: boolean;
+  properties: Record<string, boolean>;
   created_at: string;
 }
 
@@ -65,7 +84,10 @@ export default function CustomFurnitureLibrary() {
   const { user, loading: authLoading } = useAuth();
   const { toast } = useToast();
   
+  const [activeTab, setActiveTab] = useState<'products' | 'materials' | 'shared'>('products');
   const [items, setItems] = useState<CustomFurnitureItem[]>([]);
+  const [sharedItems, setSharedItems] = useState<CustomFurnitureItem[]>([]);
+  const [materials, setMaterials] = useState<CustomMaterial[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('All');
@@ -76,6 +98,8 @@ export default function CustomFurnitureLibrary() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [itemToDelete, setItemToDelete] = useState<CustomFurnitureItem | null>(null);
   const [editingImageItem, setEditingImageItem] = useState<CustomFurnitureItem | null>(null);
+  const [sharingItem, setSharingItem] = useState<CustomFurnitureItem | null>(null);
+  const [materialUploaderOpen, setMaterialUploaderOpen] = useState(false);
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -92,6 +116,7 @@ export default function CustomFurnitureLibrary() {
   const fetchCustomFurniture = async () => {
     setLoading(true);
     try {
+      // Fetch user's own products
       const { data, error } = await supabase
         .from('staged_furniture')
         .select('*')
@@ -100,6 +125,24 @@ export default function CustomFurnitureLibrary() {
 
       if (error) throw error;
       setItems(data || []);
+
+      // Fetch public/shared products from others
+      const { data: publicData } = await supabase
+        .from('staged_furniture')
+        .select('*')
+        .eq('is_public', true)
+        .neq('user_id', user?.id)
+        .order('created_at', { ascending: false });
+      
+      setSharedItems(publicData || []);
+
+      // Fetch custom materials
+      const { data: materialsData } = await supabase
+        .from('custom_materials')
+        .select('*')
+        .order('created_at', { ascending: false });
+      
+      setMaterials((materialsData as CustomMaterial[]) || []);
     } catch (error) {
       console.error('Failed to fetch custom furniture:', error);
       toast({ variant: 'destructive', title: 'Error', description: 'Failed to load custom furniture.' });
@@ -263,6 +306,7 @@ export default function CustomFurnitureLibrary() {
                 onDelete={() => { setItemToDelete(item); setDeleteDialogOpen(true); }}
                 onBOM={() => setBomItem(item)}
                 onVendorRequest={() => setVendorRequestItem(item)}
+                onShare={() => setSharingItem(item)}
               />
             ))}
           </div>
@@ -278,6 +322,7 @@ export default function CustomFurnitureLibrary() {
                 onDelete={() => { setItemToDelete(item); setDeleteDialogOpen(true); }}
                 onBOM={() => setBomItem(item)}
                 onVendorRequest={() => setVendorRequestItem(item)}
+                onShare={() => setSharingItem(item)}
               />
             ))}
           </div>
@@ -397,9 +442,10 @@ interface FurnitureCardProps {
   onDelete: () => void;
   onBOM: () => void;
   onVendorRequest: () => void;
+  onShare: () => void;
 }
 
-function FurnitureCard({ item, onView, onEdit, onEditImage, onDelete, onBOM, onVendorRequest }: FurnitureCardProps) {
+function FurnitureCard({ item, onView, onEdit, onEditImage, onDelete, onBOM, onVendorRequest, onShare }: FurnitureCardProps) {
   return (
     <Card className="group overflow-hidden hover:shadow-lg transition-all duration-200">
       <div className="relative aspect-square">
@@ -420,14 +466,14 @@ function FurnitureCard({ item, onView, onEdit, onEditImage, onDelete, onBOM, onV
           <Button size="icon" variant="secondary" onClick={onView} title="View">
             <Eye className="h-4 w-4" />
           </Button>
+          <Button size="icon" variant="secondary" onClick={onShare} title="Share">
+            <Share2 className="h-4 w-4" />
+          </Button>
           <Button size="icon" variant="secondary" onClick={onEditImage} title="Edit Image">
             <Wand2 className="h-4 w-4" />
           </Button>
           <Button size="icon" variant="secondary" onClick={onBOM} title="BOM Analysis">
             <FileText className="h-4 w-4" />
-          </Button>
-          <Button size="icon" variant="secondary" onClick={onVendorRequest} title="Send to Vendor">
-            <Send className="h-4 w-4" />
           </Button>
           <Button size="icon" variant="destructive" onClick={onDelete} title="Delete">
             <Trash2 className="h-4 w-4" />
@@ -435,6 +481,9 @@ function FurnitureCard({ item, onView, onEdit, onEditImage, onDelete, onBOM, onV
         </div>
 
         <Badge className="absolute top-2 left-2 text-[10px]">{item.item_category}</Badge>
+        {item.is_public && (
+          <Globe className="absolute top-2 right-2 h-4 w-4 text-green-400" />
+        )}
       </div>
       <CardContent className="p-3">
         <h3 className="font-medium text-sm truncate">{item.item_name}</h3>
@@ -448,7 +497,7 @@ function FurnitureCard({ item, onView, onEdit, onEditImage, onDelete, onBOM, onV
   );
 }
 
-function FurnitureListItem({ item, onView, onEdit, onEditImage, onDelete, onBOM, onVendorRequest }: FurnitureCardProps) {
+function FurnitureListItem({ item, onView, onEdit, onEditImage, onDelete, onBOM, onVendorRequest, onShare }: FurnitureCardProps) {
   return (
     <Card className="hover:shadow-md transition-shadow">
       <CardContent className="p-4 flex items-center gap-4">
