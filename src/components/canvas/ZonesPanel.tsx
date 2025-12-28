@@ -5,6 +5,7 @@ import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { Zone } from './ZoneSelector';
+import { ZonePreviewConfirm } from './ZonePreviewConfirm';
 
 interface ZonesPanelProps {
   projectId: string;
@@ -27,6 +28,7 @@ export function ZonesPanel({
   isGenerating,
   onClose,
 }: ZonesPanelProps) {
+  const [previewZone, setPreviewZone] = useState<Zone | null>(null);
   const [zones, setZones] = useState<Zone[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -157,7 +159,6 @@ export function ZonesPanel({
                   </p>
                 </div>
 
-                {/* Actions */}
                 <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                   <Button
                     variant="ghost"
@@ -165,10 +166,10 @@ export function ZonesPanel({
                     className="h-6 w-6"
                     onClick={(e) => {
                       e.stopPropagation();
-                      onGenerateZoneView(zone);
+                      setPreviewZone(zone);
                     }}
-                    disabled={isGenerating}
-                    title="Generate view of this zone"
+                    disabled={isGenerating || !renderUrl}
+                    title="Preview and generate view of this zone"
                   >
                     <Camera className="h-3 w-3" />
                   </Button>
@@ -198,6 +199,20 @@ export function ZonesPanel({
             Click a zone to select, then generate focused views
           </p>
         </div>
+      )}
+
+      {/* Zone Preview Confirmation Modal */}
+      {previewZone && renderUrl && (
+        <ZonePreviewConfirm
+          zone={previewZone}
+          renderUrl={renderUrl}
+          isGenerating={isGenerating}
+          onConfirm={() => {
+            onGenerateZoneView(previewZone);
+            setPreviewZone(null);
+          }}
+          onCancel={() => setPreviewZone(null)}
+        />
       )}
     </div>
   );
