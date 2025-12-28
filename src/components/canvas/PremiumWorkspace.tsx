@@ -28,7 +28,10 @@ import {
   ScanSearch,
   Package,
   ShoppingCart,
-  GripVertical
+  GripVertical,
+  Download,
+  Maximize2,
+  RefreshCcw
 } from 'lucide-react';
 import { RenderHistoryCarousel, RenderHistoryItem } from './RenderHistoryCarousel';
 import { CatalogFurnitureItem } from '@/services/catalogService';
@@ -114,6 +117,10 @@ interface PremiumWorkspaceProps {
   // Selection tool props
   isSelectionMode?: boolean;
   onSelectionComplete?: (region: { x: number; y: number; width: number; height: number } | null) => void;
+  // Start Over and Upscale props
+  onStartOver?: () => void;
+  onUpscale?: () => void;
+  isUpscaling?: boolean;
 }
 
 interface ToolbarItem {
@@ -171,6 +178,10 @@ export function PremiumWorkspace({
   // Selection tool props
   isSelectionMode,
   onSelectionComplete,
+  // Start Over and Upscale props
+  onStartOver,
+  onUpscale,
+  isUpscaling,
 }: PremiumWorkspaceProps) {
   const [showDirectorInput, setShowDirectorInput] = useState(false);
   const [directorPrompt, setDirectorPrompt] = useState('');
@@ -390,6 +401,32 @@ export function PremiumWorkspace({
 
   const actionTools: ToolbarItem[] = [
     {
+      id: 'download',
+      icon: Download,
+      label: 'Download',
+      onClick: async () => {
+        if (renderUrl) {
+          const { formatDownloadFilename } = await import('@/utils/formatDownloadFilename');
+          const link = document.createElement('a');
+          link.href = renderUrl;
+          link.download = formatDownloadFilename('render', 'project', 'png');
+          link.click();
+        }
+      },
+      disabled: !renderUrl,
+      shortcut: 'W',
+      group: 'actions',
+    },
+    {
+      id: 'upscale',
+      icon: isUpscaling ? Loader2 : Maximize2,
+      label: isUpscaling ? 'Upscaling...' : 'Upscale HD',
+      onClick: onUpscale,
+      disabled: !renderUrl || isUpscaling || isGenerating,
+      shortcut: 'U',
+      group: 'actions',
+    },
+    {
       id: 'undo',
       icon: Undo2,
       label: 'Undo',
@@ -406,6 +443,16 @@ export function PremiumWorkspace({
       disabled: !renderUrl,
       shortcut: 'X',
       group: 'actions',
+    },
+  ];
+
+  const startOverTools: ToolbarItem[] = [
+    {
+      id: 'startover',
+      icon: RefreshCcw,
+      label: 'Start Over',
+      onClick: onStartOver,
+      group: 'startover',
     },
   ];
 
@@ -479,6 +526,11 @@ export function PremiumWorkspace({
             
             {/* Actions */}
             {renderToolGroup(actionTools)}
+            
+            <Separator orientation="vertical" className="h-6 mx-1 bg-border/30" />
+            
+            {/* Start Over */}
+            {renderToolGroup(startOverTools)}
           </div>
         </div>
 

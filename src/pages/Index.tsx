@@ -35,6 +35,17 @@ import { AutoFurnishPanel } from '@/components/canvas/AutoFurnishPanel';
 import { FullScreenCatalogModal } from '@/components/canvas/FullScreenCatalogModal';
 import { Button } from '@/components/ui/button';
 import { Move, Plus } from 'lucide-react';
+import { formatDownloadFilename } from '@/utils/formatDownloadFilename';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { cropZoneFromRender } from '@/utils/cropZoneImage';
 import {
   getMemorySettings,
@@ -165,6 +176,10 @@ const Index = () => {
   // Selection tool state
   const [selectionMode, setSelectionMode] = useState(false);
   const [currentSelection, setCurrentSelection] = useState<SelectionRegion | null>(null);
+
+  // Start Over and Upscale state
+  const [showStartOverDialog, setShowStartOverDialog] = useState(false);
+  const [isUpscaling, setIsUpscaling] = useState(false);
 
   // Load memory settings on user login
   useEffect(() => {
@@ -2967,6 +2982,92 @@ ABSOLUTE REQUIREMENTS FOR CONSISTENCY:
     return !!currentRender?.parent_render_id;
   })();
 
+  // Handle Start Over - creates a new project and resets state
+  const handleStartOver = useCallback(async () => {
+    if (!user) return;
+    
+    try {
+      // Create a new project
+      const { data: newProject, error } = await supabase
+        .from('projects')
+        .insert({ user_id: user.id, name: 'New Project' })
+        .select('id')
+        .single();
+      
+      if (error) throw error;
+      
+      // Reset all state
+      setMessages([]);
+      setCurrentRenderUrl(null);
+      setCurrentRenderId(null);
+      setCurrentUpload(null);
+      setStagedItems([]);
+      setLayoutImageUrl(null);
+      setRoomPhotoUrl(null);
+      setStyleRefUrls([]);
+      setAllRenderUrls([]);
+      setAllRenders([]);
+      setZones([]);
+      setAgentBState('idle');
+      setAgentBUnderstanding(null);
+      setAgentBQuestions([]);
+      setAgentBAnswers([]);
+      setMulticamViews({ perspective: null, front: null, side: null, top: null, custom: null });
+      setIsAIDetectionActive(false);
+      setSelectedDetections([]);
+      setDetectionReplacements(new Map());
+      setLockedDetections(new Set());
+      setUploadedProducts([]);
+      
+      // Navigate to new project
+      setCurrentProjectId(newProject.id);
+      setSearchParams({ project: newProject.id }, { replace: true });
+      setProjectName('New Project');
+      
+      toast({ title: 'Started fresh!', description: 'New project created' });
+      setShowStartOverDialog(false);
+    } catch (error) {
+      console.error('Failed to start over:', error);
+      toast({ variant: 'destructive', title: 'Error', description: 'Failed to create new project' });
+    }
+  }, [user, toast, setSearchParams]);
+
+  // Handle Upscale Render
+  const handleUpscaleRender = useCallback(async () => {
+    if (!currentRenderUrl) {
+      toast({ variant: 'destructive', title: 'No render to upscale', description: 'Generate a render first' });
+      return;
+    }
+    
+    setIsUpscaling(true);
+    
+    try {
+      const response = await supabase.functions.invoke('upscale-image', {
+        body: { imageUrl: currentRenderUrl }
+      });
+      
+      if (response.error) throw response.error;
+      
+      const upscaledUrl = response.data?.upscaledUrl;
+      if (!upscaledUrl) throw new Error('No upscaled URL returned');
+      
+      // Download the upscaled image
+      const link = document.createElement('a');
+      link.href = upscaledUrl;
+      link.download = formatDownloadFilename('upscaled', projectName, 'png');
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
+      toast({ title: 'Upscaled!', description: 'HD image downloaded' });
+    } catch (error) {
+      console.error('Upscale failed:', error);
+      toast({ variant: 'destructive', title: 'Upscale failed', description: 'Please try again' });
+    } finally {
+      setIsUpscaling(false);
+    }
+  }, [currentRenderUrl, projectName, toast]);
+
   // Loading state - early returns AFTER all hooks
   if (authLoading) {
     return (
@@ -3069,6 +3170,10 @@ ABSOLUTE REQUIREMENTS FOR CONSISTENCY:
             // Selection tool props
             isSelectionMode={selectionMode && !currentSelection}
             onSelectionComplete={handleSelectionComplete}
+            // Start Over and Upscale props
+            onStartOver={() => setShowStartOverDialog(true)}
+            onUpscale={handleUpscaleRender}
+            isUpscaling={isUpscaling}
           />
 
           {/* Selection is now handled inside PremiumWorkspace */}
@@ -3303,6 +3408,22 @@ ABSOLUTE REQUIREMENTS FOR CONSISTENCY:
         similarityBadge={similarSearchData?.itemLabel}
         isLoading={isFindingSimilar}
       />
+
+      {/* Start Over Confirmation Dialog */}
+      <AlertDialog open={showStartOverDialog} onOpenChange={setShowStartOverDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Start Over?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will create a new project and discard your current work. Your existing project will still be saved and accessible from the sidebar.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleStartOver}>Start Fresh</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   </SidebarProvider>
   </PageTransition>

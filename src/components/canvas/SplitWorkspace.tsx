@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { 
   Eye, Camera as CameraIcon, Plus, Lock, Unlock, Maximize2, Minimize2, Map, Sparkles,
   ZoomIn, ZoomOut, RotateCcw, Download, Crop, Undo2, Wand2, Video, LayoutGrid,
-  Move, FileDown, ShoppingCart, Layers
+  Move, FileDown, ShoppingCart, Layers, RefreshCcw, Loader2
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -63,6 +63,10 @@ interface SplitWorkspaceProps {
   onStopZoneDrawing?: () => void;
   onGenerateZoneView?: (zone: Zone) => void;
   onToggleZonesPanel?: () => void;
+  // Start Over and Upscale props
+  onStartOver?: () => void;
+  onUpscale?: () => void;
+  isUpscaling?: boolean;
 }
 
 export function SplitWorkspace({
@@ -108,6 +112,10 @@ export function SplitWorkspace({
   onStopZoneDrawing,
   onGenerateZoneView,
   onToggleZonesPanel,
+  // Start Over and Upscale props
+  onStartOver,
+  onUpscale,
+  isUpscaling,
 }: SplitWorkspaceProps) {
   const [isMinimapExpanded, setIsMinimapExpanded] = useState(false);
   const [zoom, setZoom] = useState(1);
@@ -324,6 +332,29 @@ export function SplitWorkspace({
               </TooltipContent>
             </Tooltip>
 
+            {/* Upscale HD */}
+            {onUpscale && (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={onUpscale}
+                    disabled={!birdEyeRenderUrl || isUpscaling || isGenerating}
+                    className={cn(
+                      "h-8 w-8",
+                      isUpscaling ? "text-primary" : "hover:bg-primary/20 text-primary"
+                    )}
+                  >
+                    {isUpscaling ? <Loader2 className="h-4 w-4 animate-spin" /> : <Maximize2 className="h-4 w-4" />}
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>{isUpscaling ? 'Upscaling...' : 'Upscale HD'}</p>
+                </TooltipContent>
+              </Tooltip>
+            )}
+
             {/* Start Order */}
             {onStartOrder && (
               <Tooltip>
@@ -452,6 +483,25 @@ export function SplitWorkspace({
                 </TooltipTrigger>
                 <TooltipContent>
                   <p>{showZonesPanel ? 'Close Zones' : 'Zones - Define areas for focused renders'}</p>
+                </TooltipContent>
+              </Tooltip>
+            )}
+
+            {/* Start Over */}
+            {onStartOver && (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={onStartOver}
+                    className="h-8 w-8 hover:bg-destructive/20 text-muted-foreground hover:text-destructive"
+                  >
+                    <RefreshCcw className="h-4 w-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>Start Over</p>
                 </TooltipContent>
               </Tooltip>
             )}
