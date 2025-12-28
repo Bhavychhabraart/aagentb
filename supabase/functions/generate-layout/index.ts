@@ -39,10 +39,11 @@ serve(async (req) => {
   }
 
   try {
-    const { prompt, roomDimensions, useBrainKnowledge, userId } = await req.json();
+    const { prompt, roomDimensions, useBrainKnowledge, userId, zoneConstraints } = await req.json();
 
     console.log('Generating layout for prompt:', prompt);
     console.log('Room dimensions:', roomDimensions);
+    console.log('Zone constraints:', zoneConstraints);
 
     const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
     if (!LOVABLE_API_KEY) {
@@ -77,6 +78,16 @@ serve(async (req) => {
       }
     }
 
+    // Build zone constraint text if provided
+    const zoneText = zoneConstraints ? `
+ZONE CONSTRAINTS (CRITICAL - furniture MUST be placed within these bounds):
+- Zone X start: ${zoneConstraints.x}px
+- Zone Y start: ${zoneConstraints.y}px
+- Zone width: ${zoneConstraints.width}px
+- Zone height: ${zoneConstraints.height}px
+All furniture x/y positions MUST be within this zone. Ensure furniture fits entirely within zone boundaries.
+` : '';
+
     const systemPrompt = `You are an expert interior designer AI that generates 2D floor plan layouts.
 
 Available furniture (use these exact IDs):
@@ -84,15 +95,17 @@ ${FURNITURE_LIBRARY.map(f => `- ${f.id}: ${f.name} (${f.width}" x ${f.depth}")`)
 
 Room dimensions: ${roomDimensions.width} ${roomDimensions.unit} x ${roomDimensions.depth} ${roomDimensions.unit}
 ${brainContext}
+${zoneText}
 
 IMPORTANT RULES:
-1. Position furniture using PIXEL coordinates (1 inch = 8 pixels, 1 foot = 96 pixels)
-2. Leave adequate clearance (at least 36" / 288px) for walkways
+1. Position furniture using PIXEL coordinates (1 inch = 4 pixels, 1 foot = 48 pixels)
+2. Leave adequate clearance (at least 36" / 144px) for walkways
 3. Consider natural light from windows (typically on outer walls)
 4. Create functional zones (seating area, work area, etc.)
 5. Furniture should not overlap
 6. Keep furniture away from walls by at least 100 pixels (padding)
 7. Room padding is 100 pixels on each side
+${zoneConstraints ? '8. ALL furniture MUST be placed WITHIN the specified zone boundaries' : ''}
 
 Return a valid JSON object with this exact structure:
 {

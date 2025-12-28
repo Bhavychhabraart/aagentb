@@ -1,10 +1,14 @@
-import { useRef, useEffect } from 'react';
-import { RoomDimensions } from '@/types/layout-creator';
+import { useRef, useEffect, useState } from 'react';
+import { RoomDimensions, FURNITURE_LIBRARY, AIZoneSelection } from '@/types/layout-creator';
 import { useLayoutCanvas } from '@/hooks/useLayoutCanvas';
 import { LayoutToolbar } from './LayoutToolbar';
 import { FurnitureLibrary } from './FurnitureLibrary';
 import { PropertiesPanel } from './PropertiesPanel';
+import { AIZonePromptModal } from './AIZonePromptModal';
 import { getRoomLabel } from '@/utils/layoutExport';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
+import { useAuth } from '@/hooks/useAuth';
 
 interface LayoutCanvasProps {
   roomDimensions: RoomDimensions;
@@ -14,6 +18,10 @@ interface LayoutCanvasProps {
 export function LayoutCanvas({ roomDimensions, onCanvasReady }: LayoutCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const { user } = useAuth();
+  
+  const [showAIZoneModal, setShowAIZoneModal] = useState(false);
+  const [isGeneratingZone, setIsGeneratingZone] = useState(false);
   
   const canvasMethods = useLayoutCanvas({
     canvasRef,
@@ -38,8 +46,12 @@ export function LayoutCanvas({ roomDimensions, onCanvasReady }: LayoutCanvasProp
     addDoor,
     addWindow,
     addFurniture,
+    addFurnitureAtPosition,
     deleteSelected,
     rotateSelected,
+    aiZoneSelection,
+    clearAIZone,
+    saveToHistory,
   } = canvasMethods;
 
   // Initialize canvas
@@ -53,6 +65,77 @@ export function LayoutCanvas({ roomDimensions, onCanvasReady }: LayoutCanvasProp
       fabricCanvas?.dispose();
     };
   }, [roomDimensions]);
+
+  // Show modal when zone is selected
+  useEffect(() => {
+    if (aiZoneSelection && aiZoneSelection.width > 50 && aiZoneSelection.height > 50) {
+      setShowAIZoneModal(true);
+    }
+  }, [aiZoneSelection]);
+
+  // Handle AI zone generation
+  const handleAIZoneGenerate = async (prompt: string, useBrainKnowledge: boolean) => {
+    if (!aiZoneSelection || !canvas) return;
+    
+    setIsGeneratingZone(true);
+    
+    try {
+      const { data, error } = await supabase.functions.invoke('generate-layout', {
+        body: {
+          prompt,
+          roomDimensions,
+          useBrainKnowledge,
+          userId: user?.id,
+          zoneConstraints: {
+            x: aiZoneSelection.x,
+            y: aiZoneSelection.y,
+            width: aiZoneSelection.width,
+            height: aiZoneSelection.height,
+          },
+        },
+      });
+
+      if (error) throw error;
+
+      if (data?.furniture && Array.isArray(data.furniture)) {
+        // Add each furniture item at the specified position
+        data.furniture.forEach((item: { id: string; x: number; y: number; rotation?: number }) => {
+          const furnitureDef = FURNITURE_LIBRARY.find(f => f.id === item.id);
+          if (furnitureDef) {
+            addFurnitureAtPosition(furnitureDef, item.x, item.y, item.rotation || 0);
+          }
+        });
+        
+        // Save to history after all furniture added
+        saveToHistory(canvas);
+        
+        toast.success(`Added ${data.furniture.length} items to the zone`);
+        
+        if (data.suggestions?.length > 0) {
+          toast.info(data.suggestions[0], { duration: 5000 });
+        }
+      }
+      
+      // Clear zone and close modal
+      clearAIZone();
+      setShowAIZoneModal(false);
+      setActiveTool('select');
+      
+    } catch (error) {
+      console.error('AI zone generation error:', error);
+      toast.error('Failed to generate furniture for zone');
+    } finally {
+      setIsGeneratingZone(false);
+    }
+  };
+
+  // Handle modal close
+  const handleModalClose = (open: boolean) => {
+    setShowAIZoneModal(open);
+    if (!open) {
+      clearAIZone();
+    }
+  };
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -69,6 +152,11 @@ export function LayoutCanvas({ roomDimensions, onCanvasReady }: LayoutCanvasProp
         case 'f':
           setActiveTool('furniture');
           break;
+        case 'a':
+          if (!e.ctrlKey && !e.metaKey) {
+            setActiveTool('ai-zone');
+          }
+          break;
         case 'd':
           if (!e.ctrlKey && !e.metaKey) {
             addDoor();
@@ -83,6 +171,12 @@ export function LayoutCanvas({ roomDimensions, onCanvasReady }: LayoutCanvasProp
         case 'delete':
         case 'backspace':
           deleteSelected();
+          break;
+        case 'escape':
+          if (activeTool === 'ai-zone') {
+            clearAIZone();
+            setActiveTool('select');
+          }
           break;
         case 'z':
           if (e.ctrlKey || e.metaKey) {
@@ -118,7 +212,7 @@ export function LayoutCanvas({ roomDimensions, onCanvasReady }: LayoutCanvasProp
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [setActiveTool, addDoor, addWindow, rotateSelected, deleteSelected, undo, redo, zoom, setCanvasZoom, fitToScreen]);
+  }, [setActiveTool, addDoor, addWindow, rotateSelected, deleteSelected, undo, redo, zoom, setCanvasZoom, fitToScreen, activeTool, clearAIZone]);
 
   return (
     <div className="flex flex-col h-full">
@@ -169,15 +263,28 @@ export function LayoutCanvas({ roomDimensions, onCanvasReady }: LayoutCanvasProp
           <span>Room: {getRoomLabel(roomDimensions)}</span>
           <span>Grid: {showGrid ? '1 ft' : 'Off'}</span>
           <span>Snap: {snapToGrid ? 'On' : 'Off'}</span>
+          {activeTool === 'ai-zone' && (
+            <span className="text-primary font-medium">Draw a zone to generate furniture</span>
+          )}
         </div>
         <div className="flex items-center gap-4">
           <span>Objects: {canvas?.getObjects().filter(o => {
             const data = (o as { data?: { type?: string } }).data;
-            return data?.type !== 'room-outline' && data?.type !== 'grid';
+            return data?.type !== 'room-outline' && data?.type !== 'grid' && data?.type !== 'ai-zone-selection';
           }).length || 0}</span>
           <span>Zoom: {zoom}%</span>
         </div>
       </div>
+
+      {/* AI Zone Prompt Modal */}
+      <AIZonePromptModal
+        open={showAIZoneModal}
+        onOpenChange={handleModalClose}
+        zone={aiZoneSelection}
+        onGenerate={handleAIZoneGenerate}
+        isGenerating={isGeneratingZone}
+        unit={roomDimensions.unit}
+      />
     </div>
   );
 }
