@@ -5,7 +5,8 @@ import {
   RoomDimensions, 
   FurnitureBlockDefinition,
   PIXELS_PER_INCH,
-  DEFAULT_WALL_THICKNESS
+  DEFAULT_WALL_THICKNESS,
+  AIZoneSelection
 } from '@/types/layout-creator';
 
 interface UseLayoutCanvasProps {
@@ -25,11 +26,14 @@ export function useLayoutCanvas({ canvasRef, roomDimensions }: UseLayoutCanvasPr
   const [snapToGrid, setSnapToGrid] = useState(true);
   const [gridSize, setGridSize] = useState(12); // 1 foot
   const [zoom, setZoom] = useState(100);
+  const [aiZoneSelection, setAIZoneSelection] = useState<AIZoneSelection | null>(null);
   
   const historyRef = useRef<HistoryEntry[]>([]);
   const historyIndexRef = useRef(-1);
   const isLoadingRef = useRef(false);
   const wallStartRef = useRef<{ x: number; y: number } | null>(null);
+  const zoneStartRef = useRef<{ x: number; y: number } | null>(null);
+  const zoneRectRef = useRef<Rect | null>(null);
 
   // Convert dimensions to pixels
   const getPixelDimensions = useCallback(() => {
@@ -424,6 +428,70 @@ export function useLayoutCanvas({ canvasRef, roomDimensions }: UseLayoutCanvasPr
     return canvas.toDataURL({ format, quality: 1, multiplier: 1 });
   }, [canvas]);
 
+  // Add furniture at specific position (for AI zone generation)
+  const addFurnitureAtPosition = useCallback((furniture: FurnitureBlockDefinition, x: number, y: number, rotation: number = 0) => {
+    if (!canvas) return;
+
+    const width = furniture.width * PIXELS_PER_INCH;
+    const depth = furniture.depth * PIXELS_PER_INCH;
+
+    let shape: Rect | Circle;
+    if (furniture.shape === 'circle') {
+      shape = new Circle({
+        radius: Math.min(width, depth) / 2,
+        fill: furniture.color,
+        stroke: '#1f2937',
+        strokeWidth: 1,
+        originX: 'center',
+        originY: 'center',
+      });
+    } else {
+      shape = new Rect({
+        width: width,
+        height: depth,
+        fill: furniture.color,
+        stroke: '#1f2937',
+        strokeWidth: 1,
+        rx: 4,
+        ry: 4,
+      });
+    }
+
+    const label = new FabricText(furniture.name, {
+      fontSize: 12,
+      fill: '#ffffff',
+      fontFamily: 'sans-serif',
+      originX: 'center',
+      originY: 'center',
+      left: furniture.shape === 'circle' ? 0 : width / 2,
+      top: furniture.shape === 'circle' ? 0 : depth / 2,
+    });
+
+    const group = new Group([shape, label], {
+      left: x,
+      top: y,
+      angle: rotation,
+    });
+    (group as any).data = { 
+      type: 'furniture',
+      furnitureId: furniture.id,
+      name: furniture.name,
+      category: furniture.category,
+    };
+
+    canvas.add(group);
+    canvas.renderAll();
+  }, [canvas]);
+
+  // Clear AI zone selection
+  const clearAIZone = useCallback(() => {
+    if (!canvas || !zoneRectRef.current) return;
+    canvas.remove(zoneRectRef.current);
+    zoneRectRef.current = null;
+    setAIZoneSelection(null);
+    canvas.renderAll();
+  }, [canvas]);
+
   // Setup event listeners
   useEffect(() => {
     if (!canvas) return;
@@ -440,6 +508,45 @@ export function useLayoutCanvas({ canvasRef, roomDimensions }: UseLayoutCanvasPr
       if (activeTool === 'wall' && e.pointer) {
         wallStartRef.current = { x: snapPosition(e.pointer.x), y: snapPosition(e.pointer.y) };
       }
+      
+      // AI Zone selection start
+      if (activeTool === 'ai-zone' && e.pointer) {
+        zoneStartRef.current = { x: e.pointer.x, y: e.pointer.y };
+        
+        // Remove any existing zone rect
+        if (zoneRectRef.current) {
+          canvas.remove(zoneRectRef.current);
+        }
+        
+        // Create new zone selection rect
+        zoneRectRef.current = new Rect({
+          left: e.pointer.x,
+          top: e.pointer.y,
+          width: 0,
+          height: 0,
+          fill: 'rgba(99, 102, 241, 0.15)',
+          stroke: '#6366f1',
+          strokeWidth: 2,
+          strokeDashArray: [8, 4],
+          selectable: false,
+          evented: false,
+          data: { type: 'ai-zone-selection' }
+        });
+        canvas.add(zoneRectRef.current);
+      }
+    };
+
+    const handleMouseMove = (e: { pointer?: { x: number; y: number } }) => {
+      // Update zone rect while drawing
+      if (activeTool === 'ai-zone' && zoneStartRef.current && zoneRectRef.current && e.pointer) {
+        const left = Math.min(zoneStartRef.current.x, e.pointer.x);
+        const top = Math.min(zoneStartRef.current.y, e.pointer.y);
+        const width = Math.abs(e.pointer.x - zoneStartRef.current.x);
+        const height = Math.abs(e.pointer.y - zoneStartRef.current.y);
+        
+        zoneRectRef.current.set({ left, top, width, height });
+        canvas.renderAll();
+      }
     };
 
     const handleMouseUp = (e: { pointer?: { x: number; y: number } }) => {
@@ -449,6 +556,25 @@ export function useLayoutCanvas({ canvasRef, roomDimensions }: UseLayoutCanvasPr
         addWall(wallStartRef.current.x, wallStartRef.current.y, endX, endY);
         wallStartRef.current = null;
       }
+      
+      // AI Zone selection complete
+      if (activeTool === 'ai-zone' && zoneStartRef.current && zoneRectRef.current && e.pointer) {
+        const left = Math.min(zoneStartRef.current.x, e.pointer.x);
+        const top = Math.min(zoneStartRef.current.y, e.pointer.y);
+        const width = Math.abs(e.pointer.x - zoneStartRef.current.x);
+        const height = Math.abs(e.pointer.y - zoneStartRef.current.y);
+        
+        // Only trigger if zone is large enough (at least 50px)
+        if (width > 50 && height > 50) {
+          setAIZoneSelection({ x: left, y: top, width, height });
+        } else {
+          // Zone too small, remove it
+          canvas.remove(zoneRectRef.current);
+          zoneRectRef.current = null;
+        }
+        
+        zoneStartRef.current = null;
+      }
     };
 
     canvas.on('selection:created', handleSelection);
@@ -456,6 +582,7 @@ export function useLayoutCanvas({ canvasRef, roomDimensions }: UseLayoutCanvasPr
     canvas.on('selection:cleared', handleSelection);
     canvas.on('object:modified', handleModified);
     canvas.on('mouse:down', handleMouseDown);
+    canvas.on('mouse:move', handleMouseMove);
     canvas.on('mouse:up', handleMouseUp);
 
     // Snap to grid on move
@@ -474,6 +601,7 @@ export function useLayoutCanvas({ canvasRef, roomDimensions }: UseLayoutCanvasPr
       canvas.off('selection:cleared', handleSelection);
       canvas.off('object:modified', handleModified);
       canvas.off('mouse:down', handleMouseDown);
+      canvas.off('mouse:move', handleMouseMove);
       canvas.off('mouse:up', handleMouseUp);
     };
   }, [canvas, activeTool, snapToGrid, snapPosition, addWall]);
@@ -483,9 +611,10 @@ export function useLayoutCanvas({ canvasRef, roomDimensions }: UseLayoutCanvasPr
     if (!canvas) return;
 
     canvas.selection = activeTool === 'select';
+    canvas.defaultCursor = activeTool === 'ai-zone' ? 'crosshair' : 'default';
     canvas.forEachObject((obj) => {
       const objData = (obj as FabricObject & { data?: { type?: string } }).data;
-      if (objData?.type !== 'room-outline' && objData?.type !== 'grid') {
+      if (objData?.type !== 'room-outline' && objData?.type !== 'grid' && objData?.type !== 'ai-zone-selection') {
         obj.selectable = activeTool === 'select';
       }
     });
@@ -513,11 +642,15 @@ export function useLayoutCanvas({ canvasRef, roomDimensions }: UseLayoutCanvasPr
     addDoor,
     addWindow,
     addFurniture,
+    addFurnitureAtPosition,
     deleteSelected,
     rotateSelected,
     clearCanvas,
     exportAsJSON,
     loadFromJSON,
     exportAsImage,
+    aiZoneSelection,
+    clearAIZone,
+    saveToHistory,
   };
 }

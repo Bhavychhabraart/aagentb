@@ -1,4 +1,11 @@
-export type LayoutTool = 'select' | 'move' | 'wall' | 'window' | 'door' | 'furniture' | 'rotate' | 'delete';
+export type LayoutTool = 'select' | 'move' | 'wall' | 'window' | 'door' | 'furniture' | 'rotate' | 'delete' | 'ai-zone';
+
+export interface AIZoneSelection {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
 
 export type UnitType = 'ft' | 'm' | 'in' | 'cm';
 

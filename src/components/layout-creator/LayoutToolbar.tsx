@@ -13,7 +13,8 @@ import {
   Magnet,
   ZoomIn,
   ZoomOut,
-  Maximize2
+  Maximize2,
+  Sparkles
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
@@ -40,13 +41,14 @@ interface LayoutToolbarProps {
   hasSelection: boolean;
 }
 
-const tools: { id: LayoutTool; label: string; icon: React.ReactNode; shortcut: string }[] = [
+const tools: { id: LayoutTool; label: string; icon: React.ReactNode; shortcut: string; highlight?: boolean }[] = [
   { id: 'select', label: 'Select', icon: <MousePointer className="h-4 w-4" />, shortcut: 'V' },
   { id: 'move', label: 'Pan', icon: <Move className="h-4 w-4" />, shortcut: 'H' },
   { id: 'wall', label: 'Wall', icon: <Minus className="h-4 w-4" />, shortcut: 'W' },
   { id: 'window', label: 'Window', icon: <Square className="h-4 w-4" />, shortcut: 'N' },
   { id: 'door', label: 'Door', icon: <DoorOpen className="h-4 w-4" />, shortcut: 'D' },
   { id: 'furniture', label: 'Furniture', icon: <Armchair className="h-4 w-4" />, shortcut: 'F' },
+  { id: 'ai-zone', label: 'AI Zone', icon: <Sparkles className="h-4 w-4" />, shortcut: 'A', highlight: true },
 ];
 
 export function LayoutToolbar({
@@ -78,7 +80,9 @@ export function LayoutToolbar({
                 size="sm"
                 className={cn(
                   'h-8 w-8 p-0',
-                  activeTool === tool.id && 'bg-background shadow-sm'
+                  activeTool === tool.id && 'bg-background shadow-sm',
+                  tool.highlight && activeTool !== tool.id && 'text-primary hover:text-primary',
+                  tool.highlight && activeTool === tool.id && 'bg-primary text-primary-foreground hover:bg-primary/90'
                 )}
                 onClick={() => onToolChange(tool.id)}
               >
