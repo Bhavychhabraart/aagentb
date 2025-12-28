@@ -12,6 +12,7 @@ import CustomFurnitureLibrary from "@/pages/CustomFurnitureLibrary";
 import AgentBOnboarding from "@/pages/AgentBOnboarding";
 import AgentBBrain from "@/pages/AgentBBrain";
 import DrawingToolWorkspace from "@/pages/DrawingToolWorkspace";
+import SharedProductView from "@/pages/SharedProductView";
 
 export const AnimatedRoutes = () => {
   const location = useLocation();
@@ -31,6 +32,7 @@ export const AnimatedRoutes = () => {
         <Route path="/custom-furniture/create" element={<CreateCustomFurniture />} />
         <Route path="/furniture-library" element={<CustomFurnitureLibrary />} />
         <Route path="/custom-furniture" element={<CustomFurnitureLibrary />} />
+        <Route path="/shared/:shareToken" element={<SharedProductView />} />
         <Route path="/tools/:toolType" element={<DrawingToolWorkspace />} />
         <Route path="*" element={<NotFound />} />
       </Routes>

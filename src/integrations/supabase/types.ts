@@ -284,6 +284,51 @@ export type Database = {
         }
         Relationships: []
       }
+      custom_materials: {
+        Row: {
+          category: string
+          color_hex: string | null
+          created_at: string | null
+          description: string | null
+          id: string
+          image_url: string
+          is_public: boolean | null
+          name: string
+          properties: Json | null
+          share_token: string | null
+          subcategory: string | null
+          user_id: string
+        }
+        Insert: {
+          category?: string
+          color_hex?: string | null
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          image_url: string
+          is_public?: boolean | null
+          name: string
+          properties?: Json | null
+          share_token?: string | null
+          subcategory?: string | null
+          user_id: string
+        }
+        Update: {
+          category?: string
+          color_hex?: string | null
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          image_url?: string
+          is_public?: boolean | null
+          name?: string
+          properties?: Json | null
+          share_token?: string | null
+          subcategory?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       design_memory_settings: {
         Row: {
           auto_learn: boolean | null
@@ -757,12 +802,57 @@ export type Database = {
           },
         ]
       }
+      shared_products: {
+        Row: {
+          allow_copy: boolean | null
+          created_at: string | null
+          expires_at: string | null
+          id: string
+          is_public: boolean | null
+          product_id: string
+          share_token: string
+          shared_by_user_id: string
+          shared_with_user_id: string | null
+        }
+        Insert: {
+          allow_copy?: boolean | null
+          created_at?: string | null
+          expires_at?: string | null
+          id?: string
+          is_public?: boolean | null
+          product_id: string
+          share_token: string
+          shared_by_user_id: string
+          shared_with_user_id?: string | null
+        }
+        Update: {
+          allow_copy?: boolean | null
+          created_at?: string | null
+          expires_at?: string | null
+          id?: string
+          is_public?: boolean | null
+          product_id?: string
+          share_token?: string
+          shared_by_user_id?: string
+          shared_with_user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "shared_products_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "staged_furniture"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       staged_furniture: {
         Row: {
           catalog_item_id: string
           created_at: string
           height_percent: number | null
           id: string
+          is_public: boolean | null
           item_category: string
           item_description: string | null
           item_image_url: string | null
@@ -770,6 +860,8 @@ export type Database = {
           item_price: number | null
           project_id: string
           room_id: string | null
+          share_token: string | null
+          shared_at: string | null
           user_id: string
           width_percent: number | null
           x_position: number | null
@@ -780,6 +872,7 @@ export type Database = {
           created_at?: string
           height_percent?: number | null
           id?: string
+          is_public?: boolean | null
           item_category: string
           item_description?: string | null
           item_image_url?: string | null
@@ -787,6 +880,8 @@ export type Database = {
           item_price?: number | null
           project_id: string
           room_id?: string | null
+          share_token?: string | null
+          shared_at?: string | null
           user_id: string
           width_percent?: number | null
           x_position?: number | null
@@ -797,6 +892,7 @@ export type Database = {
           created_at?: string
           height_percent?: number | null
           id?: string
+          is_public?: boolean | null
           item_category?: string
           item_description?: string | null
           item_image_url?: string | null
@@ -804,6 +900,8 @@ export type Database = {
           item_price?: number | null
           project_id?: string
           room_id?: string | null
+          share_token?: string | null
+          shared_at?: string | null
           user_id?: string
           width_percent?: number | null
           x_position?: number | null
