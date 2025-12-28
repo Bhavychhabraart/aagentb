@@ -12,6 +12,7 @@ import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Package, X, Plus, Link2, Upload, Loader2, Image as ImageIcon, Library, Search, Check, Layers, Grid3X3, ShoppingBag, Sparkles } from "lucide-react";
+import { fetchFurnitureCatalog, CatalogFurnitureItem } from "@/services/catalogService";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -99,24 +100,17 @@ export function ProductPickerModal({
     }
   }, [userId, open]);
 
-  // Load catalog items (vendor products)
+  // Load catalog items (BentChair + vendor products)
   useEffect(() => {
     const loadCatalog = async () => {
       setCatalogLoading(true);
       try {
-        const { data, error } = await supabase
-          .from('vendor_products')
-          .select('*')
-          .eq('is_active', true)
-          .order('created_at', { ascending: false })
-          .limit(50);
-        
-        if (error) throw error;
-        setCatalogItems(data?.map(item => ({
+        const catalogData = await fetchFurnitureCatalog();
+        setCatalogItems(catalogData.map(item => ({
           id: item.id,
           name: item.name,
-          imageUrl: item.image_url || undefined,
-        })) || []);
+          imageUrl: item.imageUrl,
+        })));
       } catch (error) {
         console.error('Failed to load catalog:', error);
       } finally {
