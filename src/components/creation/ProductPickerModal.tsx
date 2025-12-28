@@ -32,6 +32,7 @@ interface ProductPickerModalProps {
 }
 
 type MainTab = "moodboard" | "individual" | "catalog";
+type MoodboardSource = "library" | "catalog";
 
 export function ProductPickerModal({
   open,
@@ -47,8 +48,13 @@ export function ProductPickerModal({
   const [inputMode, setInputMode] = useState<"upload" | "url">("upload");
   const [isUploading, setIsUploading] = useState(false);
   const [dragActive, setDragActive] = useState(false);
-  const [uploadedImageUrl, setUploadedImageUrl] = useState<string | null>(null);
+  const [individualUploadedUrl, setIndividualUploadedUrl] = useState<string | null>(null);
   const [mainTab, setMainTab] = useState<MainTab>("moodboard");
+  
+  // Moodboard sub-source toggle
+  const [moodboardSource, setMoodboardSource] = useState<MoodboardSource>("library");
+  const [moodboardCatalogSearch, setMoodboardCatalogSearch] = useState("");
+  const [selectedMoodboardCatalogIds, setSelectedMoodboardCatalogIds] = useState<Set<string>>(new Set());
   
   // Library state
   const [libraryItems, setLibraryItems] = useState<ProductItem[]>([]);
@@ -133,6 +139,11 @@ export function ProductPickerModal({
     !catalogSearch || item.name.toLowerCase().includes(catalogSearch.toLowerCase())
   );
 
+  // Filter catalog items for moodboard tab
+  const filteredMoodboardCatalogItems = catalogItems.filter(item =>
+    !moodboardCatalogSearch || item.name.toLowerCase().includes(moodboardCatalogSearch.toLowerCase())
+  );
+
   const handleDrag = useCallback((e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
@@ -196,7 +207,8 @@ export function ProductPickerModal({
     }
   };
 
-  const handleDrop = useCallback(async (e: React.DragEvent) => {
+  // Handler for Individual tab uploads - stores URL for preview before adding
+  const handleIndividualDrop = useCallback(async (e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
     setDragActive(false);
@@ -205,23 +217,54 @@ export function ProductPickerModal({
     if (files && files[0]) {
       const url = await uploadFile(files[0]);
       if (url) {
-        setUploadedImageUrl(url);
+        setIndividualUploadedUrl(url);
       }
     }
   }, [userId]);
 
-  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleIndividualFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (files && files[0]) {
       const url = await uploadFile(files[0]);
       if (url) {
-        setUploadedImageUrl(url);
+        setIndividualUploadedUrl(url);
       }
     }
   };
 
+  // Handler for Moodboard tab uploads - adds directly to products with auto-generated name
+  const handleMoodboardDrop = useCallback(async (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragActive(false);
+
+    const files = e.dataTransfer.files;
+    if (files && files[0]) {
+      const url = await uploadFile(files[0]);
+      if (url) {
+        const autoName = `Moodboard Item ${products.length + 1}`;
+        setProducts(prev => [...prev, { name: autoName, imageUrl: url }]);
+        toast.success("Image added to moodboard!");
+      }
+    }
+  }, [userId, products.length]);
+
+  const handleMoodboardFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (files && files[0]) {
+      const url = await uploadFile(files[0]);
+      if (url) {
+        const autoName = `Moodboard Item ${products.length + 1}`;
+        setProducts(prev => [...prev, { name: autoName, imageUrl: url }]);
+        toast.success("Image added to moodboard!");
+      }
+    }
+    // Reset input value to allow uploading same file again
+    e.target.value = '';
+  };
+
   const addProduct = () => {
-    const imageUrl = inputMode === "upload" ? uploadedImageUrl : newProductUrl.trim();
+    const imageUrl = inputMode === "upload" ? individualUploadedUrl : newProductUrl.trim();
 
     if (!newProductName.trim()) {
       toast.error("Please enter a product name");
@@ -237,7 +280,7 @@ export function ProductPickerModal({
     setProducts([...products, newProduct]);
     setNewProductName("");
     setNewProductUrl("");
-    setUploadedImageUrl(null);
+    setIndividualUploadedUrl(null);
     toast.success("Product added! Click 'Confirm & Use' to include in your render.", {
       duration: 3000,
     });
@@ -267,6 +310,23 @@ export function ProductPickerModal({
     setSelectedCatalogIds(newSelected);
   };
 
+  const toggleMoodboardCatalogItem = (item: ProductItem) => {
+    const newSelected = new Set(selectedMoodboardCatalogIds);
+    if (item.id && newSelected.has(item.id)) {
+      newSelected.delete(item.id);
+    } else if (item.id) {
+      newSelected.add(item.id);
+    }
+    setSelectedMoodboardCatalogIds(newSelected);
+  };
+
+  const addSelectedFromMoodboardCatalog = () => {
+    const itemsToAdd = catalogItems.filter(item => item.id && selectedMoodboardCatalogIds.has(item.id));
+    setProducts([...products, ...itemsToAdd]);
+    setSelectedMoodboardCatalogIds(new Set());
+    toast.success(`Added ${itemsToAdd.length} product(s) to moodboard`);
+  };
+
   const addSelectedFromLibrary = () => {
     const itemsToAdd = libraryItems.filter(item => item.id && selectedLibraryIds.has(item.id));
     setProducts([...products, ...itemsToAdd]);
@@ -290,10 +350,10 @@ export function ProductPickerModal({
 
   const resetImageInput = () => {
     setNewProductUrl("");
-    setUploadedImageUrl(null);
+    setIndividualUploadedUrl(null);
   };
 
-  const canAddProduct = newProductName.trim() && (inputMode === "upload" ? uploadedImageUrl : newProductUrl.trim());
+  const canAddProduct = newProductName.trim() && (inputMode === "upload" ? individualUploadedUrl : newProductUrl.trim());
 
   const renderProductGrid = (
     items: ProductItem[],
@@ -391,33 +451,95 @@ export function ProductPickerModal({
             <TabsContent value="moodboard" className="mt-4 space-y-4">
               <div className="text-sm text-muted-foreground bg-muted/50 rounded-lg p-3">
                 <p className="font-medium text-foreground mb-1">Furniture Moodboard</p>
-                <p>Upload multiple furniture images to create a cohesive moodboard. All items will be combined as a collage for design inspiration.</p>
+                <p>Select from your library, catalog, or upload images to create a cohesive moodboard.</p>
               </div>
 
-              {/* Search library */}
-              <div className="relative">
-                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input
-                  placeholder="Search your saved products..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-9"
-                />
+              {/* Source toggle: Library vs Catalog */}
+              <div className="flex gap-2 p-1 bg-muted rounded-lg">
+                <button
+                  onClick={() => setMoodboardSource("library")}
+                  className={cn(
+                    "flex-1 flex items-center justify-center gap-2 py-2 px-3 rounded-md text-sm font-medium transition-colors",
+                    moodboardSource === "library"
+                      ? "bg-background text-foreground shadow-sm"
+                      : "text-muted-foreground hover:text-foreground"
+                  )}
+                >
+                  <Library className="h-4 w-4" />
+                  My Library
+                </button>
+                <button
+                  onClick={() => setMoodboardSource("catalog")}
+                  className={cn(
+                    "flex-1 flex items-center justify-center gap-2 py-2 px-3 rounded-md text-sm font-medium transition-colors",
+                    moodboardSource === "catalog"
+                      ? "bg-background text-foreground shadow-sm"
+                      : "text-muted-foreground hover:text-foreground"
+                  )}
+                >
+                  <ShoppingBag className="h-4 w-4" />
+                  Catalog
+                </button>
               </div>
 
-              {renderProductGrid(
-                filteredLibraryItems,
-                selectedLibraryIds,
-                toggleLibraryItem,
-                libraryLoading,
-                libraryItems.length === 0 ? "No products in library yet" : "No products match your search"
+              {/* Library source content */}
+              {moodboardSource === "library" && (
+                <>
+                  <div className="relative">
+                    <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      placeholder="Search your saved products..."
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      className="pl-9"
+                    />
+                  </div>
+
+                  {renderProductGrid(
+                    filteredLibraryItems,
+                    selectedLibraryIds,
+                    toggleLibraryItem,
+                    libraryLoading,
+                    libraryItems.length === 0 ? "No products in library yet" : "No products match your search"
+                  )}
+
+                  {selectedLibraryIds.size > 0 && (
+                    <Button onClick={addSelectedFromLibrary} className="w-full">
+                      <Plus className="h-4 w-4 mr-2" />
+                      Add {selectedLibraryIds.size} to Moodboard
+                    </Button>
+                  )}
+                </>
               )}
 
-              {selectedLibraryIds.size > 0 && (
-                <Button onClick={addSelectedFromLibrary} className="w-full">
-                  <Plus className="h-4 w-4 mr-2" />
-                  Add {selectedLibraryIds.size} to Moodboard
-                </Button>
+              {/* Catalog source content */}
+              {moodboardSource === "catalog" && (
+                <>
+                  <div className="relative">
+                    <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      placeholder="Search catalog products..."
+                      value={moodboardCatalogSearch}
+                      onChange={(e) => setMoodboardCatalogSearch(e.target.value)}
+                      className="pl-9"
+                    />
+                  </div>
+
+                  {renderProductGrid(
+                    filteredMoodboardCatalogItems,
+                    selectedMoodboardCatalogIds,
+                    toggleMoodboardCatalogItem,
+                    catalogLoading,
+                    catalogItems.length === 0 ? "No catalog products available" : "No products match your search"
+                  )}
+
+                  {selectedMoodboardCatalogIds.size > 0 && (
+                    <Button onClick={addSelectedFromMoodboardCatalog} className="w-full">
+                      <Plus className="h-4 w-4 mr-2" />
+                      Add {selectedMoodboardCatalogIds.size} to Moodboard
+                    </Button>
+                  )}
+                </>
               )}
 
               {/* Quick upload for moodboard */}
@@ -432,7 +554,7 @@ export function ProductPickerModal({
                   onDragEnter={handleDrag}
                   onDragLeave={handleDrag}
                   onDragOver={handleDrag}
-                  onDrop={handleDrop}
+                  onDrop={handleMoodboardDrop}
                   onClick={() => document.getElementById("moodboard-file-input")?.click()}
                 >
                   <input
@@ -440,7 +562,7 @@ export function ProductPickerModal({
                     type="file"
                     accept="image/*"
                     className="hidden"
-                    onChange={handleFileSelect}
+                    onChange={handleMoodboardFileSelect}
                     disabled={isUploading}
                   />
                   <div className="flex items-center justify-center gap-2 text-center">
@@ -450,7 +572,7 @@ export function ProductPickerModal({
                       <Upload className="h-5 w-5 text-muted-foreground" />
                     )}
                     <p className="text-sm text-muted-foreground">
-                      {isUploading ? "Uploading..." : "Drop images or click to browse"}
+                      {isUploading ? "Uploading..." : "Drop images or click to browse (adds directly)"}
                     </p>
                   </div>
                 </div>
@@ -486,10 +608,10 @@ export function ProductPickerModal({
                 </TabsList>
 
                 <TabsContent value="upload" className="mt-4">
-                  {uploadedImageUrl ? (
+                  {individualUploadedUrl ? (
                     <div className="relative rounded-lg border overflow-hidden">
                       <img
-                        src={uploadedImageUrl}
+                        src={individualUploadedUrl}
                         alt="Uploaded product"
                         className="w-full h-32 object-contain bg-muted"
                       />
@@ -497,7 +619,7 @@ export function ProductPickerModal({
                         variant="destructive"
                         size="icon"
                         className="absolute top-2 right-2 h-6 w-6"
-                        onClick={() => setUploadedImageUrl(null)}
+                        onClick={() => setIndividualUploadedUrl(null)}
                       >
                         <X className="h-4 w-4" />
                       </Button>
@@ -512,7 +634,7 @@ export function ProductPickerModal({
                       onDragEnter={handleDrag}
                       onDragLeave={handleDrag}
                       onDragOver={handleDrag}
-                      onDrop={handleDrop}
+                      onDrop={handleIndividualDrop}
                       onClick={() => document.getElementById("product-file-input")?.click()}
                     >
                       <input
@@ -520,7 +642,7 @@ export function ProductPickerModal({
                         type="file"
                         accept="image/*"
                         className="hidden"
-                        onChange={handleFileSelect}
+                        onChange={handleIndividualFileSelect}
                         disabled={isUploading}
                       />
                       <div className="flex flex-col items-center justify-center text-center">
