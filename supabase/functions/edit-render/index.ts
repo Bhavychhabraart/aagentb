@@ -64,19 +64,36 @@ function findZoneForPosition(x: number, y: number, zones: LayoutAnalysis['furnit
   return null;
 }
 
-// Build layout constraints string
+// Build layout constraints string with STRONG enforcement
 function buildLayoutConstraints(analysis: LayoutAnalysis): string {
   return `
-LAYOUT CONSTRAINTS (from floor plan analysis):
-═══════════════════════════════════════════════════════════════
-Room: ${analysis.roomShape} (${analysis.dimensions.width}×${analysis.dimensions.depth}${analysis.dimensions.unit === 'feet' ? 'ft' : 'm'})
-Windows: ${analysis.windows.map(w => `${w.wall} wall @${Math.round(w.positionPercent)}%`).join(', ') || 'None visible'}
-Doors: ${analysis.doors.map(d => `${d.wall} wall @${Math.round(d.positionPercent)}%`).join(', ') || 'None visible'}
+╔═══════════════════════════════════════════════════════════════════════════════╗
+║                    ⚠️ LAYOUT ACCURACY - HIGHEST PRIORITY ⚠️                    ║
+╠═══════════════════════════════════════════════════════════════════════════════╣
+║  THE FLOOR PLAN LAYOUT IS THE ABSOLUTE AUTHORITY FOR THIS RENDER              ║
+║  ANY DEVIATION FROM THE LAYOUT = AUTOMATIC REJECTION                          ║
+╚═══════════════════════════════════════════════════════════════════════════════╝
 
-FURNITURE ZONES:
+MANDATORY ROOM SPECIFICATIONS (FROM FLOOR PLAN ANALYSIS):
+═══════════════════════════════════════════════════════════════
+Room Shape: ${analysis.roomShape.toUpperCase()}
+Dimensions: ${analysis.dimensions.width}×${analysis.dimensions.depth}${analysis.dimensions.unit === 'feet' ? 'ft' : 'm'}
+
+WINDOW COUNT: EXACTLY ${analysis.windows.length} windows - NO MORE, NO LESS
+${analysis.windows.map((w, i) => `  Window ${i + 1}: ${w.wall} wall at ${Math.round(w.positionPercent)}% from left corner`).join('\n') || '  (No windows)'}
+
+DOOR COUNT: EXACTLY ${analysis.doors.length} doors - NO MORE, NO LESS
+${analysis.doors.map((d, i) => `  Door ${i + 1}: ${d.wall} wall at ${Math.round(d.positionPercent)}% from left corner`).join('\n') || '  (No doors)'}
+
+FURNITURE ZONES (place items ONLY within these zones):
 ${analysis.furnitureZones.map(z => `• ${z.label}: X(${z.xStart}-${z.xEnd}%) Y(${z.yStart}-${z.yEnd}%)`).join('\n')}
 
-⚠️ CRITICAL: Do NOT move or modify any architectural elements (walls, windows, doors, floors, ceilings)
+⚠️ CRITICAL CONSTRAINTS:
+✓ Window count MUST be EXACTLY ${analysis.windows.length}
+✓ Door count MUST be EXACTLY ${analysis.doors.length}
+✓ Room proportions MUST match ${analysis.dimensions.width}:${analysis.dimensions.depth} ratio
+✓ Do NOT add, remove, or reposition any windows/doors
+✓ Do NOT modify walls, floors, or ceilings
 ═══════════════════════════════════════════════════════════════
 `;
 }

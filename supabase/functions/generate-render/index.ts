@@ -230,6 +230,7 @@ serve(async (req) => {
     console.log('Style references:', styleRefUrls?.length || 0);
 
     // Build content array with reference images
+    // IMPORTANT: Layout image goes LAST for maximum AI attention (recency bias)
     const content: Array<{ type: string; text?: string; image_url?: { url: string } }> = [];
     let imageIndex = 1;
     
@@ -239,13 +240,7 @@ serve(async (req) => {
     const styleImageIndices: number[] = [];
     const furnitureImageIndices: { name: string; category: string; index: number }[] = [];
 
-    // Add layout image first (most important for room shape)
-    if (layoutImageUrl) {
-      content.push({ type: 'image_url', image_url: { url: layoutImageUrl } });
-      layoutImageIndex = imageIndex++;
-    }
-
-    // Add room photo
+    // Add room photo FIRST (context)
     if (roomPhotoUrl) {
       content.push({ type: 'image_url', image_url: { url: roomPhotoUrl } });
       roomPhotoIndex = imageIndex++;
@@ -268,9 +263,42 @@ serve(async (req) => {
       }
     }
 
+    // Add layout image LAST (most important - AI pays more attention to recent images)
+    if (layoutImageUrl) {
+      content.push({ type: 'image_url', image_url: { url: layoutImageUrl } });
+      layoutImageIndex = imageIndex++;
+    }
+
     // Build structured prompt with ARCHITECTURAL CONSTRAINTS if layout analysis provided
     let structuredPrompt = `Role: Expert Interior Architect and Architectural Photographer with PIXEL-PERFECT accuracy.
 Task: Generate an ULTRA-PHOTOREALISTIC interior design render that EXACTLY matches the floor plan specifications.
+
+╔═══════════════════════════════════════════════════════════════════════════════╗
+║                    ⚠️ LAYOUT ACCURACY - HIGHEST PRIORITY ⚠️                    ║
+╠═══════════════════════════════════════════════════════════════════════════════╣
+║  THE FLOOR PLAN LAYOUT IS THE ABSOLUTE AUTHORITY FOR THIS RENDER              ║
+║  ANY DEVIATION FROM THE LAYOUT = AUTOMATIC REJECTION                          ║
+╚═══════════════════════════════════════════════════════════════════════════════╝
+
+LAYOUT TRACING PROCESS (MANDATORY):
+Before generating ANY pixel, you MUST:
+1. ANALYZE the floor plan image to identify the EXACT room boundary shape
+2. COUNT all windows and doors - this count is MANDATORY to match
+3. NOTE the precise positions of each window/door on each wall
+4. IDENTIFY furniture placement zones from the floor plan
+5. PROJECT this 2D floor plan into 3D isometric space with ZERO deviation
+6. PLACE walls EXACTLY where the floor plan indicates
+7. ADD windows/doors at EXACT positions shown (percentage from wall corners)
+8. ONLY THEN add furniture within the designated zones
+
+CRITICAL LAYOUT CONSTRAINTS:
+✓ Room SHAPE must match floor plan EXACTLY (rectangular, L-shaped, etc.)
+✓ Room PROPORTIONS must match floor plan (width-to-depth ratio)
+✓ WINDOW COUNT must be EXACT (if floor plan shows 2 windows, render has 2 windows)
+✓ WINDOW POSITIONS must match (e.g., north wall 30% from left corner)
+✓ DOOR COUNT must be EXACT
+✓ DOOR POSITIONS must match floor plan precisely
+✓ Furniture zones from floor plan define WHERE items can be placed
 
 ═══════════════════════════════════════════════════════════════
      MANDATORY VISUAL QUALITY: HIGH-END ARCHITECTURAL PHOTOGRAPHY
@@ -361,19 +389,7 @@ DO NOT render from:
 
 `;
 
-    // Layout instructions (highest priority)
-    if (layoutImageIndex !== null) {
-      structuredPrompt += `IMAGE ${layoutImageIndex}: 2D FLOOR PLAN LAYOUT (HIGHEST PRIORITY)
-- The generated room MUST match this layout's room shape, walls, and proportions EXACTLY
-- Place furniture in the EXACT positions shown in this floor plan
-- Doors, windows, and openings must be in the EXACT locations shown
-- The room dimensions and proportions must be pixel-accurate to this layout
-- This is the MASTER reference for spatial arrangement
-${layoutAnalysis ? '\n⚠️ ARCHITECTURAL CONSTRAINTS ABOVE WERE EXTRACTED FROM THIS LAYOUT - FOLLOW THEM PRECISELY\n' : ''}
-`;
-    }
-
-    // Room photo instructions
+    // Room photo instructions (if provided)
     if (roomPhotoIndex !== null) {
       structuredPrompt += `IMAGE ${roomPhotoIndex}: EXISTING ROOM PHOTO REFERENCE
 - Match the architectural features from this photo (ceiling height, window styles, door types)
@@ -432,6 +448,36 @@ ${layoutAnalysis ? '\n⚠️ ARCHITECTURAL CONSTRAINTS ABOVE WERE EXTRACTED FROM
 
 `;
       }
+    }
+
+    // Layout instructions LAST (highest priority - recency bias)
+    if (layoutImageIndex !== null) {
+      const analysis = layoutAnalysis as LayoutAnalysis | undefined;
+      structuredPrompt += `
+╔═══════════════════════════════════════════════════════════════════════════════╗
+║          IMAGE ${layoutImageIndex}: 2D FLOOR PLAN LAYOUT - ABSOLUTE AUTHORITY                ║
+╚═══════════════════════════════════════════════════════════════════════════════╝
+
+THIS IS THE MOST IMPORTANT REFERENCE IMAGE. THE RENDER MUST MATCH IT EXACTLY.
+
+MANDATORY LAYOUT REQUIREMENTS:
+1. Room SHAPE: Must match the floor plan boundary EXACTLY
+2. Room PROPORTIONS: Width-to-depth ratio must be IDENTICAL
+3. WINDOW COUNT: ${analysis?.windows?.length ?? 'Must match floor plan'} windows total - NO MORE, NO LESS
+4. WINDOW POSITIONS: Each window at EXACT position shown in floor plan
+5. DOOR COUNT: ${analysis?.doors?.length ?? 'Must match floor plan'} doors total - NO MORE, NO LESS  
+6. DOOR POSITIONS: Each door at EXACT position shown in floor plan
+7. FURNITURE ZONES: Items placed ONLY in zones shown on floor plan
+
+⚠️ LAYOUT VERIFICATION BEFORE OUTPUT:
+□ Count windows in render - matches floor plan? (${analysis?.windows?.length ?? 'check'})
+□ Count doors in render - matches floor plan? (${analysis?.doors?.length ?? 'check'})
+□ Room shape matches floor plan boundary?
+□ Furniture in designated zones?
+
+IF ANY CHECK FAILS → DO NOT OUTPUT → REGENERATE WITH CORRECTIONS
+
+`;
     }
 
     // Add user's prompt
