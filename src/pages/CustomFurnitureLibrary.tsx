@@ -270,6 +270,52 @@ export default function CustomFurnitureLibrary() {
         </div>
       </div>
 
+      {/* Tabs */}
+      <div className="container mx-auto px-6 py-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-1 border border-border rounded-lg p-1 bg-muted/30">
+            <Button
+              variant={activeTab === 'products' ? 'secondary' : 'ghost'}
+              size="sm"
+              onClick={() => setActiveTab('products')}
+              className="gap-2"
+            >
+              <Package className="h-4 w-4" />
+              Products
+            </Button>
+            <Button
+              variant={activeTab === 'materials' ? 'secondary' : 'ghost'}
+              size="sm"
+              onClick={() => setActiveTab('materials')}
+              className="gap-2"
+            >
+              <Palette className="h-4 w-4" />
+              Materials
+            </Button>
+            <Button
+              variant={activeTab === 'shared' ? 'secondary' : 'ghost'}
+              size="sm"
+              onClick={() => setActiveTab('shared')}
+              className="gap-2"
+            >
+              <Share2 className="h-4 w-4" />
+              Shared
+            </Button>
+          </div>
+          
+          {activeTab === 'materials' && (
+            <Button
+              size="sm"
+              onClick={() => setMaterialUploaderOpen(true)}
+              className="gap-2"
+            >
+              <Upload className="h-4 w-4" />
+              Upload Material
+            </Button>
+          )}
+        </div>
+      </div>
+
       {/* Content */}
       <main className="container mx-auto px-6 py-6">
         {loading ? (
