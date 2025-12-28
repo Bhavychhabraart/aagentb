@@ -1,9 +1,14 @@
 import { RoomDimensions } from '@/types/layout-creator';
+import { formatDownloadFilename } from './formatDownloadFilename';
 
 export function downloadDataUrl(dataUrl: string, filename: string) {
+  // Add agentb_ prefix if not already present
+  const formattedFilename = filename.startsWith('agentb_') 
+    ? filename 
+    : `agentb_layout_${filename}`;
   const link = document.createElement('a');
   link.href = dataUrl;
-  link.download = filename;
+  link.download = formattedFilename;
   document.body.appendChild(link);
   link.click();
   document.body.removeChild(link);
@@ -13,9 +18,13 @@ export function downloadJSON(data: object, filename: string) {
   const json = JSON.stringify(data, null, 2);
   const blob = new Blob([json], { type: 'application/json' });
   const url = URL.createObjectURL(blob);
-  downloadDataUrl(url, filename);
+  const formattedFilename = filename.endsWith('.json') ? filename : `${filename}.json`;
+  downloadDataUrl(url, formattedFilename.startsWith('agentb_') ? formattedFilename : `agentb_layout_${formattedFilename}`);
   URL.revokeObjectURL(url);
 }
+
+// Re-export the formatDownloadFilename for convenience
+export { formatDownloadFilename };
 
 export function formatDimension(value: number, unit: string): string {
   if (unit === 'ft') {

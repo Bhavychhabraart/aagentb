@@ -220,12 +220,13 @@ export function PhotoStudio({ products, vendorId }: PhotoStudioProps) {
 
   const handleDownload = async (imageUrl: string, productName: string) => {
     try {
+      const { formatDownloadFilename } = await import('@/utils/formatDownloadFilename');
       const response = await fetch(imageUrl);
       const blob = await response.blob();
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `${productName.replace(/\s+/g, "-").toLowerCase()}-studio-photo.png`;
+      a.download = formatDownloadFilename('photostudio', productName, 'png');
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);

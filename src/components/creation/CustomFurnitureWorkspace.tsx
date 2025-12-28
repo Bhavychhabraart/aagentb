@@ -201,12 +201,13 @@ export function CustomFurnitureWorkspace({
     if (!generatedImage) return;
     
     try {
+      const { formatDownloadFilename } = await import('@/utils/formatDownloadFilename');
       const response = await fetch(generatedImage);
       const blob = await response.blob();
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `custom-furniture-${Date.now()}.png`;
+      a.download = formatDownloadFilename('customlibrary', name || 'furniture', 'png');
       a.click();
       URL.revokeObjectURL(url);
       toast({ title: 'Downloaded!' });
