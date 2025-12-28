@@ -209,11 +209,12 @@ export default function DrawingToolWorkspace() {
     }
   };
 
-  const handleDownload = () => {
-    if (generatedPlan) {
+  const handleDownload = async () => {
+    if (generatedPlan && toolType) {
+      const { formatDownloadFilename } = await import('@/utils/formatDownloadFilename');
       const link = document.createElement("a");
       link.href = generatedPlan;
-      link.download = `${toolType}-plan.png`;
+      link.download = formatDownloadFilename('drawingplan', toolType, 'png');
       link.click();
     }
   };

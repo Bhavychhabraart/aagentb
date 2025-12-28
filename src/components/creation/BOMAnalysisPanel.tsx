@@ -142,7 +142,7 @@ export function BOMAnalysisPanel({ item, onClose }: BOMAnalysisPanelProps) {
     toast({ title: 'BOM Updated', description: 'Changes saved successfully.' });
   };
 
-  const exportAsPDF = () => {
+  const exportAsPDF = async () => {
     const dataToExport = isEditing ? { components: editedComponents, laborCost: editedLaborCost, notes: bomData?.notes || [] } : bomData;
     if (!dataToExport || !item) return;
 
@@ -224,14 +224,16 @@ export function BOMAnalysisPanel({ item, onClose }: BOMAnalysisPanelProps) {
     }
     
     // Save
-    doc.save(`BOM-${item.item_name.replace(/\s+/g, '-')}.pdf`);
+    const { formatDownloadFilename } = await import('@/utils/formatDownloadFilename');
+    doc.save(formatDownloadFilename('bom', item.item_name, 'pdf'));
     toast({ title: 'Exported', description: 'BOM exported as PDF' });
   };
 
-  const exportAsCSV = () => {
+  const exportAsCSV = async () => {
     const dataToExport = isEditing ? { components: editedComponents, laborCost: editedLaborCost } : bomData;
     if (!dataToExport || !item) return;
 
+    const { formatDownloadFilename } = await import('@/utils/formatDownloadFilename');
     const headers = ['Component', 'Material', 'Quantity', 'Estimated Cost (₹)'];
     const rows = dataToExport.components.map(c => [c.component, c.material, c.quantity, c.estimatedCost]);
     rows.push(['', '', 'Labor Cost', dataToExport.laborCost]);
@@ -242,7 +244,7 @@ export function BOMAnalysisPanel({ item, onClose }: BOMAnalysisPanelProps) {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `BOM-${item.item_name.replace(/\s+/g, '-')}.csv`;
+    a.download = formatDownloadFilename('bom', item.item_name, 'csv');
     a.click();
     URL.revokeObjectURL(url);
 

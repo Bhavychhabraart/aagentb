@@ -141,6 +141,7 @@ export function MulticamPanel({
 
     setIsExporting(true);
     try {
+      const { formatDownloadFilename } = await import('@/utils/formatDownloadFilename');
       // Download each image and create a zip-like experience (download all sequentially)
       for (const [view, url] of viewsWithImages) {
         if (!url) continue;
@@ -149,7 +150,7 @@ export function MulticamPanel({
         const blobUrl = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = blobUrl;
-        a.download = `multicam-${view}-${Date.now()}.png`;
+        a.download = formatDownloadFilename('multicam', 'project', 'png', view);
         a.click();
         URL.revokeObjectURL(blobUrl);
         // Small delay between downloads
@@ -203,7 +204,8 @@ export function MulticamPanel({
         });
       }
 
-      await pptx.writeFile({ fileName: `multicam-views-${Date.now()}.pptx` });
+      const { formatDownloadFilename } = await import('@/utils/formatDownloadFilename');
+      await pptx.writeFile({ fileName: formatDownloadFilename('ppt', 'multicamviews', 'pptx') });
       toast({ title: 'PowerPoint exported!' });
     } catch (error) {
       console.error('PPT export failed:', error);

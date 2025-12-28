@@ -131,12 +131,13 @@ export function TechnicalDrawingPanel({
     if (!generatedDrawing) return;
     
     try {
+      const { formatDownloadFilename } = await import('@/utils/formatDownloadFilename');
       const response = await fetch(generatedDrawing);
       const blob = await response.blob();
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `technical-drawing-${selectedType}-${Date.now()}.png`;
+      a.download = formatDownloadFilename('technicaldrawing', furnitureName || 'drawing', 'png', selectedType);
       a.click();
       URL.revokeObjectURL(url);
       toast({ title: 'Downloaded PNG!' });
@@ -221,7 +222,8 @@ export function TechnicalDrawingPanel({
         img.src = generatedDrawing;
       });
 
-      pdf.save(`technical-drawing-${selectedType}-${Date.now()}.pdf`);
+      const { formatDownloadFilename } = await import('@/utils/formatDownloadFilename');
+      pdf.save(formatDownloadFilename('technicaldrawing', furnitureName || 'drawing', 'pdf', selectedType));
       toast({ title: 'Downloaded PDF!' });
     } catch (error) {
       console.error('PDF generation failed:', error);
@@ -263,14 +265,16 @@ export function TechnicalDrawingPanel({
   ${annotationsSvg}
 </svg>`;
     
-    const blob = new Blob([svgContent], { type: 'image/svg+xml' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `technical-drawing-${selectedType}-${Date.now()}.svg`;
-    a.click();
-    URL.revokeObjectURL(url);
-    toast({ title: 'Downloaded SVG!', description: 'Can be imported into CAD software.' });
+    import('@/utils/formatDownloadFilename').then(({ formatDownloadFilename }) => {
+      const blob = new Blob([svgContent], { type: 'image/svg+xml' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = formatDownloadFilename('technicaldrawing', furnitureName || 'drawing', 'svg', selectedType);
+      a.click();
+      URL.revokeObjectURL(url);
+      toast({ title: 'Downloaded SVG!', description: 'Can be imported into CAD software.' });
+    });
   };
 
   const handleCanvasClick = (e: React.MouseEvent<HTMLDivElement>) => {

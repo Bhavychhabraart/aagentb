@@ -106,12 +106,13 @@ export default function Dashboard() {
     if (!render.render_url) return;
     
     try {
+      const { formatDownloadFilename } = await import('@/utils/formatDownloadFilename');
       const response = await fetch(render.render_url);
       const blob = await response.blob();
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `render-${render.id.slice(0, 8)}.png`;
+      a.download = formatDownloadFilename('render', render.project_name || 'project', 'png');
       document.body.appendChild(a);
       a.click();
       window.URL.revokeObjectURL(url);
@@ -145,12 +146,13 @@ export default function Dashboard() {
       
       if (response.data?.upscaledUrl) {
         // Download the upscaled image
+        const { formatDownloadFilename } = await import('@/utils/formatDownloadFilename');
         const downloadResponse = await fetch(response.data.upscaledUrl);
         const blob = await downloadResponse.blob();
         const url = window.URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = `upscaled-${render.id.slice(0, 8)}.png`;
+        a.download = formatDownloadFilename('upscaled', render.project_name || 'project', 'png');
         document.body.appendChild(a);
         a.click();
         window.URL.revokeObjectURL(url);

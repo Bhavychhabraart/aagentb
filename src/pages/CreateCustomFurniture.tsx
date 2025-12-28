@@ -328,11 +328,12 @@ export default function CreateCustomFurniture() {
     }
   };
 
-  const handleDownload = () => {
+  const handleDownload = async () => {
     if (generatedImage) {
+      const { formatDownloadFilename } = await import('@/utils/formatDownloadFilename');
       const link = document.createElement('a');
       link.href = generatedImage;
-      link.download = `${name || 'furniture'}-${Date.now()}.png`;
+      link.download = formatDownloadFilename('customlibrary', name || 'furniture', 'png');
       link.click();
     }
   };

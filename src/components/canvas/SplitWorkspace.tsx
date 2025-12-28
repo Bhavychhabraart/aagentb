@@ -138,11 +138,12 @@ export function SplitWorkspace({
   const handleZoomOut = () => setZoom((z) => Math.max(z - 0.25, 0.5));
   const handleReset = () => setZoom(1);
 
-  const handleDownload = () => {
+  const handleDownload = async () => {
     if (birdEyeRenderUrl) {
+      const { formatDownloadFilename } = await import('@/utils/formatDownloadFilename');
       const link = document.createElement('a');
       link.href = birdEyeRenderUrl;
-      link.download = `render-${Date.now()}.png`;
+      link.download = formatDownloadFilename('render', 'birdseye', 'png');
       link.click();
     }
   };

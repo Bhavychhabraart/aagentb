@@ -79,12 +79,20 @@ export function RenderViewer({
     setPosition({ x: 0, y: 0 });
   };
 
-  const handleDownload = () => {
+  const handleDownload = async () => {
     if (imageUrl) {
-      const link = document.createElement('a');
-      link.href = imageUrl;
-      link.download = `render-${Date.now()}.png`;
-      link.click();
+      try {
+        const { formatDownloadFilename } = await import('@/utils/formatDownloadFilename');
+        const link = document.createElement('a');
+        link.href = imageUrl;
+        link.download = formatDownloadFilename('render', 'project', 'png');
+        link.click();
+      } catch {
+        const link = document.createElement('a');
+        link.href = imageUrl;
+        link.download = `agentb_render_${Date.now()}.png`;
+        link.click();
+      }
     }
   };
 
