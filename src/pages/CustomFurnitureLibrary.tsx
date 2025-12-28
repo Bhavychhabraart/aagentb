@@ -430,6 +430,21 @@ export default function CustomFurnitureLibrary() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Share Product Modal */}
+      <ShareProductModal
+        open={!!sharingItem}
+        onOpenChange={(open) => !open && setSharingItem(null)}
+        product={sharingItem}
+        onShareCreated={() => fetchCustomFurniture()}
+      />
+
+      {/* Custom Material Uploader */}
+      <CustomMaterialUploader
+        open={materialUploaderOpen}
+        onOpenChange={setMaterialUploaderOpen}
+        onSuccess={fetchCustomFurniture}
+      />
     </div>
   );
 }
