@@ -269,8 +269,56 @@ serve(async (req) => {
     }
 
     // Build structured prompt with ARCHITECTURAL CONSTRAINTS if layout analysis provided
-    let structuredPrompt = `Role: Expert Interior Architect and 3D Visualizer with PIXEL-PERFECT architectural accuracy.
-Task: Generate a photorealistic interior design render that EXACTLY matches the floor plan specifications.
+    let structuredPrompt = `Role: Expert Interior Architect and Architectural Photographer with PIXEL-PERFECT accuracy.
+Task: Generate an ULTRA-PHOTOREALISTIC interior design render that EXACTLY matches the floor plan specifications.
+
+═══════════════════════════════════════════════════════════════
+     MANDATORY VISUAL QUALITY: HIGH-END ARCHITECTURAL PHOTOGRAPHY
+═══════════════════════════════════════════════════════════════
+
+RENDERING STYLE: ULTRA-PHOTOREALISTIC ARCHITECTURAL VISUALIZATION
+Reference Quality: RED Cinema Camera footage, Architectural Digest, Dwell Magazine, Elle Decor
+
+⚠️ CRITICAL ANTI-ILLUSTRATION DIRECTIVE ⚠️
+ABSOLUTELY NEVER produce any of the following:
+✗ Cartoon, illustrated, or stylized aesthetics
+✗ Vector art, flat graphics, or cel-shading
+✗ Video game, 3D game, or CGI-looking renders
+✗ Sketch-like, hand-drawn, or concept art appearances
+✗ Anime-style, watercolor, or artistic interpretations
+✗ Over-saturated colors or unrealistic lighting
+✗ Plastic-looking materials or fake textures
+
+CAMERA & LENS SPECIFICATIONS (RED MONSTRO 8K EQUIVALENT):
+• Sensor: Full-frame cinematographic sensor look (8K equivalent sharpness)
+• Lens: 24-35mm prime lens with subtle anamorphic characteristics
+• Depth of Field: Natural, subtle DOF with crisp focus on key elements
+• Chromatic Quality: Clean edges, no purple fringing or aberrations
+• Dynamic Range: 16+ stops, preserving shadow and highlight detail
+
+LIGHTING REQUIREMENTS (PROFESSIONAL PHOTOGRAPHY STANDARD):
+• Global Illumination: Full radiosity with accurate multi-bounce light
+• Natural Light: Realistic sun/sky lighting through windows with soft caustics
+• Shadow Quality: Soft, ray-traced shadows with natural falloff and contact shadows
+• Interior Lighting: Practical lights with realistic bloom, falloff, and color temperature
+• Ambient Occlusion: Subtle AO in corners and crevices for depth
+
+MATERIAL RENDERING (PHYSICALLY-BASED):
+• PBR Materials: Physically-based rendering for ALL surfaces
+• Wood: Visible grain detail, natural color variation, realistic reflectance
+• Fabric: Visible weave/texture, accurate subsurface scattering
+• Metal: Correct metallic reflectance with anisotropic highlights
+• Glass/Mirror: Accurate reflections with subtle imperfections
+• Stone/Marble: Visible pores, veining, subsurface scattering
+
+POST-PROCESSING LOOK (ARCHITECTURAL DIGEST STYLE):
+• Color Grading: Warm, editorial color palette with rich mid-tones
+• Contrast: Rich blacks, clean highlights without clipping
+• Sharpness: Crisp detail without over-sharpening halos
+• Film Grain: Subtle, imperceptible grain for organic feel
+
+QUALITY BENCHMARK:
+The output must be INDISTINGUISHABLE from a professional photograph shot on location with a $100,000+ camera setup for a luxury architecture magazine cover.
 
 === MANDATORY CAMERA POSITION: ISOMETRIC VIEW ===
 
@@ -294,12 +342,6 @@ Visual Reference (Isometric Corner View):
     ╲ WALL | WALL╱
      ╲____|____╱
          FLOOR
-
-This isometric angle provides:
-✓ Clear view of floor layout and furniture placement
-✓ Visibility of wall treatments and décor
-✓ Professional architectural visualization standard
-✓ Best overview for interior design presentation
 
 DO NOT render from:
 ✗ Eye-level perspective (too flat, missing room overview)
@@ -426,25 +468,37 @@ ${prompt}
     // Output requirements
     structuredPrompt += `=== OUTPUT REQUIREMENTS ===
 
-1. Photorealistic quality - professional architectural visualization
-2. 16:9 LANDSCAPE aspect ratio (wide cinematic format)
-3. **ISOMETRIC CAMERA ANGLE** - elevated 45° corner view showing floor + two walls (MANDATORY)
-4. Dramatic, realistic lighting with natural shadows
-5. High-end interior design aesthetic
-6. All reference images must be respected in order of priority: Layout > Style > Room Photo > Furniture
-${layoutAnalysis ? '7. VERIFY all architectural constraints are met before finalizing' : ''}
+1. ULTRA-PHOTOREALISTIC quality - indistinguishable from real photography
+2. RED Cinema Camera / Architectural Digest magazine quality
+3. 16:9 LANDSCAPE aspect ratio (wide cinematic format)
+4. **ISOMETRIC CAMERA ANGLE** - elevated 45° corner view showing floor + two walls (MANDATORY)
+5. Ray-traced global illumination with natural light behavior
+6. Physically-based materials with accurate reflections and textures
+7. 8K resolution equivalent sharpness and detail
+8. All reference images respected: Layout > Style > Room Photo > Furniture
+${layoutAnalysis ? '9. VERIFY all architectural constraints are met before finalizing' : ''}
 
-⚠️ QUALITY CHECK: 
-After generation, the render will be compared against specifications.
-- ISOMETRIC VIEW: Must be 45° elevated corner view (NOT eye-level, NOT top-down)
-- Window count and positions will be verified
-- Door locations will be checked
-- Room proportions will be measured
-- Furniture zones will be validated
-ANY discrepancies will require regeneration.
-The goal is 111% architectural accuracy with ISOMETRIC perspective.
+⛔ QUALITY REJECTION CRITERIA (render will be REJECTED if):
+- Looks like an illustration, cartoon, or stylized art
+- Has a 3D video game or CGI appearance
+- Features flat colors or unrealistic lighting
+- Materials look plastic, fake, or computer-generated
+- Cannot pass as a real photograph
 
-Output: ONLY the final image.`;
+✅ QUALITY ACCEPTANCE CRITERIA:
+- Looks like a photograph taken with a professional camera
+- Materials look physically accurate and tangible
+- Lighting creates realistic shadows and highlights
+- Indistinguishable from real architectural photography
+
+⚠️ VERIFICATION CHECKLIST: 
+- ISOMETRIC VIEW: 45° elevated corner view (NOT eye-level, NOT top-down)
+- Window/door count and positions verified
+- Room proportions match specification
+- Furniture placed in designated zones
+- PHOTOREALISTIC quality achieved
+
+Output: ONLY the final ultra-photorealistic image.`;
 
     content.push({ type: 'text', text: structuredPrompt });
 

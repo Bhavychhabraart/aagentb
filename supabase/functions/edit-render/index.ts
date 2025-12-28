@@ -146,7 +146,15 @@ serve(async (req) => {
         }
       }
       
-      const textEditPrompt = `You are a precise room image editor. Edit the room image (IMAGE 1) according to the user's instruction.
+      const textEditPrompt = `You are an expert architectural photographer and image editor. Edit the room image (IMAGE 1) according to the user's instruction.
+
+═══════════════════════════════════════════════════════════════
+     MANDATORY: ULTRA-PHOTOREALISTIC OUTPUT QUALITY
+═══════════════════════════════════════════════════════════════
+
+RENDERING STYLE: RED Cinema Camera / Architectural Digest quality
+⚠️ NEVER produce cartoon, illustrated, stylized, or CGI-looking results
+⚠️ Output MUST be indistinguishable from professional photography
 
 USER INSTRUCTION: ${userPrompt}
 
@@ -155,11 +163,18 @@ CRITICAL RULES:
 2. Keep architectural elements (walls, windows, doors, floor) in their exact positions
 3. Maintain the same camera angle and perspective
 4. Preserve furniture that is NOT mentioned in the instruction
-5. Apply changes naturally with consistent lighting and shadows
-6. The result should look photorealistic
-${styleRefUrls?.length ? '\n7. Match the aesthetic style from the provided style reference images' : ''}
+5. Apply changes naturally with ray-traced lighting and realistic shadows
+6. The result MUST look like a professional photograph, NOT an illustration
+7. Use physically-based materials with accurate reflections
+8. Maintain 8K equivalent sharpness and detail
+${styleRefUrls?.length ? '\n9. Match the aesthetic style from the provided style reference images' : ''}
 
-Output: The edited room image with the requested changes applied.`;
+QUALITY CHECK:
+- Must look like real architectural photography
+- Materials must look physically accurate and tangible
+- No cartoon, flat, or stylized appearance allowed
+
+Output: The edited room image with ultra-photorealistic quality.`;
 
       content.push({ type: 'text', text: textEditPrompt });
 
@@ -242,47 +257,53 @@ Output: The edited room image with the requested changes applied.`;
       
       if (zoneIndex) {
         // We have the cropped zone - use it as the primary reference
-        zonePrompt = `You are a precise interior visualization specialist. Create an enhanced detailed view of a specific zone.
+        zonePrompt = `You are an expert architectural photographer creating magazine-quality interior photography.
 
 IMAGES PROVIDED:
 - IMAGE ${fullRoomIndex}: Full room render (for overall context and style reference)
 - IMAGE ${zoneIndex}: CROPPED ZONE IMAGE - THIS IS THE EXACT CONTENT YOU MUST REPRODUCE
 
+═══════════════════════════════════════════════════════════════
+     MANDATORY: ULTRA-PHOTOREALISTIC OUTPUT QUALITY
+═══════════════════════════════════════════════════════════════
+
+RENDERING STYLE: RED Cinema Camera / Architectural Digest quality
+Camera: 8K resolution equivalent, prime lens with natural DOF
+Lighting: Ray-traced global illumination with realistic shadows
+Materials: Physically-based rendering with accurate reflections
+
+⚠️ CRITICAL ANTI-ILLUSTRATION DIRECTIVE:
+NEVER produce cartoon, illustrated, stylized, CGI, or video game aesthetics.
+Output MUST be indistinguishable from professional architectural photography.
+
 YOUR TASK:
 Create a ${viewInstruction.toLowerCase()} This view must show the EXACT same content as IMAGE ${zoneIndex}.
 
-═══════════════════════════════════════════════════════════════
-CRITICAL REQUIREMENTS - READ CAREFULLY:
-═══════════════════════════════════════════════════════════════
+CRITICAL REQUIREMENTS:
 
 1. CONTENT ACCURACY (HIGHEST PRIORITY):
    - The output MUST show the EXACT SAME furniture, objects, and elements as IMAGE ${zoneIndex}
-   - Do NOT add any new furniture or objects
-   - Do NOT remove any furniture or objects
-   - Do NOT change the position or arrangement of anything
-   - This is a DETAILED VIEW of existing content, NOT a new creation
+   - Do NOT add, remove, or reposition anything
+   - This is an ENHANCED VIEW of existing content, NOT a new creation
 
-2. VISUAL FIDELITY:
+2. PHOTOREALISTIC QUALITY:
+   - Materials must look physically accurate (visible wood grain, fabric weave, metal reflections)
+   - Lighting must be realistic with soft shadows and natural falloff
+   - Must look like a professional photograph, NOT an illustration
+
+3. VISUAL FIDELITY:
    - Maintain the EXACT same wall colors and textures
    - Keep the EXACT same floor materials and patterns
-   - Preserve the EXACT same lighting conditions
    - Match all material textures and finishes precisely
 
-3. STYLE CONSISTENCY:
-   - The result must look like a zoomed-in photograph of IMAGE ${zoneIndex}
-   - Enhanced detail and resolution, but SAME content
-   - Same photorealistic quality as the original
-
 4. OUTPUT:
-   - Generate a 16:9 aspect ratio image
+   - 16:9 aspect ratio image
    - Higher detail/resolution than the cropped zone
-   - Photorealistic interior photograph
+   - RED Cinema Camera / Architectural Digest quality
 
 ADDITIONAL DIRECTION: ${userPrompt}
 
-═══════════════════════════════════════════════════════════════
-REMEMBER: You are REPRODUCING and ENHANCING what's in IMAGE ${zoneIndex}.
-You are NOT creating anything new. Just showing the same content in more detail.
+QUALITY CHECK: Output will be REJECTED if it looks illustrated, cartoon, or CGI.
 ═══════════════════════════════════════════════════════════════`;
       } else {
         // Fallback: No cropped zone image, use coordinate-based approach
@@ -405,7 +426,14 @@ Use this mask as a precise boundary for your edits.`
       
       if (catalogItem) {
         // Catalog-based selective edit with product reference
-        selectivePrompt = `You are a precision furniture staging specialist performing INPAINTING. Replace content in the masked region with the EXACT product shown in the reference image.
+        selectivePrompt = `You are an expert architectural photographer performing precision INPAINTING.
+
+═══════════════════════════════════════════════════════════════
+     MANDATORY: ULTRA-PHOTOREALISTIC OUTPUT QUALITY
+═══════════════════════════════════════════════════════════════
+
+RENDERING STYLE: RED Cinema Camera / Architectural Digest quality
+⚠️ NEVER produce cartoon, illustrated, or CGI-looking results
 
 IMAGES PROVIDED:
 - IMAGE ${renderIndex}: The room to edit
@@ -426,15 +454,18 @@ CRITICAL INPAINTING RULES:
 1. ${maskIndex ? 'ONLY edit pixels where the mask is WHITE - leave BLACK areas completely unchanged' : 'ONLY edit content within the specified region percentage coordinates'}
 2. The placed furniture must be a PIXEL-PERFECT copy of IMAGE ${refIndex}
 3. Copy the EXACT shape, color, material texture, and proportions from the reference
-4. Blend edges seamlessly with surrounding room elements
-5. Maintain consistent lighting and shadows with the room
-6. Apply realistic shadows matching the room's lighting direction
+4. Blend edges seamlessly with ray-traced lighting and realistic shadows
+5. Materials must look physically accurate with proper reflections
+6. Apply photorealistic shadows matching the room's lighting direction
 
 ${userPrompt ? `ADDITIONAL INSTRUCTIONS: ${userPrompt}` : ''}
 
-QUALITY CHECK: Areas outside the ${maskIndex ? 'white mask region' : 'specified region'} must be IDENTICAL to IMAGE ${renderIndex}. Any changes outside the edit zone is a failure.
+QUALITY CHECK: 
+- Areas outside edit zone must be IDENTICAL to IMAGE ${renderIndex}
+- Result MUST look like professional photography, NOT illustration
+- Materials must be physically accurate and tangible
 
-Output: The room image with ONLY the masked/specified region modified.`;
+Output: Ultra-photorealistic room image with ONLY the masked region modified.`;
       } else if (referenceImageUrl) {
         // Upload-based selective edit with reference image
         selectivePrompt = `You are a precise image editor performing INPAINTING. Apply the reference image to the masked region.
@@ -594,8 +625,24 @@ Output: The edited image with ONLY the masked/specified region modified.`;
       }
 
       // Build the MASTER STAGING ARCHITECT prompt
-      let masterPrompt = `Role: Master Staging Architect with 111% ARCHITECTURAL ACCURACY.
+      let masterPrompt = `Role: Master Staging Architect and Architectural Photographer with 111% ACCURACY.
 Task: BATCH FURNITURE REPLACEMENT while PRESERVING all architectural elements.
+
+═══════════════════════════════════════════════════════════════
+     MANDATORY: ULTRA-PHOTOREALISTIC OUTPUT QUALITY
+═══════════════════════════════════════════════════════════════
+
+RENDERING STYLE: RED Cinema Camera / Architectural Digest magazine quality
+Camera: 8K resolution equivalent, prime lens with natural depth of field
+Lighting: Ray-traced global illumination with physically accurate shadows
+Materials: PBR rendering with accurate reflections, SSS, and micro-detail
+
+⚠️ CRITICAL ANTI-ILLUSTRATION DIRECTIVE:
+ABSOLUTELY NEVER produce:
+✗ Cartoon, illustrated, or stylized aesthetics
+✗ Video game, CGI, or 3D render appearance
+✗ Flat colors, fake lighting, or plastic materials
+✗ Any result that doesn't pass as real photography
 
 Input: A room image (IMAGE ${baseRenderIndex}).
 
@@ -632,7 +679,7 @@ ${analysis ? '- Architectural elements have already been extracted and constrain
       if (styleIndices.length > 0) {
         masterPrompt += `IMAGES ${styleIndices.join(', ')}: STYLE REFERENCES
 - Match the overall aesthetic and lighting style from these references
-- Apply realistic shadows that match the room's lighting direction
+- Apply ray-traced shadows that match the room's lighting direction
 
 `;
       }
@@ -647,19 +694,19 @@ ${changeInstructions}
 2. COPY the product EXACTLY from its reference image - zero modifications allowed.
 3. The product shape, silhouette, and proportions must be IDENTICAL to the reference.
 4. Colors must match EXACTLY - do not adjust, enhance, or correct.
-5. Material textures must be preserved PERFECTLY.
-6. Maintain perfect perspective, scale, and lighting consistency with the rest of the room.
+5. Material textures must be preserved PERFECTLY with visible detail.
+6. Maintain perfect perspective, scale, and ray-traced lighting consistency.
 7. Do NOT modify any parts of the room NOT listed in the Change List.
-8. Ensure high-end photorealism with realistic shadows for each placed item.
+8. Ensure PHOTOREALISTIC quality with accurate shadows for each placed item.
 ${analysis ? '9. NEVER alter any architectural elements - windows, doors, walls must remain EXACTLY as in the base render.' : ''}
 
 VISUAL IDENTITY TO PRESERVE:
-- If a product has a unique shape (curved, angular, organic) → KEEP THAT EXACT SHAPE
-- If a product has specific colors → KEEP THOSE EXACT COLORS (no white-balancing)
-- If a product has visible textures → REPLICATE THOSE EXACT TEXTURES
-- If a product has design details (buttons, stitching, patterns) → INCLUDE ALL DETAILS
+- If a product has a unique shape → KEEP THAT EXACT SHAPE
+- If a product has specific colors → KEEP THOSE EXACT COLORS
+- If a product has visible textures → REPLICATE with visible material detail
+- If a product has design details → INCLUDE ALL DETAILS
 
-The staged products should look like they were CUT from their reference images and PASTED into the room.
+The staged products should look like they were photographed in this room with a RED Cinema Camera.
 
 `;
 
@@ -669,21 +716,27 @@ The staged products should look like they were CUT from their reference images a
 
       masterPrompt += `=== OUTPUT REQUIREMENTS ===
 
-1. The output must be the BASE RENDER (IMAGE ${baseRenderIndex}) with furniture replaced/added
-2. Room must be UNCHANGED - only modify furniture at specified coordinates
-3. Furniture must be PIXEL-PERFECT copies of reference images
-4. Maintain 16:9 LANDSCAPE aspect ratio
-5. Apply realistic shadows for each placed item
-6. Final result should look like a professional furniture staging
-${analysis ? '7. VERIFY: All architectural elements (windows, doors) remain exactly as in the original' : ''}
+1. ULTRA-PHOTOREALISTIC quality - RED Cinema Camera / Architectural Digest standard
+2. The output must be the BASE RENDER (IMAGE ${baseRenderIndex}) with furniture replaced/added
+3. Room must be UNCHANGED - only modify furniture at specified coordinates
+4. Furniture must be PIXEL-PERFECT copies of reference images
+5. Maintain 16:9 LANDSCAPE aspect ratio
+6. Apply ray-traced shadows with realistic contact shadows
+7. Materials must look physically accurate with visible texture detail
+${analysis ? '8. VERIFY: All architectural elements (windows, doors) remain exactly as in the original' : ''}
 
-⚠️ QUALITY CHECK: 
-After compositing, each furniture item will be compared side-by-side with its reference.
-${analysis ? 'The render will also be validated against the architectural constraints.' : ''}
-ANY deviation in shape, color, or details is a failure.
-The goal is 111% visual and architectural accuracy.
+⛔ QUALITY REJECTION CRITERIA:
+- Output looks like illustration, cartoon, or CGI
+- Materials appear plastic, fake, or computer-generated
+- Flat colors or unrealistic lighting
+- Cannot pass as real architectural photography
 
-Output: ONLY the final image.`;
+✅ QUALITY ACCEPTANCE CRITERIA:
+- Indistinguishable from professional photography
+- Materials look physically accurate and tangible
+- Realistic lighting with natural shadows
+
+Output: ONLY the final ultra-photorealistic image.`;
 
       content.push({ type: 'text', text: masterPrompt });
 
@@ -778,8 +831,16 @@ Output: ONLY the final image.`;
     }
 
     // Build the editing instruction prompt with numbered change list
-    let editInstruction = `Role: Master Staging Architect with 111% ARCHITECTURAL ACCURACY.
+    let editInstruction = `Role: Master Staging Architect and Architectural Photographer with 111% ACCURACY.
 Task: FURNITURE REPLACEMENT while PRESERVING all architectural elements.
+
+═══════════════════════════════════════════════════════════════
+     MANDATORY: ULTRA-PHOTOREALISTIC OUTPUT QUALITY
+═══════════════════════════════════════════════════════════════
+
+RENDERING STYLE: RED Cinema Camera / Architectural Digest magazine quality
+⚠️ NEVER produce cartoon, illustrated, CGI, or video game aesthetics
+Output MUST be indistinguishable from professional architectural photography
 
 Input: A room image (IMAGE ${currentRenderIndex}).
 
@@ -875,18 +936,24 @@ ${analysis ? '7. NEVER alter any architectural elements - windows, doors, walls 
 
     editInstruction += `=== OUTPUT REQUIREMENTS ===
 
-1. Photorealistic quality - professional furniture staging
+1. ULTRA-PHOTOREALISTIC quality - RED Cinema Camera / Architectural Digest standard
 2. Maintain 16:9 LANDSCAPE aspect ratio
 3. Products MUST appear IDENTICALLY to their reference images
-4. Apply realistic lighting and shadows to placed products
-5. Room architecture must remain completely unchanged
-${analysis ? '6. VERIFY: All windows, doors, and architectural features remain in exact positions' : ''}
+4. Apply ray-traced lighting and realistic shadows to placed products
+5. Materials must look physically accurate with visible texture detail
+6. Room architecture must remain completely unchanged
+${analysis ? '7. VERIFY: All windows, doors, and architectural features remain in exact positions' : ''}
 
-⚠️ QUALITY CHECK:
-${analysis ? 'The render will be validated against architectural constraints.\n' : ''}ANY deviation in product appearance or architectural elements is a failure.
-The goal is 111% accuracy.
+⛔ QUALITY REJECTION CRITERIA:
+- Output looks like illustration, cartoon, or CGI
+- Materials appear plastic or computer-generated
+- Cannot pass as real photography
 
-Output: ONLY the final image.`;
+✅ QUALITY ACCEPTANCE CRITERIA:
+- Indistinguishable from professional architectural photography
+- Materials look physically accurate and tangible
+${analysis ? 'The render will be validated against architectural constraints.\n' : ''}
+Output: ONLY the final ultra-photorealistic image.`;
 
     content.push({ type: 'text', text: editInstruction });
 
