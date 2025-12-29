@@ -79,7 +79,6 @@ const Index = () => {
 
   const [currentProjectId, setCurrentProjectId] = useState<string | null>(null);
   const [currentRoomId, setCurrentRoomId] = useState<string | null>(null);
-  const [currentRoomName, setCurrentRoomName] = useState<string | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [currentRenderUrl, setCurrentRenderUrl] = useState<string | null>(null);
   const [currentRenderId, setCurrentRenderId] = useState<string | null>(null);
@@ -100,7 +99,6 @@ const Index = () => {
   const [styleRefUrls, setStyleRefUrls] = useState<string[]>([]);
   const [allRenderUrls, setAllRenderUrls] = useState<string[]>([]);
   const [allRenders, setAllRenders] = useState<RenderHistoryItem[]>([]);
-  const [showAllRenders, setShowAllRenders] = useState(true); // Toggle between all renders vs room-specific
   const [isSelectiveEditing, setIsSelectiveEditing] = useState(false);
   const [isProjectSwitching, setIsProjectSwitching] = useState(false);
   const [isMulticamGenerating, setIsMulticamGenerating] = useState(false);
@@ -278,7 +276,7 @@ const Index = () => {
             loadLayoutImage(),
             loadRoomPhoto(),
             loadProjectDetails(),
-            loadAllRenders(currentRoomId),
+            loadAllRenders(),
           ]);
         } finally {
           setIsProjectSwitching(false);
@@ -327,15 +325,6 @@ const Index = () => {
       }
     }
   }, [currentProjectId]);
-
-  // Reload renders when room changes or toggle changes
-  useEffect(() => {
-    if (currentProjectId) {
-      // If showing all renders, pass null/undefined to get all
-      // If showing room-specific, pass currentRoomId (can be null which shows unassigned renders)
-      loadAllRenders(showAllRenders ? null : currentRoomId);
-    }
-  }, [currentRoomId, showAllRenders]);
 
   // Load layout image for comparison view
   const loadLayoutImage = async () => {
@@ -424,22 +413,16 @@ const Index = () => {
     setStyleRefUrls(styleUploads?.map(s => s.file_url) || []);
   };
 
-  // Load all renders for the project, optionally filtered by room
-  const loadAllRenders = async (roomId?: string | null) => {
+  // Load all renders for the project
+  const loadAllRenders = async () => {
     if (!currentProjectId) return;
     
-    let query = supabase
+    const { data: renders } = await supabase
       .from('renders')
-      .select('id, render_url, prompt, parent_render_id, created_at, view_type, room_id')
+      .select('id, render_url, prompt, parent_render_id, created_at, view_type')
       .eq('project_id', currentProjectId)
-      .eq('status', 'completed');
-    
-    // Filter by room if provided
-    if (roomId) {
-      query = query.eq('room_id', roomId);
-    }
-    
-    const { data: renders } = await query.order('created_at', { ascending: false });
+      .eq('status', 'completed')
+      .order('created_at', { ascending: false });
     
     const historyItems: RenderHistoryItem[] = (renders || [])
       .filter(r => r.render_url)
@@ -450,7 +433,6 @@ const Index = () => {
         parent_render_id: r.parent_render_id,
         created_at: r.created_at,
         view_type: r.view_type || 'original',
-        room_id: r.room_id,
       }));
     
     setAllRenders(historyItems);
@@ -1892,7 +1874,6 @@ Ready to generate a render! Describe your vision.`;
           parent_render_id: currentRenderId,
           status: 'generating',
           view_type: 'composite',
-          room_id: currentRoomId,
         })
         .select()
         .single();
@@ -1932,18 +1913,13 @@ Ready to generate a render! Describe your vision.`;
 
       const { imageUrl } = await response.json();
 
-      // Update render with URL and ensure view_type is set correctly
       await supabase
         .from('renders')
-        .update({ 
-          render_url: imageUrl, 
-          status: 'completed',
-          view_type: 'composite',
-        })
+        .update({ render_url: imageUrl, status: 'completed' })
         .eq('id', renderRecord.id);
 
       // Refresh render history so the composite appears in the carousel
-      await loadAllRenders(currentRoomId);
+      await loadAllRenders();
 
       setCurrentRenderUrl(imageUrl);
       setCurrentRenderId(renderRecord.id);
@@ -1996,7 +1972,6 @@ Ready to generate a render! Describe your vision.`;
           parent_render_id: currentRenderId,
           status: 'generating',
           view_type: 'edit',
-          room_id: currentRoomId,
         })
         .select()
         .single();
@@ -2065,7 +2040,7 @@ Ready to generate a render! Describe your vision.`;
       });
 
       // Reload all renders to include the new one
-      await loadAllRenders(currentRoomId);
+      await loadAllRenders();
 
       toast({ title: 'Edit complete', description: catalogItem ? `${catalogItem.name} placed in selected area.` : 'Selected area has been updated.' });
     } catch (error) {
@@ -2209,7 +2184,7 @@ Ready to generate a render! Describe your vision.`;
         status: 'ready',
       });
 
-      await loadAllRenders(currentRoomId);
+      await loadAllRenders();
       toast({ title: 'Changes applied', description: 'AI Director modifications complete.' });
     } catch (error) {
       console.error('AI Director failed:', error);
@@ -2296,7 +2271,6 @@ ABSOLUTE REQUIREMENTS FOR CONSISTENCY:
           status: 'pending',
           parent_render_id: currentRenderId || null,
           view_type: viewTypeMap[view] || 'view_custom',
-          room_id: currentRoomId,
         })
         .select('id')
         .single();
@@ -2367,7 +2341,7 @@ ABSOLUTE REQUIREMENTS FOR CONSISTENCY:
           console.error('Failed to update render record:', updateError);
         } else {
           // Refresh render history so the new view appears in the carousel
-          await loadAllRenders(currentRoomId);
+          await loadAllRenders();
         }
       }
 
@@ -2439,75 +2413,42 @@ ABSOLUTE REQUIREMENTS FOR CONSISTENCY:
     }
   }, [currentProjectId, loadZones]);
 
-  // Create a new zone - also creates a linked room automatically
+  // Create a new zone
   const handleZoneCreate = useCallback(async (zone: Omit<Zone, 'id'>) => {
     if (!user || !currentProjectId) return;
 
-    try {
-      // First, create a room with the same name as the zone
-      const { data: roomData, error: roomError } = await supabase
-        .from('rooms')
-        .insert({
-          project_id: currentProjectId,
-          user_id: user.id,
-          name: zone.name,
-        })
-        .select()
-        .single();
+    const { data, error } = await supabase
+      .from('staging_zones')
+      .insert({
+        project_id: currentProjectId,
+        user_id: user.id,
+        name: zone.name,
+        x_start: zone.x_start,
+        y_start: zone.y_start,
+        x_end: zone.x_end,
+        y_end: zone.y_end,
+      })
+      .select()
+      .single();
 
-      if (roomError) {
-        console.error('Failed to create room for zone:', roomError);
-        // Continue anyway - zone will work but won't have room filtering
-      }
-
-      const roomId = roomData?.id || null;
-
-      // Create the zone with room_id linked
-      const { data, error } = await supabase
-        .from('staging_zones')
-        .insert({
-          project_id: currentProjectId,
-          user_id: user.id,
-          name: zone.name,
-          x_start: zone.x_start,
-          y_start: zone.y_start,
-          x_end: zone.x_end,
-          y_end: zone.y_end,
-          room_id: roomId,
-        })
-        .select()
-        .single();
-
-      if (error) {
-        console.error('Failed to create zone:', error);
-        toast({ variant: 'destructive', title: 'Error', description: 'Failed to create zone' });
-        return;
-      }
-
-      const newZone: Zone = {
-        id: data.id,
-        name: data.name,
-        x_start: Number(data.x_start),
-        y_start: Number(data.y_start),
-        x_end: Number(data.x_end),
-        y_end: Number(data.y_end),
-      };
-
-      setZones(prev => [...prev, newZone]);
-      setSelectedZoneId(data.id);
-      
-      // Set the newly created room as current room to filter renders by it
-      if (roomId) {
-        setCurrentRoomId(roomId);
-        setCurrentRoomName(zone.name);
-        setShowAllRenders(false); // Auto-switch to room filter when zone is created
-      }
-
-      toast({ title: 'Zone created', description: `"${zone.name}" added as a new room` });
-    } catch (err) {
-      console.error('Zone creation error:', err);
+    if (error) {
+      console.error('Failed to create zone:', error);
       toast({ variant: 'destructive', title: 'Error', description: 'Failed to create zone' });
+      return;
     }
+
+    const newZone: Zone = {
+      id: data.id,
+      name: data.name,
+      x_start: Number(data.x_start),
+      y_start: Number(data.y_start),
+      x_end: Number(data.x_end),
+      y_end: Number(data.y_end),
+    };
+
+    setZones(prev => [...prev, newZone]);
+    setSelectedZoneId(data.id);
+    toast({ title: 'Zone created', description: `"${zone.name}" added` });
   }, [user, currentProjectId, toast]);
 
   // Delete a zone
@@ -2560,7 +2501,6 @@ ABSOLUTE REQUIREMENTS FOR CONSISTENCY:
           status: 'generating',
           room_upload_id: currentUpload?.id || null,
           parent_render_id: currentRenderId,
-          room_id: currentRoomId,
         })
         .select()
         .single();
@@ -2632,7 +2572,7 @@ ABSOLUTE REQUIREMENTS FOR CONSISTENCY:
       });
 
       // Reload all renders to include the new one in history
-      await loadAllRenders(currentRoomId);
+      await loadAllRenders();
 
       toast({ title: 'Zone view ready', description: `"${zone.name}" ${viewLabel} view generated` });
     } catch (error) {
@@ -2845,7 +2785,7 @@ ABSOLUTE REQUIREMENTS FOR CONSISTENCY:
         status: 'ready',
       });
       
-      await loadAllRenders(currentRoomId);
+      await loadAllRenders();
       toast({ title: 'Camera view generated', description: `${camera.name} perspective ready` });
     } catch (error) {
       console.error('Camera render failed:', error);
@@ -3366,9 +3306,6 @@ ABSOLUTE REQUIREMENTS FOR CONSISTENCY:
             currentRenderId={currentRenderId}
             onRenderHistorySelect={handleRenderHistorySelect}
             onDeleteRender={handleDeleteRender}
-            showAllRenders={showAllRenders}
-            onToggleShowAllRenders={() => setShowAllRenders(prev => !prev)}
-            currentRoomName={currentRoomName}
             onSelectiveEdit={handleEnterSelectionMode}
             onAIDirectorChange={handleAIDirectorChange}
             onMulticamGenerate={handleMulticamGenerate}

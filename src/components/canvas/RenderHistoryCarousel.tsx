@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
-import { History, ChevronDown, ChevronUp, Trash2, Camera, Paintbrush, Layers, Eye, Sparkles, LayoutGrid, Home } from 'lucide-react';
+import { History, ChevronDown, ChevronUp, Trash2, Camera, Paintbrush, Layers, Eye, Sparkles } from 'lucide-react';
 import {
   Carousel,
   CarouselContent,
@@ -20,7 +20,6 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
-import { Button } from '@/components/ui/button';
 
 export interface RenderHistoryItem {
   id: string;
@@ -29,7 +28,6 @@ export interface RenderHistoryItem {
   parent_render_id: string | null;
   created_at: string;
   view_type?: string;
-  room_id?: string | null;
 }
 
 interface RenderHistoryCarouselProps {
@@ -37,9 +35,6 @@ interface RenderHistoryCarouselProps {
   currentRenderId: string | null;
   onSelect: (render: RenderHistoryItem) => void;
   onDelete?: (renderId: string) => void;
-  showAllRenders?: boolean;
-  onToggleShowAll?: () => void;
-  currentRoomName?: string | null;
 }
 
 export function RenderHistoryCarousel({
@@ -47,9 +42,6 @@ export function RenderHistoryCarousel({
   currentRenderId,
   onSelect,
   onDelete,
-  showAllRenders = true,
-  onToggleShowAll,
-  currentRoomName,
 }: RenderHistoryCarouselProps) {
   const [isExpanded, setIsExpanded] = useState(true);
   const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -68,53 +60,27 @@ export function RenderHistoryCarousel({
     <div className="absolute bottom-24 left-1/2 -translate-x-1/2 z-20 w-full max-w-2xl px-4">
       <div className="glass-premium rounded-xl border border-border/20 overflow-hidden">
         {/* Header - Always visible, clickable to toggle */}
-        <div className="flex items-center justify-between p-3">
-          <button
-            onClick={() => setIsExpanded(!isExpanded)}
-            className="flex items-center gap-2 hover:opacity-80 transition-opacity flex-1"
-          >
+        <button
+          onClick={() => setIsExpanded(!isExpanded)}
+          className="w-full flex items-center justify-between p-3 hover:bg-muted/20 transition-colors"
+        >
+          <div className="flex items-center gap-2">
             <History className="h-3.5 w-3.5 text-primary" />
             <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-              {showAllRenders ? 'All Renders' : currentRoomName ? `${currentRoomName} Renders` : 'Room Renders'}
+              Render History
             </span>
-          </button>
+          </div>
           <div className="flex items-center gap-2">
-            {/* Toggle between All / Room renders */}
-            {onToggleShowAll && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onToggleShowAll();
-                }}
-                className="h-6 px-2 text-xs gap-1"
-              >
-                {showAllRenders ? (
-                  <>
-                    <Home className="h-3 w-3" />
-                    Room
-                  </>
-                ) : (
-                  <>
-                    <LayoutGrid className="h-3 w-3" />
-                    All
-                  </>
-                )}
-              </Button>
-            )}
             <span className="text-xs font-mono text-muted-foreground">
               {renders.length} version{renders.length !== 1 ? 's' : ''}
             </span>
-            <button onClick={() => setIsExpanded(!isExpanded)} className="hover:opacity-80">
-              {isExpanded ? (
-                <ChevronDown className="h-4 w-4 text-muted-foreground" />
-              ) : (
-                <ChevronUp className="h-4 w-4 text-muted-foreground" />
-              )}
-            </button>
+            {isExpanded ? (
+              <ChevronDown className="h-4 w-4 text-muted-foreground" />
+            ) : (
+              <ChevronUp className="h-4 w-4 text-muted-foreground" />
+            )}
           </div>
-        </div>
+        </button>
         
         {/* Collapsible content */}
         <div
