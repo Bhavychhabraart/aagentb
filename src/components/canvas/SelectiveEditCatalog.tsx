@@ -36,6 +36,8 @@ export function SelectiveEditCatalog({ selectedItem, onItemSelect }: SelectiveEd
   const [searchQuery, setSearchQuery] = useState('');
   const [activeCategory, setActiveCategory] = useState('All');
   const [activeTab, setActiveTab] = useState('catalog');
+  const [catalogDisplayLimit, setCatalogDisplayLimit] = useState(40);
+  const [customDisplayLimit, setCustomDisplayLimit] = useState(40);
 
   useEffect(() => {
     const loadCatalog = async () => {
@@ -121,89 +123,109 @@ export function SelectiveEditCatalog({ selectedItem, onItemSelect }: SelectiveEd
     }
   };
 
-  const renderItemGrid = (items: CatalogFurnitureItem[], isCustom = false) => (
-    <div className="grid grid-cols-4 gap-2 pr-3">
-      {items.slice(0, 20).map(item => (
-        <button
-          key={item.id}
-          onClick={() => handleCatalogItemClick(item)}
-          className={cn(
-            "relative aspect-square rounded-lg overflow-hidden border-2 transition-all",
-            "hover:ring-2 hover:ring-primary/50",
-            selectedItem?.id === item.id
-              ? "border-primary ring-2 ring-primary/30"
-              : "border-border/50"
-          )}
-        >
-          {item.imageUrl ? (
-            <img
-              src={item.imageUrl}
-              alt={item.name}
-              className="w-full h-full object-cover"
-              loading="lazy"
-            />
-          ) : (
-            <div className="w-full h-full bg-muted flex items-center justify-center">
-              <span className="text-xs text-muted-foreground">No img</span>
-            </div>
-          )}
-          
-          {selectedItem?.id === item.id && (
-            <div className="absolute inset-0 bg-primary/20 flex items-center justify-center">
-              <div className="h-6 w-6 rounded-full bg-primary flex items-center justify-center">
-                <Check className="h-4 w-4 text-primary-foreground" />
+  const renderItemGrid = (items: CatalogFurnitureItem[], displayLimit: number, onLoadMore: () => void) => (
+    <div className="flex flex-col gap-2">
+      <div className="grid grid-cols-4 gap-2 pr-3">
+        {items.slice(0, displayLimit).map(item => (
+          <button
+            key={item.id}
+            onClick={() => handleCatalogItemClick(item)}
+            className={cn(
+              "relative aspect-square rounded-lg overflow-hidden border-2 transition-all",
+              "hover:ring-2 hover:ring-primary/50",
+              selectedItem?.id === item.id
+                ? "border-primary ring-2 ring-primary/30"
+                : "border-border/50"
+            )}
+          >
+            {item.imageUrl ? (
+              <img
+                src={item.imageUrl}
+                alt={item.name}
+                className="w-full h-full object-cover"
+                loading="lazy"
+              />
+            ) : (
+              <div className="w-full h-full bg-muted flex items-center justify-center">
+                <span className="text-xs text-muted-foreground">No img</span>
               </div>
+            )}
+            
+            {selectedItem?.id === item.id && (
+              <div className="absolute inset-0 bg-primary/20 flex items-center justify-center">
+                <div className="h-6 w-6 rounded-full bg-primary flex items-center justify-center">
+                  <Check className="h-4 w-4 text-primary-foreground" />
+                </div>
+              </div>
+            )}
+            
+            <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-1">
+              <p className="text-[10px] text-white truncate">{item.name}</p>
             </div>
-          )}
-          
-          <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-1">
-            <p className="text-[10px] text-white truncate">{item.name}</p>
-          </div>
+          </button>
+        ))}
+      </div>
+      {items.length > displayLimit && (
+        <button
+          onClick={onLoadMore}
+          className="w-full py-2 text-xs text-primary hover:text-primary/80 hover:bg-primary/5 rounded-lg transition-colors"
+        >
+          Load More ({items.length - displayLimit} remaining)
         </button>
-      ))}
+      )}
     </div>
   );
 
   const renderCustomItemGrid = () => (
-    <div className="grid grid-cols-4 gap-2 pr-3">
-      {filteredCustomItems.slice(0, 20).map(item => (
-        <button
-          key={item.id}
-          onClick={() => handleCustomItemClick(item)}
-          className={cn(
-            "relative aspect-square rounded-lg overflow-hidden border-2 transition-all",
-            "hover:ring-2 hover:ring-primary/50",
-            selectedItem?.id === item.catalog_item_id
-              ? "border-primary ring-2 ring-primary/30"
-              : "border-border/50"
-          )}
-        >
-          {item.item_image_url ? (
-            <img
-              src={item.item_image_url}
-              alt={item.item_name}
-              className="w-full h-full object-cover"
-              loading="lazy"
-            />
-          ) : (
-            <div className="w-full h-full bg-muted flex items-center justify-center">
-              <span className="text-xs text-muted-foreground">No img</span>
-            </div>
-          )}
-          
-          {selectedItem?.id === item.catalog_item_id && (
-            <div className="absolute inset-0 bg-primary/20 flex items-center justify-center">
-              <div className="h-6 w-6 rounded-full bg-primary flex items-center justify-center">
-                <Check className="h-4 w-4 text-primary-foreground" />
+    <div className="flex flex-col gap-2">
+      <div className="grid grid-cols-4 gap-2 pr-3">
+        {filteredCustomItems.slice(0, customDisplayLimit).map(item => (
+          <button
+            key={item.id}
+            onClick={() => handleCustomItemClick(item)}
+            className={cn(
+              "relative aspect-square rounded-lg overflow-hidden border-2 transition-all",
+              "hover:ring-2 hover:ring-primary/50",
+              selectedItem?.id === item.catalog_item_id
+                ? "border-primary ring-2 ring-primary/30"
+                : "border-border/50"
+            )}
+          >
+            {item.item_image_url ? (
+              <img
+                src={item.item_image_url}
+                alt={item.item_name}
+                className="w-full h-full object-cover"
+                loading="lazy"
+              />
+            ) : (
+              <div className="w-full h-full bg-muted flex items-center justify-center">
+                <span className="text-xs text-muted-foreground">No img</span>
               </div>
+            )}
+            
+            {selectedItem?.id === item.catalog_item_id && (
+              <div className="absolute inset-0 bg-primary/20 flex items-center justify-center">
+                <div className="h-6 w-6 rounded-full bg-primary flex items-center justify-center">
+                  <Check className="h-4 w-4 text-primary-foreground" />
+                </div>
+              </div>
+            )}
+            
+            <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-1">
+              <p className="text-[10px] text-white truncate">{item.item_name}</p>
             </div>
-          )}
-          
-          <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-1">
-            <p className="text-[10px] text-white truncate">{item.item_name}</p>
-          </div>
+          </button>
+        ))}
+      </div>
+      {filteredCustomItems.length > customDisplayLimit && (
+        <button
+          onClick={() => setCustomDisplayLimit(prev => prev + 40)}
+          className="w-full py-2 text-xs text-primary hover:text-primary/80 hover:bg-primary/5 rounded-lg transition-colors"
+        >
+          Load More ({filteredCustomItems.length - customDisplayLimit} remaining)
         </button>
-      ))}
+      )}
     </div>
   );
 
@@ -265,7 +287,7 @@ export function SelectiveEditCatalog({ selectedItem, onItemSelect }: SelectiveEd
                 No items found
               </div>
             ) : (
-              renderItemGrid(filteredCatalogItems)
+              renderItemGrid(filteredCatalogItems, catalogDisplayLimit, () => setCatalogDisplayLimit(prev => prev + 40))
             )}
           </ScrollArea>
         </TabsContent>

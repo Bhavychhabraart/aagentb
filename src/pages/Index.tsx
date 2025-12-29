@@ -3008,11 +3008,18 @@ ABSOLUTE REQUIREMENTS FOR CONSISTENCY:
     return !!currentRender?.parent_render_id;
   })();
 
-  // Handle Start Over - creates a new project and resets state
+  // Handle Start Over - creates a new project but KEEPS uploaded assets
   const handleStartOver = useCallback(async () => {
     if (!user) return;
     
     try {
+      // Store current assets to copy to new project
+      const currentLayoutUrl = layoutImageUrl;
+      const currentRoomPhotoUrl = roomPhotoUrl;
+      const currentStyleRefUrls = [...styleRefUrls];
+      const currentUploadedProducts = [...uploadedProducts];
+      const oldProjectId = currentProjectId;
+      
       // Create a new project
       const { data: newProject, error } = await supabase
         .from('projects')
@@ -3022,15 +3029,67 @@ ABSOLUTE REQUIREMENTS FOR CONSISTENCY:
       
       if (error) throw error;
       
-      // Reset all state
+      // Copy room uploads (layout and room photo) to new project
+      if (oldProjectId) {
+        const { data: oldUploads } = await supabase
+          .from('room_uploads')
+          .select('*')
+          .eq('project_id', oldProjectId)
+          .in('upload_type', ['layout', 'room_photo']);
+        
+        if (oldUploads && oldUploads.length > 0) {
+          const newUploads = oldUploads.map(upload => ({
+            project_id: newProject.id,
+            user_id: user.id,
+            file_name: upload.file_name,
+            file_url: upload.file_url,
+            upload_type: upload.upload_type,
+            analysis_status: upload.analysis_status,
+            analysis_result: upload.analysis_result,
+          }));
+          await supabase.from('room_uploads').insert(newUploads);
+        }
+        
+        // Copy style uploads to new project
+        const { data: oldStyleUploads } = await supabase
+          .from('style_uploads')
+          .select('*')
+          .eq('project_id', oldProjectId);
+        
+        if (oldStyleUploads && oldStyleUploads.length > 0) {
+          const newStyleUploads = oldStyleUploads.map(upload => ({
+            project_id: newProject.id,
+            user_id: user.id,
+            file_name: upload.file_name,
+            file_url: upload.file_url,
+          }));
+          await supabase.from('style_uploads').insert(newStyleUploads);
+        }
+        
+        // Copy product items to new project
+        const { data: oldProducts } = await supabase
+          .from('product_items')
+          .select('*')
+          .eq('project_id', oldProjectId);
+        
+        if (oldProducts && oldProducts.length > 0) {
+          const newProducts = oldProducts.map(product => ({
+            project_id: newProject.id,
+            user_id: user.id,
+            name: product.name,
+            image_url: product.image_url,
+            product_url: product.product_url,
+          }));
+          await supabase.from('product_items').insert(newProducts);
+        }
+      }
+      
+      // Reset render-related state but KEEP assets
       setMessages([]);
       setCurrentRenderUrl(null);
       setCurrentRenderId(null);
       setCurrentUpload(null);
       setStagedItems([]);
-      setLayoutImageUrl(null);
-      setRoomPhotoUrl(null);
-      setStyleRefUrls([]);
       setAllRenderUrls([]);
       setAllRenders([]);
       setZones([]);
@@ -3043,20 +3102,25 @@ ABSOLUTE REQUIREMENTS FOR CONSISTENCY:
       setSelectedDetections([]);
       setDetectionReplacements(new Map());
       setLockedDetections(new Set());
-      setUploadedProducts([]);
+      
+      // KEEP the assets - restore them after project switch
+      setLayoutImageUrl(currentLayoutUrl);
+      setRoomPhotoUrl(currentRoomPhotoUrl);
+      setStyleRefUrls(currentStyleRefUrls);
+      setUploadedProducts(currentUploadedProducts);
       
       // Navigate to new project
       setCurrentProjectId(newProject.id);
       setSearchParams({ project: newProject.id }, { replace: true });
       setProjectName('New Project');
       
-      toast({ title: 'Started fresh!', description: 'New project created' });
+      toast({ title: 'Started fresh!', description: 'New project created with your uploaded assets' });
       setShowStartOverDialog(false);
     } catch (error) {
       console.error('Failed to start over:', error);
       toast({ variant: 'destructive', title: 'Error', description: 'Failed to create new project' });
     }
-  }, [user, toast, setSearchParams]);
+  }, [user, toast, setSearchParams, layoutImageUrl, roomPhotoUrl, styleRefUrls, uploadedProducts, currentProjectId]);
 
   // Handle Upscale Render
   const handleUpscaleRender = useCallback(async () => {
@@ -3146,7 +3210,7 @@ ABSOLUTE REQUIREMENTS FOR CONSISTENCY:
             onMulticamGenerate={handleMulticamGenerate}
             onToggleMulticamPanel={() => setShowMulticamPanel(!showMulticamPanel)}
             showMulticamPanel={showMulticamPanel}
-            onPositionFurniture={stagedItems.length > 0 && (currentRenderUrl || roomPhotoUrl) ? () => setShowPositioner(true) : undefined}
+            onPositionFurniture={stagedItems.length > 0 && (currentRenderUrl || roomPhotoUrl) ? () => { setShowCatalogModal(false); setShowPositioner(true); } : undefined}
             onExport={() => setShowExportModal(true)}
             onUndo={handleUndo}
             canUndo={canUndo}
