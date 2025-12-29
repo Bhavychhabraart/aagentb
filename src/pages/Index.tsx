@@ -3114,13 +3114,32 @@ ABSOLUTE REQUIREMENTS FOR CONSISTENCY:
       setSearchParams({ project: newProject.id }, { replace: true });
       setProjectName('New Project');
       
-      toast({ title: 'Started fresh!', description: 'New project created with your uploaded assets' });
+      toast({ title: 'Starting fresh render...', description: 'Generating new render with your assets' });
       setShowStartOverDialog(false);
+      
+      // Automatically trigger a new render generation with the kept assets
+      setTimeout(() => {
+        const hasAssets = currentLayoutUrl || currentRoomPhotoUrl || currentStyleRefUrls.length > 0;
+        if (hasAssets) {
+          // Build a prompt based on available assets
+          let prompt = 'Generate a fresh interior design render';
+          if (currentLayoutUrl) prompt += ' based on the floor plan layout';
+          if (currentRoomPhotoUrl) prompt += ' for the uploaded room photo';
+          if (currentStyleRefUrls.length > 0) prompt += ' with the selected style references';
+          if (currentUploadedProducts.length > 0) {
+            const productNames = currentUploadedProducts.slice(0, 3).map(p => p.name).join(', ');
+            prompt += ` featuring ${productNames}`;
+          }
+          
+          // Trigger the generation
+          handleSendMessageWithAgentB(prompt);
+        }
+      }, 500);
     } catch (error) {
       console.error('Failed to start over:', error);
       toast({ variant: 'destructive', title: 'Error', description: 'Failed to create new project' });
     }
-  }, [user, toast, setSearchParams, layoutImageUrl, roomPhotoUrl, styleRefUrls, uploadedProducts, currentProjectId]);
+  }, [user, toast, setSearchParams, layoutImageUrl, roomPhotoUrl, styleRefUrls, uploadedProducts, currentProjectId, handleSendMessageWithAgentB]);
 
   // Handle Upscale Render
   const handleUpscaleRender = useCallback(async () => {
