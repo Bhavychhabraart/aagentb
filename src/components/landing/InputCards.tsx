@@ -29,7 +29,7 @@ export function InputCards({
   onCardClick,
   onClear,
 }: InputCardsProps) {
-  // Primary inputs - floating glass cards
+  // Primary inputs - large cards with animated gradient borders
   const primaryInputs = [
     {
       id: "layout" as const,
@@ -49,7 +49,7 @@ export function InputCards({
     },
   ];
 
-  // Secondary inputs - compact floating pills
+  // Secondary inputs - compact pills
   const secondaryInputs = [
     {
       id: "style" as const,
@@ -61,13 +61,13 @@ export function InputCards({
     {
       id: "rcp" as const,
       icon: Lightbulb,
-      label: "Ceiling Plan",
+      label: "Ceiling Plan (RCP)",
       hasContent: !!ceilingPlan,
     },
     {
       id: "wall-plan" as const,
       icon: Layers,
-      label: "Wall Plan",
+      label: "Wall Ceiling Plan",
       hasContent: !!wallCeilingPlan,
     },
     {
@@ -80,40 +80,44 @@ export function InputCards({
   ];
 
   return (
-    <div className="w-full max-w-5xl space-y-10 mb-10 mt-4">
-      {/* Primary Inputs - Floating Glass Cards */}
+    <div className="w-full max-w-5xl space-y-8 mb-8">
+      {/* Primary Inputs - Larger Cards */}
       <motion.div
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.2, duration: 0.4 }}
-        className="grid grid-cols-2 gap-8"
+        className="grid grid-cols-2 gap-6"
       >
         {primaryInputs.map((card, index) => (
           <motion.button
             key={card.id}
-            initial={{ opacity: 0, scale: 0.95, y: 20 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            transition={{ delay: 0.3 + index * 0.1, duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
-            whileHover={{ scale: 1.02, y: -4 }}
+            initial={{ opacity: 0, scale: 0.98 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ delay: 0.25 + index * 0.05, duration: 0.3 }}
+            whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.98 }}
             onClick={() => onCardClick(card.id)}
             className="relative group"
           >
-            {/* Glass card */}
+            {/* Animated gradient border */}
             <div className={cn(
-              "relative flex items-center gap-5 p-6 rounded-2xl",
-              "bg-[hsl(220,25%,8%/0.6)] backdrop-blur-xl",
-              "border border-[hsl(200,50%,30%/0.2)]",
-              "transition-all duration-300",
-              "hover:border-cyan-500/30 hover:bg-[hsl(220,25%,10%/0.7)]",
-              "hover:shadow-[0_0_40px_hsl(200,100%,50%/0.1),inset_0_1px_0_hsl(200,100%,80%/0.05)]",
-              card.hasContent && "border-cyan-500/30 bg-[hsl(220,25%,10%/0.7)]"
+              "absolute -inset-[1px] rounded-2xl opacity-50 transition-opacity duration-300",
+              "bg-gradient-to-r from-primary via-violet-500 to-primary bg-[length:200%_100%]",
+              "group-hover:opacity-100",
+              card.hasContent && "opacity-70"
+            )} style={{ animation: 'gradient-x 3s ease infinite' }} />
+            
+            {/* Card content */}
+            <div className={cn(
+              "relative flex items-center gap-6 p-8 rounded-2xl",
+              "bg-background/95 backdrop-blur-sm",
+              "transition-all duration-300"
             )}>
               {/* Preview image background */}
               {card.preview && (
                 <div className="absolute inset-0 rounded-2xl overflow-hidden">
-                  <img src={card.preview} alt="" className="w-full h-full object-cover opacity-10" />
-                  <div className="absolute inset-0 bg-gradient-to-r from-[hsl(220,25%,8%)] via-[hsl(220,25%,8%/0.95)] to-[hsl(220,25%,8%/0.8)]" />
+                  <img src={card.preview} alt="" className="w-full h-full object-cover opacity-15" />
+                  <div className="absolute inset-0 bg-gradient-to-r from-background via-background/95 to-background/80" />
                 </div>
               )}
               
@@ -121,32 +125,27 @@ export function InputCards({
               {card.hasContent && (
                 <button
                   onClick={(e) => { e.stopPropagation(); onClear(card.id); }}
-                  className="absolute top-3 right-3 p-1.5 rounded-full bg-background/80 border border-border/50 opacity-0 group-hover:opacity-100 transition-all hover:bg-destructive hover:border-destructive hover:text-destructive-foreground z-10"
+                  className="absolute top-4 right-4 p-2 rounded-full bg-background/90 border border-border opacity-0 group-hover:opacity-100 transition-all hover:bg-destructive hover:border-destructive hover:text-destructive-foreground z-10"
                 >
-                  <X className="w-3.5 h-3.5" />
+                  <X className="w-4 h-4" />
                 </button>
               )}
               
-              {/* Icon container */}
+              {/* Icon */}
               <div className={cn(
-                "relative p-4 rounded-xl transition-all duration-300 shrink-0",
-                card.hasContent 
-                  ? "bg-cyan-500/15 shadow-[0_0_20px_hsl(185,100%,50%/0.15)]" 
-                  : "bg-[hsl(220,25%,15%/0.5)] group-hover:bg-cyan-500/10"
+                "relative p-5 rounded-xl transition-all duration-300 shrink-0",
+                card.hasContent ? "bg-primary/20" : "bg-muted/40 group-hover:bg-primary/10"
               )}>
                 <card.icon className={cn(
-                  "w-7 h-7 transition-colors",
-                  card.hasContent ? "text-cyan-400" : "text-muted-foreground group-hover:text-cyan-400"
+                  "w-10 h-10 transition-colors",
+                  card.hasContent ? "text-primary" : "text-muted-foreground group-hover:text-primary"
                 )} />
               </div>
               
               {/* Text */}
               <div className="relative text-left">
-                <span className="block text-base font-medium text-foreground">{card.title}</span>
-                <span className={cn(
-                  "block text-sm transition-colors",
-                  card.hasContent ? "text-cyan-400/80" : "text-muted-foreground/60"
-                )}>
+                <span className="block text-lg font-semibold text-foreground">{card.title}</span>
+                <span className="block text-base text-muted-foreground">
                   {card.hasContent ? "Uploaded ✓" : card.description}
                 </span>
               </div>
@@ -155,55 +154,52 @@ export function InputCards({
         ))}
       </motion.div>
 
-      {/* Secondary Inputs - Floating Pills */}
+      {/* Secondary Inputs - Larger Inline Pills */}
       <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
-        transition={{ delay: 0.5, duration: 0.3 }}
-        className="flex flex-wrap justify-center gap-3"
+        transition={{ delay: 0.35, duration: 0.3 }}
+        className="flex flex-wrap justify-center gap-4"
       >
         {secondaryInputs.map((pill, index) => (
           <motion.button
             key={pill.id}
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.55 + index * 0.05, duration: 0.3 }}
-            whileHover={{ scale: 1.03, y: -2 }}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.4 + index * 0.05, duration: 0.3 }}
+            whileHover={{ scale: 1.03 }}
             whileTap={{ scale: 0.97 }}
             onClick={() => onCardClick(pill.id)}
             className={cn(
-              "group relative flex items-center gap-2.5 px-4 py-2.5 rounded-full",
-              "bg-[hsl(220,25%,8%/0.5)] backdrop-blur-lg",
-              "border transition-all duration-200",
-              pill.hasContent 
-                ? "border-cyan-500/30 shadow-[0_0_15px_hsl(185,100%,50%/0.1)]" 
-                : "border-[hsl(220,25%,20%/0.3)] hover:border-cyan-500/20"
+              "group relative flex items-center gap-3 px-6 py-3 rounded-full",
+              "glass-premium border transition-all duration-200",
+              pill.hasContent ? "border-primary/40 bg-primary/5" : "border-border/40 hover:border-primary/30"
             )}
           >
             <pill.icon className={cn(
-              "w-4 h-4 transition-colors",
-              pill.hasContent ? "text-cyan-400" : "text-muted-foreground/60 group-hover:text-cyan-400/80"
+              "w-5 h-5 transition-colors",
+              pill.hasContent ? "text-primary" : "text-muted-foreground group-hover:text-primary"
             )} />
             
             <span className={cn(
-              "text-sm font-medium transition-colors",
-              pill.hasContent ? "text-foreground" : "text-muted-foreground/70 group-hover:text-foreground/80"
+              "text-base font-medium transition-colors",
+              pill.hasContent ? "text-foreground" : "text-muted-foreground group-hover:text-foreground"
             )}>
               {pill.label}
             </span>
             
             {pill.hasContent ? (
-              <span className="flex items-center gap-1.5">
-                <span className="text-sm text-cyan-400">{pill.count || "✓"}</span>
+              <span className="flex items-center gap-2">
+                <span className="text-base text-primary">{pill.count || "✓"}</span>
                 <button
                   onClick={(e) => { e.stopPropagation(); onClear(pill.id); }}
-                  className="p-0.5 rounded-full opacity-0 group-hover:opacity-100 hover:bg-destructive/20 transition-all"
+                  className="p-1 rounded-full opacity-0 group-hover:opacity-100 hover:bg-destructive/20 transition-all"
                 >
-                  <X className="w-3 h-3 text-muted-foreground hover:text-destructive" />
+                  <X className="w-4 h-4 text-muted-foreground hover:text-destructive" />
                 </button>
               </span>
             ) : (
-              <Plus className="w-3.5 h-3.5 text-muted-foreground/40 group-hover:text-cyan-400/60" />
+              <Plus className="w-4 h-4 text-muted-foreground group-hover:text-primary" />
             )}
           </motion.button>
         ))}
