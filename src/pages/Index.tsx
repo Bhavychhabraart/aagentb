@@ -2192,10 +2192,21 @@ Ready to generate a render! Describe your vision.`;
 
   // Handle Multicam view generation (with optional zone focus)
   // IMPORTANT: Passes furniture items and style references for CONSISTENT rendering across views
+  // SAVES to renders table so views appear in Render History carousel
   const handleMulticamGenerate = useCallback(async (view: CameraView, customPrompt?: string, zone?: ZoneRegion) => {
     if (!user || !currentProjectId || !currentRenderUrl) return;
 
     setIsMulticamGenerating(true);
+    
+    // View labels for display
+    const viewLabels: Record<CameraView, string> = {
+      perspective: '📷 Perspective View',
+      front: '📷 Front View',
+      side: '📷 Side View',
+      top: "📷 Bird's Eye View",
+      cinematic: '📷 Cinematic View',
+      custom: '📷 Custom View',
+    };
     
     // Camera-specific prompts with STRICT consistency requirements
     const viewPrompts: Record<CameraView, string> = {
@@ -2209,6 +2220,9 @@ Ready to generate a render! Describe your vision.`;
 
     // Build zone-specific prompt if zone is provided
     let prompt = view === 'custom' && customPrompt ? customPrompt : viewPrompts[view];
+    const zoneLabel = zone ? ' (zone focus)' : '';
+    const displayPrompt = viewLabels[view] + zoneLabel;
+    
     if (zone) {
       const zoneDesc = `Focus specifically on the region from ${zone.x_start.toFixed(0)}% to ${zone.x_end.toFixed(0)}% horizontally and ${zone.y_start.toFixed(0)}% to ${zone.y_end.toFixed(0)}% vertically. Crop or zoom the view to focus on this specific area of the room. `;
       prompt = zoneDesc + prompt;
@@ -2228,8 +2242,32 @@ ABSOLUTE REQUIREMENTS FOR CONSISTENCY:
 
 ` + prompt;
 
+    // Create a pending render record in the database BEFORE generating
+    let pendingRenderId: string | null = null;
+    
     try {
-      const zoneLabel = zone ? ' (zone focus)' : '';
+      const { data: pendingRender, error: insertError } = await supabase
+        .from('renders')
+        .insert({
+          user_id: user.id,
+          project_id: currentProjectId,
+          prompt: displayPrompt,
+          status: 'pending',
+          parent_render_id: currentRenderId || null,
+        })
+        .select('id')
+        .single();
+      
+      if (insertError) {
+        console.error('Failed to create pending render:', insertError);
+      } else {
+        pendingRenderId = pendingRender.id;
+      }
+    } catch (err) {
+      console.error('Error creating pending render:', err);
+    }
+
+    try {
       await addMessage('user', `📷 Generating ${view} view${zoneLabel}...`, { type: 'text' });
 
       // Build furniture items with images for reference
@@ -2272,6 +2310,24 @@ ABSOLUTE REQUIREMENTS FOR CONSISTENCY:
 
       const { imageUrl } = await response.json();
 
+      // Update the render record with the generated image URL
+      if (pendingRenderId) {
+        const { error: updateError } = await supabase
+          .from('renders')
+          .update({
+            render_url: imageUrl,
+            status: 'completed',
+          })
+          .eq('id', pendingRenderId);
+        
+        if (updateError) {
+          console.error('Failed to update render record:', updateError);
+        } else {
+          // Refresh render history so the new view appears in the carousel
+          await loadAllRenders();
+        }
+      }
+
       setMulticamViews(prev => ({ ...prev, [view]: imageUrl }));
 
       await addMessage('assistant', `${view.charAt(0).toUpperCase() + view.slice(1)} view${zoneLabel} generated!`, {
@@ -2284,12 +2340,21 @@ ABSOLUTE REQUIREMENTS FOR CONSISTENCY:
     } catch (error) {
       console.error('Multicam generation failed:', error);
       const message = error instanceof Error ? error.message : 'Unknown error';
+      
+      // Clean up the pending render record on failure
+      if (pendingRenderId) {
+        await supabase
+          .from('renders')
+          .delete()
+          .eq('id', pendingRenderId);
+      }
+      
       await addMessage('assistant', `Failed to generate ${view} view: ${message}`, { type: 'text', status: 'failed' });
       toast({ variant: 'destructive', title: 'Failed', description: message });
     } finally {
       setIsMulticamGenerating(false);
     }
-  }, [user, currentProjectId, currentRenderUrl, stagedItems, styleRefUrls, addMessage, toast]);
+  }, [user, currentProjectId, currentRenderUrl, currentRenderId, stagedItems, styleRefUrls, addMessage, toast, loadAllRenders]);
 
   // Handle setting a multicam view as main render
   const handleSetMulticamAsMain = useCallback((imageUrl: string) => {
