@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
-import { History, ChevronDown, ChevronUp, Trash2 } from 'lucide-react';
+import { History, ChevronDown, ChevronUp, Trash2, Camera, Paintbrush, Layers, Eye, Sparkles } from 'lucide-react';
 import {
   Carousel,
   CarouselContent,
@@ -27,6 +27,7 @@ export interface RenderHistoryItem {
   prompt: string;
   parent_render_id: string | null;
   created_at: string;
+  view_type?: string;
 }
 
 interface RenderHistoryCarouselProps {
@@ -101,6 +102,25 @@ export function RenderHistoryCarousel({
                   const isCurrent = render.id === currentRenderId;
                   const timestamp = new Date(render.created_at);
                   
+                  // Get view type badge info
+                  const getViewTypeBadge = () => {
+                    const viewType = render.view_type || 'original';
+                    const badges: Record<string, { icon: React.ReactNode; label: string; color: string }> = {
+                      original: { icon: <Sparkles className="h-2.5 w-2.5" />, label: 'Original', color: 'bg-primary/80' },
+                      edit: { icon: <Paintbrush className="h-2.5 w-2.5" />, label: 'Edit', color: 'bg-amber-500/80' },
+                      composite: { icon: <Layers className="h-2.5 w-2.5" />, label: 'Staged', color: 'bg-emerald-500/80' },
+                      view_perspective: { icon: <Camera className="h-2.5 w-2.5" />, label: '3/4', color: 'bg-blue-500/80' },
+                      view_front: { icon: <Eye className="h-2.5 w-2.5" />, label: 'Front', color: 'bg-blue-500/80' },
+                      view_side: { icon: <Eye className="h-2.5 w-2.5" />, label: 'Side', color: 'bg-blue-500/80' },
+                      view_top: { icon: <Eye className="h-2.5 w-2.5" />, label: 'Top', color: 'bg-blue-500/80' },
+                      view_cinematic: { icon: <Camera className="h-2.5 w-2.5" />, label: 'Cine', color: 'bg-purple-500/80' },
+                      view_custom: { icon: <Camera className="h-2.5 w-2.5" />, label: 'View', color: 'bg-blue-500/80' },
+                    };
+                    return badges[viewType] || badges.original;
+                  };
+                  
+                  const badge = getViewTypeBadge();
+                  
                   return (
                     <CarouselItem key={render.id} className="pl-2 basis-1/4 sm:basis-1/5">
                       <div className="relative group">
@@ -126,6 +146,17 @@ export function RenderHistoryCarousel({
                           {isCurrent && (
                             <div className="absolute top-1 right-1 px-1.5 py-0.5 bg-primary/90 backdrop-blur-sm rounded text-[10px] font-medium text-primary-foreground">
                               Current
+                            </div>
+                          )}
+                          
+                          {/* View type badge - show when not current */}
+                          {!isCurrent && render.view_type && render.view_type !== 'original' && (
+                            <div className={cn(
+                              'absolute top-1 right-1 px-1.5 py-0.5 backdrop-blur-sm rounded text-[10px] font-medium text-white flex items-center gap-1',
+                              badge.color
+                            )}>
+                              {badge.icon}
+                              {badge.label}
                             </div>
                           )}
                           

@@ -645,6 +645,7 @@ export type Database = {
           room_upload_id: string | null
           status: string
           user_id: string
+          view_type: string | null
         }
         Insert: {
           created_at?: string
@@ -657,6 +658,7 @@ export type Database = {
           room_upload_id?: string | null
           status?: string
           user_id: string
+          view_type?: string | null
         }
         Update: {
           created_at?: string
@@ -669,6 +671,7 @@ export type Database = {
           room_upload_id?: string | null
           status?: string
           user_id?: string
+          view_type?: string | null
         }
         Relationships: [
           {
