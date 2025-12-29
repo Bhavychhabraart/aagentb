@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
-import { History, ChevronDown, ChevronUp } from 'lucide-react';
+import { History, ChevronDown, ChevronUp, Trash2 } from 'lucide-react';
 import {
   Carousel,
   CarouselContent,
@@ -9,6 +9,17 @@ import {
   CarouselPrevious,
   CarouselNext,
 } from '@/components/ui/carousel';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
 
 export interface RenderHistoryItem {
   id: string;
@@ -22,16 +33,27 @@ interface RenderHistoryCarouselProps {
   renders: RenderHistoryItem[];
   currentRenderId: string | null;
   onSelect: (render: RenderHistoryItem) => void;
+  onDelete?: (renderId: string) => void;
 }
 
 export function RenderHistoryCarousel({
   renders,
   currentRenderId,
   onSelect,
+  onDelete,
 }: RenderHistoryCarouselProps) {
   const [isExpanded, setIsExpanded] = useState(true);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   if (renders.length === 0) return null;
+
+  const handleDelete = (renderId: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (onDelete) {
+      onDelete(renderId);
+      setDeletingId(null);
+    }
+  };
 
   return (
     <div className="absolute bottom-24 left-1/2 -translate-x-1/2 z-20 w-full max-w-2xl px-4">
@@ -81,45 +103,87 @@ export function RenderHistoryCarousel({
                   
                   return (
                     <CarouselItem key={render.id} className="pl-2 basis-1/4 sm:basis-1/5">
-                      <button
-                        onClick={() => onSelect(render)}
-                        className={cn(
-                          'relative w-full aspect-video rounded-lg overflow-hidden',
-                          'border transition-all duration-200',
-                          'hover:scale-105 hover:z-10',
-                          isCurrent
-                            ? 'border-primary ring-1 ring-primary/40'
-                            : 'border-border/30 hover:border-primary/50'
-                        )}
-                      >
-                        <img
-                          src={render.render_url}
-                          alt={`Render ${index + 1}`}
-                          className="absolute inset-0 w-full h-full object-cover"
-                          draggable={false}
-                        />
-                        
-                        {/* Current badge */}
-                        {isCurrent && (
-                          <div className="absolute top-1 right-1 px-1.5 py-0.5 bg-primary/90 backdrop-blur-sm rounded text-[10px] font-medium text-primary-foreground">
-                            Current
+                      <div className="relative group">
+                        <button
+                          onClick={() => onSelect(render)}
+                          className={cn(
+                            'relative w-full aspect-video rounded-lg overflow-hidden',
+                            'border transition-all duration-200',
+                            'hover:scale-105 hover:z-10',
+                            isCurrent
+                              ? 'border-primary ring-1 ring-primary/40'
+                              : 'border-border/30 hover:border-primary/50'
+                          )}
+                        >
+                          <img
+                            src={render.render_url}
+                            alt={`Render ${index + 1}`}
+                            className="absolute inset-0 w-full h-full object-cover"
+                            draggable={false}
+                          />
+                          
+                          {/* Current badge */}
+                          {isCurrent && (
+                            <div className="absolute top-1 right-1 px-1.5 py-0.5 bg-primary/90 backdrop-blur-sm rounded text-[10px] font-medium text-primary-foreground">
+                              Current
+                            </div>
+                          )}
+                          
+                          {/* Timestamp overlay */}
+                          <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-background/90 to-transparent p-1">
+                            <span className="text-[10px] font-mono text-foreground/80">
+                              {format(timestamp, 'HH:mm')}
+                            </span>
                           </div>
+                          
+                          {/* Version number */}
+                          <div className="absolute top-1 left-1 w-5 h-5 rounded glass flex items-center justify-center">
+                            <span className="text-[10px] font-mono text-foreground">
+                              {renders.length - index}
+                            </span>
+                          </div>
+                        </button>
+
+                        {/* Delete button - only show for non-current renders */}
+                        {!isCurrent && onDelete && (
+                          <AlertDialog open={deletingId === render.id} onOpenChange={(open) => !open && setDeletingId(null)}>
+                            <AlertDialogTrigger asChild>
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setDeletingId(render.id);
+                                }}
+                                className={cn(
+                                  'absolute -top-2 -right-2 p-1.5 rounded-full',
+                                  'bg-destructive/90 text-destructive-foreground',
+                                  'opacity-0 group-hover:opacity-100 transition-opacity',
+                                  'hover:bg-destructive shadow-lg',
+                                  'z-20'
+                                )}
+                              >
+                                <Trash2 className="h-3 w-3" />
+                              </button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent onClick={(e) => e.stopPropagation()}>
+                              <AlertDialogHeader>
+                                <AlertDialogTitle>Delete Render?</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                  This will permanently delete version {renders.length - index} from your render history. This action cannot be undone.
+                                </AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter>
+                                <AlertDialogCancel onClick={(e) => e.stopPropagation()}>Cancel</AlertDialogCancel>
+                                <AlertDialogAction 
+                                  onClick={(e) => handleDelete(render.id, e)}
+                                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                                >
+                                  Delete
+                                </AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
                         )}
-                        
-                        {/* Timestamp overlay */}
-                        <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-background/90 to-transparent p-1">
-                          <span className="text-[10px] font-mono text-foreground/80">
-                            {format(timestamp, 'HH:mm')}
-                          </span>
-                        </div>
-                        
-                        {/* Version number */}
-                        <div className="absolute top-1 left-1 w-5 h-5 rounded glass flex items-center justify-center">
-                          <span className="text-[10px] font-mono text-foreground">
-                            {renders.length - index}
-                          </span>
-                        </div>
-                      </button>
+                      </div>
                     </CarouselItem>
                   );
                 })}

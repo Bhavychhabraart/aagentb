@@ -73,6 +73,7 @@ interface PremiumWorkspaceProps {
   allRenders: RenderHistoryItem[];
   currentRenderId: string | null;
   onRenderHistorySelect: (render: RenderHistoryItem) => void;
+  onDeleteRender?: (renderId: string) => void;
   // Toolbar actions
   onSelectiveEdit?: () => void;
   onAIDirectorChange?: (directive: string) => void;
@@ -142,6 +143,7 @@ export function PremiumWorkspace({
   allRenders,
   currentRenderId,
   onRenderHistorySelect,
+  onDeleteRender,
   onSelectiveEdit,
   onAIDirectorChange,
   onMulticamGenerate,
@@ -349,16 +351,6 @@ export function PremiumWorkspace({
   ];
 
   const viewTools: ToolbarItem[] = [
-    {
-      id: 'views',
-      icon: Video,
-      label: 'Views',
-      onClick: onToggleMulticamPanel,
-      disabled: !renderUrl || isGenerating,
-      active: showMulticamPanel,
-      shortcut: 'V',
-      group: 'view',
-    },
     {
       id: 'zones',
       icon: Layers,
@@ -994,6 +986,7 @@ export function PremiumWorkspace({
             renders={allRenders}
             currentRenderId={currentRenderId}
             onSelect={onRenderHistorySelect}
+            onDelete={onDeleteRender}
           />
         )}
       </div>

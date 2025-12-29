@@ -37,25 +37,28 @@ serve(async (req) => {
       { type: 'image_url', image_url: { url: roomImageUrl } },
       {
         type: 'text',
-        text: `Analyze this interior room image.
-Identify all distinct furniture and decor items (e.g., Sofa, Chair, Table, Lamp, Plant, Bed, Rug, Painting, Cabinet, Desk).
+        text: `You are a furniture detection AI. Analyze this interior room image and identify ALL furniture and decor items.
 
-Return a STRICT JSON array where each object has:
-- "label": Name of the item (e.g., "Sofa", "Coffee Table", "Floor Lamp").
-- "box_2d": A bounding box [ymin, xmin, ymax, xmax] using 0-1000 coordinate space.
+OUTPUT FORMAT - You MUST return ONLY a valid JSON array with NO additional text:
 
-IMPORTANT:
-- Do NOT use markdown code blocks or backticks.
-- Do NOT include any explanations or text outside the JSON.
-- Ensure string values are properly escaped. No unescaped newlines inside strings.
-- Only include furniture and decor items, not architectural features like walls or windows.
-
-Example Format:
 [
-  {"label": "Sofa", "box_2d": [500, 200, 800, 800]},
-  {"label": "Coffee Table", "box_2d": [600, 300, 700, 600]},
-  {"label": "Floor Lamp", "box_2d": [300, 100, 500, 200]}
-]`
+  {"label": "Sofa", "box_2d": [320, 150, 650, 720]},
+  {"label": "Coffee Table", "box_2d": [480, 250, 580, 550]},
+  {"label": "Floor Lamp", "box_2d": [100, 680, 400, 780]}
+]
+
+RULES:
+1. Return ONLY the JSON array - no markdown, no backticks, no explanations
+2. Each object MUST have exactly 2 properties: "label" (string) and "box_2d" (array of 4 integers)
+3. box_2d format: [ymin, xmin, ymax, xmax] where values are 0-1000 (representing 0-100% of image)
+4. Use descriptive labels like "Sectional Sofa", "Round Coffee Table", "Floor Lamp", "Area Rug"
+5. Detect: sofas, chairs, tables, lamps, plants, rugs, beds, dressers, cabinets, shelves, artwork, mirrors
+6. Do NOT detect architectural features (walls, windows, doors, ceilings, floors)
+7. Each item MUST be a complete JSON object - never leave objects incomplete
+8. Double-check your JSON is valid before responding
+
+EXAMPLE VALID RESPONSE:
+[{"label": "Modern Sofa", "box_2d": [400, 100, 700, 600]}, {"label": "Coffee Table", "box_2d": [550, 200, 650, 500]}]`
       }
     ];
 
@@ -68,7 +71,6 @@ Example Format:
       body: JSON.stringify({
         model: 'google/gemini-2.5-flash',
         messages: [{ role: 'user', content }],
-        response_format: { type: 'json_object' }
       }),
     });
 
@@ -100,9 +102,33 @@ Example Format:
       });
     }
 
+    console.log('Raw AI response length:', textResponse.length);
+
     // Clean and parse JSON response
-    let cleanText = textResponse.replace(/```json|```|```/g, '').trim();
+    let cleanText = textResponse
+      .replace(/```json\s*/gi, '')
+      .replace(/```\s*/g, '')
+      .trim();
     
+    // Find the JSON array boundaries
+    const firstBracket = cleanText.indexOf('[');
+    const lastBracket = cleanText.lastIndexOf(']');
+    
+    if (firstBracket !== -1 && lastBracket !== -1 && lastBracket > firstBracket) {
+      cleanText = cleanText.substring(firstBracket, lastBracket + 1);
+    }
+    
+    // Fix common JSON issues
+    // Remove trailing commas before ]
+    cleanText = cleanText.replace(/,\s*]/g, ']');
+    // Remove trailing commas before }
+    cleanText = cleanText.replace(/,\s*}/g, '}');
+    // Fix incomplete objects by removing them
+    cleanText = cleanText.replace(/,?\s*\{[^}]*$/g, '');
+    // Ensure proper closing
+    if (!cleanText.endsWith(']')) {
+      cleanText = cleanText + ']';
+    }
     // Sanitize invalid numbers with leading zeros (e.g. 01 -> 1)
     cleanText = cleanText.replace(/(\[|,)\s*0+([1-9])/g, '$1$2');
     
@@ -110,38 +136,50 @@ Example Format:
     try {
       const parsed = JSON.parse(cleanText);
       // Handle both array and object with items property
-      const rawItems = Array.isArray(parsed) ? parsed : (parsed.items || parsed.furniture || []);
+      const rawItems = Array.isArray(parsed) ? parsed : (parsed.items || parsed.furniture || parsed.objects || []);
       
       if (!Array.isArray(rawItems)) {
-        console.error('Parsed response is not an array:', cleanText);
+        console.error('Parsed response is not an array:', typeof rawItems);
         items = [];
       } else {
-        items = rawItems.map((item: any, index: number) => {
-          let x = 50;
-          let y = 50;
-          
-          if (item.box_2d && Array.isArray(item.box_2d) && item.box_2d.length === 4) {
-            const [ymin, xmin, ymax, xmax] = item.box_2d;
+        // Filter and validate items
+        items = rawItems
+          .filter((item: any) => {
+            // Must have label
+            if (!item.label || typeof item.label !== 'string') {
+              console.log('Skipping item without valid label:', item);
+              return false;
+            }
+            // Must have valid box_2d
+            if (!item.box_2d || !Array.isArray(item.box_2d) || item.box_2d.length !== 4) {
+              console.log('Skipping item without valid box_2d:', item);
+              return false;
+            }
+            // All values must be numbers
+            const allNumbers = item.box_2d.every((v: any) => typeof v === 'number' && !isNaN(v));
+            if (!allNumbers) {
+              console.log('Skipping item with non-numeric box_2d values:', item);
+              return false;
+            }
+            return true;
+          })
+          .map((item: any, index: number) => {
+            const [ymin, xmin, ymax, xmax] = item.box_2d.map((v: number) => Math.max(0, Math.min(1000, Math.round(v))));
             const centerY = (ymin + ymax) / 2;
             const centerX = (xmin + xmax) / 2;
-            y = centerY / 10; // Convert 0-1000 to 0-100
-            x = centerX / 10;
-          } else if (item.x !== undefined && item.y !== undefined) {
-            x = item.x;
-            y = item.y;
-          }
-
-          return {
-            id: `detected_${index}_${Date.now()}`,
-            label: item.label || 'Unknown Item',
-            x: Math.max(0, Math.min(100, x)),
-            y: Math.max(0, Math.min(100, y)),
-            box_2d: item.box_2d
-          };
-        });
+            
+            return {
+              id: `detected_${index}_${Date.now()}`,
+              label: item.label.trim(),
+              x: Math.max(0, Math.min(100, centerX / 10)), // Convert 0-1000 to 0-100
+              y: Math.max(0, Math.min(100, centerY / 10)),
+              box_2d: [ymin, xmin, ymax, xmax] as [number, number, number, number]
+            };
+          });
       }
     } catch (parseError) {
-      console.error('JSON Parse Error:', parseError, 'Raw text:', textResponse);
+      console.error('JSON Parse Error:', parseError);
+      console.error('Attempted to parse:', cleanText.substring(0, 500));
       items = [];
     }
 
