@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Plus, MoreHorizontal, Pencil, Trash2, Check, X, Home, Lock, Unlock } from 'lucide-react';
+import { MoreHorizontal, Pencil, Trash2, Check, X, Home, Lock, Unlock } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -23,7 +23,6 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/useAuth';
 import { cn } from '@/lib/utils';
-import { AddRoomModal } from './AddRoomModal';
 
 interface Room {
   id: string;
@@ -57,7 +56,6 @@ export function RoomListPanel({
   const [editingName, setEditingName] = useState('');
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [roomToDelete, setRoomToDelete] = useState<Room | null>(null);
-  const [addModalOpen, setAddModalOpen] = useState(false);
 
   useEffect(() => {
     if (projectId) {
@@ -91,34 +89,6 @@ export function RoomListPanel({
       }
     }
     setLoading(false);
-  };
-
-  const handleAddRoom = async (name: string) => {
-    if (!user || !projectId) return;
-
-    const { data, error } = await supabase
-      .from('rooms')
-      .insert({
-        project_id: projectId,
-        user_id: user.id,
-        name,
-      })
-      .select()
-      .single();
-
-    if (error) {
-      toast({
-        variant: 'destructive',
-        title: 'Error',
-        description: 'Failed to create room.',
-      });
-    } else {
-      const newRooms = [...rooms, data];
-      setRooms(newRooms);
-      onRoomsChange?.(newRooms);
-      onRoomSelect(data.id);
-      toast({ title: 'Room created' });
-    }
   };
 
   const startEditing = (room: Room) => {
@@ -348,23 +318,7 @@ export function RoomListPanel({
           </div>
         ))}
 
-        {/* Add Room Button */}
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={() => setAddModalOpen(true)}
-          className="w-full justify-start gap-2 ml-4 text-xs text-muted-foreground hover:text-foreground h-7"
-        >
-          <Plus className="h-3 w-3" />
-          Add Room
-        </Button>
       </div>
-
-      <AddRoomModal
-        open={addModalOpen}
-        onOpenChange={setAddModalOpen}
-        onAddRoom={handleAddRoom}
-      />
 
       {/* Delete Confirmation Dialog */}
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
