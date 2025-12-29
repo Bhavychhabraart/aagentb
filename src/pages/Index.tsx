@@ -3085,6 +3085,14 @@ ABSOLUTE REQUIREMENTS FOR CONSISTENCY:
       const currentUploadedProducts = [...uploadedProducts];
       const oldProjectId = currentProjectId;
       
+      // Delete all renders from the old project first
+      if (oldProjectId) {
+        await supabase
+          .from('renders')
+          .delete()
+          .eq('project_id', oldProjectId);
+      }
+      
       // Create a new project
       const { data: newProject, error } = await supabase
         .from('projects')
