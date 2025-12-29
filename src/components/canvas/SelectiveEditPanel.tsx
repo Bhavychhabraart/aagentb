@@ -1,11 +1,12 @@
 import { useState, useEffect } from 'react';
-import { Send, X, Loader2, Crop, Type, Package, Paintbrush, Upload, Eye, Eraser } from 'lucide-react';
+import { Send, X, Loader2, Crop, Type, Package, Paintbrush, Upload, Eye, Eraser, Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { SelectionRegion } from './SelectionOverlay';
 import { SelectiveEditCatalog } from './SelectiveEditCatalog';
 import { SelectiveEditFinishes } from './SelectiveEditFinishes';
 import { SelectiveEditUploader } from './SelectiveEditUploader';
+import { SelectiveEditCreateProduct } from './SelectiveEditCreateProduct';
 import { CatalogFurnitureItem } from '@/services/catalogService';
 import { FinishItem } from '@/services/finishesLibrary';
 import { cn } from '@/lib/utils';
@@ -19,7 +20,7 @@ interface SelectiveEditPanelProps {
   isProcessing: boolean;
 }
 
-type EditMode = 'prompt' | 'catalog' | 'finish' | 'upload' | 'erase';
+type EditMode = 'prompt' | 'catalog' | 'finish' | 'upload' | 'erase' | 'create';
 
 export function SelectiveEditPanel({ 
   selection, 
@@ -35,6 +36,8 @@ export function SelectiveEditPanel({
   const [additionalInstructions, setAdditionalInstructions] = useState('');
   const [uploadedImageUrls, setUploadedImageUrls] = useState<string[]>([]);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [createdProductImageUrl, setCreatedProductImageUrl] = useState<string | null>(null);
+  const [createdProductDescription, setCreatedProductDescription] = useState('');
 
   // Generate selection preview when component mounts or selection changes
   useEffect(() => {
@@ -80,7 +83,22 @@ export function SelectiveEditPanel({
         ? `Remove this element and fill with matching background. ${additionalInstructions.trim()}`
         : 'Remove this element and fill with matching background that blends naturally with the surroundings';
       onSubmit(finalPrompt);
+    } else if (editMode === 'create') {
+      if (createdProductImageUrl) {
+        const finalPrompt = additionalInstructions.trim()
+          ? `Replace with custom product: ${createdProductDescription}. ${additionalInstructions.trim()}`
+          : `Replace with custom product: ${createdProductDescription}`;
+        onSubmit(finalPrompt, undefined, createdProductImageUrl);
+      }
     }
+  };
+
+  const handleProductGenerated = (imageUrl: string, description: string, category: string) => {
+    setCreatedProductImageUrl(imageUrl);
+    setCreatedProductDescription(description);
+    // Auto-submit when product is applied
+    const finalPrompt = `Replace with custom ${category.toLowerCase()}: ${description}`;
+    onSubmit(finalPrompt, undefined, imageUrl);
   };
 
   // Only allow Enter key to submit in prompt mode (text input)
@@ -106,7 +124,9 @@ export function SelectiveEditPanel({
         ? selectedFinish !== null
         : editMode === 'erase'
           ? true // Erase is always ready
-          : uploadedImageUrls.length > 0;
+          : editMode === 'create'
+            ? createdProductImageUrl !== null
+            : uploadedImageUrls.length > 0;
 
   return (
     <div className="absolute bottom-[12%] left-1/2 -translate-x-1/2 z-30 w-full max-w-lg px-4">
@@ -213,6 +233,18 @@ export function SelectiveEditPanel({
               <Eraser className="h-3 w-3" />
               Erase
             </button>
+            <button
+              onClick={() => setEditMode('create')}
+              className={cn(
+                "flex-1 flex items-center justify-center gap-1 py-2 px-1.5 rounded-lg text-xs font-medium transition-colors",
+                editMode === 'create'
+                  ? "bg-green-600 text-white"
+                  : "bg-muted text-muted-foreground hover:bg-muted/80"
+              )}
+            >
+              <Plus className="h-3 w-3" />
+              Create
+            </button>
           </div>
         </div>
 
@@ -312,6 +344,15 @@ export function SelectiveEditPanel({
               </div>
             </div>
           )}
+
+          {editMode === 'create' && (
+            <div className="mb-3">
+              <SelectiveEditCreateProduct
+                onProductGenerated={handleProductGenerated}
+                isDisabled={isProcessing}
+              />
+            </div>
+          )}
           
           <div className="flex items-center justify-between">
             <p className="text-xs text-muted-foreground">
@@ -327,9 +368,11 @@ export function SelectiveEditPanel({
                       : 'Select a finish, then click Apply Edit'
                     : editMode === 'erase'
                       ? 'Ready to erase - click Apply Edit'
-                      : uploadedImageUrls.length > 0
-                        ? `${uploadedImageUrls.length} image(s) ready - click Apply Edit`
-                        : 'Upload image(s), then click Apply Edit'}
+                      : editMode === 'create'
+                        ? 'Generate a custom product with AI'
+                        : uploadedImageUrls.length > 0
+                          ? `${uploadedImageUrls.length} image(s) ready - click Apply Edit`
+                          : 'Upload image(s), then click Apply Edit'}
             </p>
             <div className="flex gap-2">
               <Button
