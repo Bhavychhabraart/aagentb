@@ -94,9 +94,7 @@ export function SelectiveEditPanel({
   };
 
   const handleProductGenerated = (imageUrl: string, description: string, category: string) => {
-    setCreatedProductImageUrl(imageUrl);
-    setCreatedProductDescription(description);
-    // Auto-submit when product is applied
+    // Don't store state - directly submit to prevent double submission via "Apply Edit" button
     const finalPrompt = `Replace with custom ${category.toLowerCase()}: ${description}`;
     onSubmit(finalPrompt, undefined, imageUrl);
   };
