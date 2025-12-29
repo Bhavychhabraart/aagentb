@@ -74,6 +74,10 @@ interface PremiumWorkspaceProps {
   currentRenderId: string | null;
   onRenderHistorySelect: (render: RenderHistoryItem) => void;
   onDeleteRender?: (renderId: string) => void;
+  // Render history toggle props
+  showAllRenders?: boolean;
+  onToggleShowAllRenders?: () => void;
+  currentRoomName?: string | null;
   // Toolbar actions
   onSelectiveEdit?: () => void;
   onAIDirectorChange?: (directive: string) => void;
@@ -144,6 +148,9 @@ export function PremiumWorkspace({
   currentRenderId,
   onRenderHistorySelect,
   onDeleteRender,
+  showAllRenders = true,
+  onToggleShowAllRenders,
+  currentRoomName,
   onSelectiveEdit,
   onAIDirectorChange,
   onMulticamGenerate,
@@ -997,6 +1004,9 @@ export function PremiumWorkspace({
             currentRenderId={currentRenderId}
             onSelect={onRenderHistorySelect}
             onDelete={onDeleteRender}
+            showAllRenders={showAllRenders}
+            onToggleShowAll={onToggleShowAllRenders}
+            currentRoomName={currentRoomName}
           />
         )}
       </div>
