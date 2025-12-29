@@ -1,11 +1,11 @@
-import { Package, Search, PenTool, Trash2, X, Lock } from 'lucide-react';
+import { Package, Search, PenTool, Trash2, X, Lock, Upload } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { DetectedItem } from './AIDetectionOverlay';
 
 interface DetectionActionMenuProps {
   item: DetectedItem;
   style: { left: string; top: string; width: string; height: string };
-  onAction: (action: 'replace' | 'similar' | 'custom' | 'remove' | 'lock') => void;
+  onAction: (action: 'replace' | 'similar' | 'custom' | 'remove' | 'lock' | 'upload') => void;
   onClose: () => void;
   isLocked?: boolean;
 }
@@ -26,6 +26,7 @@ export function DetectionActionMenu({
     },
     { id: 'replace' as const, icon: Package, label: 'Replace from Catalogue' },
     { id: 'similar' as const, icon: Search, label: 'Find Similar' },
+    { id: 'upload' as const, icon: Upload, label: 'Upload Product' },
     { id: 'custom' as const, icon: PenTool, label: 'Create Custom' },
     { id: 'remove' as const, icon: Trash2, label: 'Remove', className: 'text-destructive hover:bg-destructive/10' },
   ];
@@ -43,7 +44,7 @@ export function DetectionActionMenu({
       }}
       onClick={(e) => e.stopPropagation()}
     >
-      <div className="glass-premium rounded-lg border border-border shadow-xl overflow-hidden w-44">
+      <div className="glass-premium rounded-lg border border-border shadow-xl overflow-hidden w-48">
         {/* Header */}
         <div className="flex items-center justify-between px-3 py-2 border-b border-border/50 bg-muted/30">
           <span className="text-xs font-medium truncate">{item.label}</span>

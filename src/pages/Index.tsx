@@ -1664,6 +1664,13 @@ Ready to generate a render! Describe your vision.`;
     } else if (action === 'remove') {
       // Trigger erase action for the detected item
       await handleEraserAction(item);
+    } else if (action === 'upload') {
+      // Set up for upload replacement
+      setReplacingDetectionId(item.id);
+      setReplacingDetectionLabel(item.label);
+      toast({ title: 'Upload Product', description: 'Upload a product image to replace this item' });
+      // Open catalog modal in upload mode - user can use the upload tab
+      setShowCatalogModal(true);
     }
   }, [toast, navigate]);
 
@@ -2059,6 +2066,22 @@ Ready to generate a render! Describe your vision.`;
     setCurrentRenderUrl(render.render_url);
     setCurrentRenderId(render.id);
     toast({ title: 'Render selected', description: 'Viewing selected render version.' });
+  }, [toast]);
+
+  // Handle render deletion from history carousel
+  const handleDeleteRender = useCallback(async (renderId: string) => {
+    try {
+      // Remove from local state
+      setAllRenders(prev => prev.filter(r => r.id !== renderId));
+      
+      // Delete from database
+      await supabase.from('renders').delete().eq('id', renderId);
+      
+      toast({ title: 'Render deleted', description: 'Version removed from history.' });
+    } catch (error) {
+      console.error('Error deleting render:', error);
+      toast({ variant: 'destructive', title: 'Delete failed', description: 'Could not delete render.' });
+    }
   }, [toast]);
 
   // Handle undo - go back to parent render
@@ -3117,6 +3140,7 @@ ABSOLUTE REQUIREMENTS FOR CONSISTENCY:
             allRenders={allRenders}
             currentRenderId={currentRenderId}
             onRenderHistorySelect={handleRenderHistorySelect}
+            onDeleteRender={handleDeleteRender}
             onSelectiveEdit={handleEnterSelectionMode}
             onAIDirectorChange={handleAIDirectorChange}
             onMulticamGenerate={handleMulticamGenerate}

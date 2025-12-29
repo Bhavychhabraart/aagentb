@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { cn } from '@/lib/utils';
-import { Loader2, ScanSearch, X, RefreshCw, Sparkles, RotateCcw } from 'lucide-react';
+import { Loader2, ScanSearch, X, RefreshCw, Sparkles, RotateCcw, Package, Upload } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -27,7 +27,9 @@ interface AIDetectionOverlayProps {
   isMultiSelectMode: boolean;
   selectedItems: string[];
   onItemSelect: (itemId: string) => void;
-  onItemAction: (item: DetectedItem, action: 'replace' | 'similar' | 'custom' | 'remove' | 'lock') => void;
+  onItemAction: (item: DetectedItem, action: 'replace' | 'similar' | 'custom' | 'remove' | 'lock' | 'upload') => void;
+  onBatchCatalogReplace?: (items: DetectedItem[]) => void;
+  onBatchUpload?: (items: DetectedItem[]) => void;
   onBatchGenerate: (items: DetectedItem[]) => void;
   lockedItems?: string[];
   replacementItems?: Map<string, ReplacementItem>;
@@ -45,6 +47,8 @@ export function AIDetectionOverlay({
   onItemSelect,
   onItemAction,
   onBatchGenerate,
+  onBatchCatalogReplace,
+  onBatchUpload,
   lockedItems = [],
   replacementItems = new Map(),
   onApplyFurnish,
@@ -178,17 +182,47 @@ export function AIDetectionOverlay({
       {/* Multi-select action bar */}
       {isMultiSelectMode && selectedItems.length > 0 && (
         <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-30">
-          <div className="glass-premium rounded-xl px-4 py-2 flex items-center gap-3">
+          <div className="glass-premium rounded-xl px-4 py-3 flex items-center gap-3">
             <span className="text-sm text-muted-foreground">
               {selectedItems.length} item{selectedItems.length > 1 ? 's' : ''} selected
             </span>
-            <Button
-              size="sm"
-              onClick={handleBatchAction}
-              className="btn-glow text-xs"
-            >
-              Generate Replacements
-            </Button>
+            <div className="flex items-center gap-2">
+              {onBatchCatalogReplace && (
+                <Button
+                  size="sm"
+                  onClick={() => {
+                    const selectedDetections = detectedItems.filter(item => selectedItems.includes(item.id));
+                    onBatchCatalogReplace(selectedDetections);
+                  }}
+                  className="btn-glow text-xs"
+                >
+                  <Package className="h-3 w-3 mr-1" />
+                  Replace All from Catalog
+                </Button>
+              )}
+              {onBatchUpload && (
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  onClick={() => {
+                    const selectedDetections = detectedItems.filter(item => selectedItems.includes(item.id));
+                    onBatchUpload(selectedDetections);
+                  }}
+                  className="text-xs"
+                >
+                  <Upload className="h-3 w-3 mr-1" />
+                  Upload Replacement
+                </Button>
+              )}
+              <Button
+                size="sm"
+                onClick={handleBatchAction}
+                variant="outline"
+                className="text-xs"
+              >
+                Generate Replacements
+              </Button>
+            </div>
             <Button
               variant="ghost"
               size="sm"
