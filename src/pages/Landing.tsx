@@ -286,12 +286,12 @@ export default function Landing() {
   };
 
   return (
-    <PageTransition className="min-h-screen bg-background relative overflow-hidden">
+    <PageTransition className="min-h-screen bg-[hsl(220,30%,4%)] relative overflow-hidden">
       <BackgroundEffects />
       
       <Header user={user} />
 
-      <main className="relative z-10 flex flex-col items-center justify-center px-6 pt-16 pb-24">
+      <main className="relative z-10 flex flex-col items-center justify-center px-6 pt-8 pb-20">
         <HeroSection />
 
         <InputCards
