@@ -419,7 +419,7 @@ const Index = () => {
     
     const { data: renders } = await supabase
       .from('renders')
-      .select('id, render_url, prompt, parent_render_id, created_at')
+      .select('id, render_url, prompt, parent_render_id, created_at, view_type')
       .eq('project_id', currentProjectId)
       .eq('status', 'completed')
       .order('created_at', { ascending: false });
@@ -432,6 +432,7 @@ const Index = () => {
         prompt: r.prompt,
         parent_render_id: r.parent_render_id,
         created_at: r.created_at,
+        view_type: r.view_type || 'original',
       }));
     
     setAllRenders(historyItems);
@@ -1872,6 +1873,7 @@ Ready to generate a render! Describe your vision.`;
           room_upload_id: currentUpload?.id || null,
           parent_render_id: currentRenderId,
           status: 'generating',
+          view_type: 'composite',
         })
         .select()
         .single();
@@ -1915,6 +1917,9 @@ Ready to generate a render! Describe your vision.`;
         .from('renders')
         .update({ render_url: imageUrl, status: 'completed' })
         .eq('id', renderRecord.id);
+
+      // Refresh render history so the composite appears in the carousel
+      await loadAllRenders();
 
       setCurrentRenderUrl(imageUrl);
       setCurrentRenderId(renderRecord.id);
@@ -1966,6 +1971,7 @@ Ready to generate a render! Describe your vision.`;
           room_upload_id: currentUpload?.id || null,
           parent_render_id: currentRenderId,
           status: 'generating',
+          view_type: 'edit',
         })
         .select()
         .single();
@@ -2246,6 +2252,16 @@ ABSOLUTE REQUIREMENTS FOR CONSISTENCY:
     let pendingRenderId: string | null = null;
     
     try {
+      // Determine view_type based on the camera view
+      const viewTypeMap: Record<CameraView, string> = {
+        perspective: 'view_perspective',
+        front: 'view_front',
+        side: 'view_side',
+        top: 'view_top',
+        cinematic: 'view_cinematic',
+        custom: 'view_custom',
+      };
+      
       const { data: pendingRender, error: insertError } = await supabase
         .from('renders')
         .insert({
@@ -2254,6 +2270,7 @@ ABSOLUTE REQUIREMENTS FOR CONSISTENCY:
           prompt: displayPrompt,
           status: 'pending',
           parent_render_id: currentRenderId || null,
+          view_type: viewTypeMap[view] || 'view_custom',
         })
         .select('id')
         .single();
