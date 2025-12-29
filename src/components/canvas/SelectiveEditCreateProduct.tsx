@@ -32,6 +32,7 @@ export function SelectiveEditCreateProduct({
   const [category, setCategory] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
   const [generatedImageUrl, setGeneratedImageUrl] = useState<string | null>(null);
+  const [isApplying, setIsApplying] = useState(false);
 
   const handleGenerate = async () => {
     if (!description.trim()) {
@@ -68,7 +69,8 @@ export function SelectiveEditCreateProduct({
   };
 
   const handleApply = () => {
-    if (generatedImageUrl) {
+    if (generatedImageUrl && !isApplying) {
+      setIsApplying(true); // Prevent double-click
       onProductGenerated(generatedImageUrl, description, category || 'Furniture');
     }
   };
@@ -154,11 +156,20 @@ export function SelectiveEditCreateProduct({
             type="button"
             size="sm"
             onClick={handleApply}
-            disabled={isDisabled || isGenerating}
+            disabled={isDisabled || isGenerating || isApplying}
             className="w-full bg-green-600 hover:bg-green-700 text-white"
           >
-            <Check className="h-4 w-4 mr-2" />
-            Apply to Selection
+            {isApplying ? (
+              <>
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                Applying...
+              </>
+            ) : (
+              <>
+                <Check className="h-4 w-4 mr-2" />
+                Apply to Selection
+              </>
+            )}
           </Button>
         </div>
       )}
