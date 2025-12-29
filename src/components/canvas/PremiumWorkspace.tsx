@@ -352,6 +352,16 @@ export function PremiumWorkspace({
 
   const viewTools: ToolbarItem[] = [
     {
+      id: 'views',
+      icon: Camera,
+      label: 'Views',
+      onClick: onToggleMulticamPanel,
+      disabled: !renderUrl || isGenerating,
+      active: showMulticamPanel,
+      shortcut: 'V',
+      group: 'view',
+    },
+    {
       id: 'zones',
       icon: Layers,
       label: 'Zones',
