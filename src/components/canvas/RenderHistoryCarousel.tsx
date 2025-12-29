@@ -28,6 +28,7 @@ export interface RenderHistoryItem {
   parent_render_id: string | null;
   created_at: string;
   view_type?: string;
+  room_id?: string | null;
 }
 
 interface RenderHistoryCarouselProps {

@@ -276,7 +276,7 @@ const Index = () => {
             loadLayoutImage(),
             loadRoomPhoto(),
             loadProjectDetails(),
-            loadAllRenders(),
+            loadAllRenders(currentRoomId),
           ]);
         } finally {
           setIsProjectSwitching(false);
@@ -325,6 +325,13 @@ const Index = () => {
       }
     }
   }, [currentProjectId]);
+
+  // Reload renders when room changes (zone-based filtering)
+  useEffect(() => {
+    if (currentProjectId && currentRoomId !== null) {
+      loadAllRenders(currentRoomId);
+    }
+  }, [currentRoomId]);
 
   // Load layout image for comparison view
   const loadLayoutImage = async () => {
@@ -413,16 +420,22 @@ const Index = () => {
     setStyleRefUrls(styleUploads?.map(s => s.file_url) || []);
   };
 
-  // Load all renders for the project
-  const loadAllRenders = async () => {
+  // Load all renders for the project, optionally filtered by room
+  const loadAllRenders = async (roomId?: string | null) => {
     if (!currentProjectId) return;
     
-    const { data: renders } = await supabase
+    let query = supabase
       .from('renders')
-      .select('id, render_url, prompt, parent_render_id, created_at, view_type')
+      .select('id, render_url, prompt, parent_render_id, created_at, view_type, room_id')
       .eq('project_id', currentProjectId)
-      .eq('status', 'completed')
-      .order('created_at', { ascending: false });
+      .eq('status', 'completed');
+    
+    // Filter by room if provided
+    if (roomId) {
+      query = query.eq('room_id', roomId);
+    }
+    
+    const { data: renders } = await query.order('created_at', { ascending: false });
     
     const historyItems: RenderHistoryItem[] = (renders || [])
       .filter(r => r.render_url)
@@ -433,6 +446,7 @@ const Index = () => {
         parent_render_id: r.parent_render_id,
         created_at: r.created_at,
         view_type: r.view_type || 'original',
+        room_id: r.room_id,
       }));
     
     setAllRenders(historyItems);
@@ -1874,6 +1888,7 @@ Ready to generate a render! Describe your vision.`;
           parent_render_id: currentRenderId,
           status: 'generating',
           view_type: 'composite',
+          room_id: currentRoomId,
         })
         .select()
         .single();
@@ -1913,13 +1928,18 @@ Ready to generate a render! Describe your vision.`;
 
       const { imageUrl } = await response.json();
 
+      // Update render with URL and ensure view_type is set correctly
       await supabase
         .from('renders')
-        .update({ render_url: imageUrl, status: 'completed' })
+        .update({ 
+          render_url: imageUrl, 
+          status: 'completed',
+          view_type: 'composite',
+        })
         .eq('id', renderRecord.id);
 
       // Refresh render history so the composite appears in the carousel
-      await loadAllRenders();
+      await loadAllRenders(currentRoomId);
 
       setCurrentRenderUrl(imageUrl);
       setCurrentRenderId(renderRecord.id);
@@ -1972,6 +1992,7 @@ Ready to generate a render! Describe your vision.`;
           parent_render_id: currentRenderId,
           status: 'generating',
           view_type: 'edit',
+          room_id: currentRoomId,
         })
         .select()
         .single();
@@ -2040,7 +2061,7 @@ Ready to generate a render! Describe your vision.`;
       });
 
       // Reload all renders to include the new one
-      await loadAllRenders();
+      await loadAllRenders(currentRoomId);
 
       toast({ title: 'Edit complete', description: catalogItem ? `${catalogItem.name} placed in selected area.` : 'Selected area has been updated.' });
     } catch (error) {
@@ -2184,7 +2205,7 @@ Ready to generate a render! Describe your vision.`;
         status: 'ready',
       });
 
-      await loadAllRenders();
+      await loadAllRenders(currentRoomId);
       toast({ title: 'Changes applied', description: 'AI Director modifications complete.' });
     } catch (error) {
       console.error('AI Director failed:', error);
@@ -2271,6 +2292,7 @@ ABSOLUTE REQUIREMENTS FOR CONSISTENCY:
           status: 'pending',
           parent_render_id: currentRenderId || null,
           view_type: viewTypeMap[view] || 'view_custom',
+          room_id: currentRoomId,
         })
         .select('id')
         .single();
@@ -2341,7 +2363,7 @@ ABSOLUTE REQUIREMENTS FOR CONSISTENCY:
           console.error('Failed to update render record:', updateError);
         } else {
           // Refresh render history so the new view appears in the carousel
-          await loadAllRenders();
+          await loadAllRenders(currentRoomId);
         }
       }
 
@@ -2413,42 +2435,73 @@ ABSOLUTE REQUIREMENTS FOR CONSISTENCY:
     }
   }, [currentProjectId, loadZones]);
 
-  // Create a new zone
+  // Create a new zone - also creates a linked room automatically
   const handleZoneCreate = useCallback(async (zone: Omit<Zone, 'id'>) => {
     if (!user || !currentProjectId) return;
 
-    const { data, error } = await supabase
-      .from('staging_zones')
-      .insert({
-        project_id: currentProjectId,
-        user_id: user.id,
-        name: zone.name,
-        x_start: zone.x_start,
-        y_start: zone.y_start,
-        x_end: zone.x_end,
-        y_end: zone.y_end,
-      })
-      .select()
-      .single();
+    try {
+      // First, create a room with the same name as the zone
+      const { data: roomData, error: roomError } = await supabase
+        .from('rooms')
+        .insert({
+          project_id: currentProjectId,
+          user_id: user.id,
+          name: zone.name,
+        })
+        .select()
+        .single();
 
-    if (error) {
-      console.error('Failed to create zone:', error);
+      if (roomError) {
+        console.error('Failed to create room for zone:', roomError);
+        // Continue anyway - zone will work but won't have room filtering
+      }
+
+      const roomId = roomData?.id || null;
+
+      // Create the zone with room_id linked
+      const { data, error } = await supabase
+        .from('staging_zones')
+        .insert({
+          project_id: currentProjectId,
+          user_id: user.id,
+          name: zone.name,
+          x_start: zone.x_start,
+          y_start: zone.y_start,
+          x_end: zone.x_end,
+          y_end: zone.y_end,
+          room_id: roomId,
+        })
+        .select()
+        .single();
+
+      if (error) {
+        console.error('Failed to create zone:', error);
+        toast({ variant: 'destructive', title: 'Error', description: 'Failed to create zone' });
+        return;
+      }
+
+      const newZone: Zone = {
+        id: data.id,
+        name: data.name,
+        x_start: Number(data.x_start),
+        y_start: Number(data.y_start),
+        x_end: Number(data.x_end),
+        y_end: Number(data.y_end),
+      };
+
+      setZones(prev => [...prev, newZone]);
+      setSelectedZoneId(data.id);
+      
+      // Set the newly created room as current room to filter renders by it
+      if (roomId) {
+        setCurrentRoomId(roomId);
+      }
+
+      toast({ title: 'Zone created', description: `"${zone.name}" added as a new room` });
+    } catch (err) {
+      console.error('Zone creation error:', err);
       toast({ variant: 'destructive', title: 'Error', description: 'Failed to create zone' });
-      return;
     }
-
-    const newZone: Zone = {
-      id: data.id,
-      name: data.name,
-      x_start: Number(data.x_start),
-      y_start: Number(data.y_start),
-      x_end: Number(data.x_end),
-      y_end: Number(data.y_end),
-    };
-
-    setZones(prev => [...prev, newZone]);
-    setSelectedZoneId(data.id);
-    toast({ title: 'Zone created', description: `"${zone.name}" added` });
   }, [user, currentProjectId, toast]);
 
   // Delete a zone
@@ -2501,6 +2554,7 @@ ABSOLUTE REQUIREMENTS FOR CONSISTENCY:
           status: 'generating',
           room_upload_id: currentUpload?.id || null,
           parent_render_id: currentRenderId,
+          room_id: currentRoomId,
         })
         .select()
         .single();
@@ -2572,7 +2626,7 @@ ABSOLUTE REQUIREMENTS FOR CONSISTENCY:
       });
 
       // Reload all renders to include the new one in history
-      await loadAllRenders();
+      await loadAllRenders(currentRoomId);
 
       toast({ title: 'Zone view ready', description: `"${zone.name}" ${viewLabel} view generated` });
     } catch (error) {
@@ -2785,7 +2839,7 @@ ABSOLUTE REQUIREMENTS FOR CONSISTENCY:
         status: 'ready',
       });
       
-      await loadAllRenders();
+      await loadAllRenders(currentRoomId);
       toast({ title: 'Camera view generated', description: `${camera.name} perspective ready` });
     } catch (error) {
       console.error('Camera render failed:', error);
