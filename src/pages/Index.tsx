@@ -102,6 +102,7 @@ const Index = () => {
   const [isSelectiveEditing, setIsSelectiveEditing] = useState(false);
   const [isProjectSwitching, setIsProjectSwitching] = useState(false);
   const [isMulticamGenerating, setIsMulticamGenerating] = useState(false);
+  const [showMulticamPanel, setShowMulticamPanel] = useState(false);
   const [generatingZoneName, setGeneratingZoneName] = useState<string | null>(null);
   const [generatingViewType, setGeneratingViewType] = useState<ViewType | null>(null);
   const [multicamViews, setMulticamViews] = useState<Record<CameraView, string | null>>({
@@ -109,6 +110,7 @@ const Index = () => {
     front: null,
     side: null,
     top: null,
+    cinematic: null,
     custom: null,
   });
   
@@ -2178,6 +2180,7 @@ Ready to generate a render! Describe your vision.`;
       front: 'CRITICAL: Render this EXACT same room from a straight-on front view. MAINTAIN all furniture items EXACTLY as they appear - same colors, same positions, same products. Only change the camera angle to face the main focal wall directly.',
       side: 'CRITICAL: Render this EXACT same room from a side view. MAINTAIN all furniture items EXACTLY as they appear - same colors, same positions, same products. Only change the camera angle to show the profile of the space from the side.',
       top: "CRITICAL: Render this EXACT same room from a bird's eye top-down view. MAINTAIN all furniture items EXACTLY as they appear - same colors, same positions, same products. Only change the camera angle to an overhead view showing the floor plan layout.",
+      cinematic: 'CRITICAL: Render this EXACT same room from a dramatic cinematic wide-angle view. Use a low camera angle with a wide field of view for a hero shot. MAINTAIN all furniture items EXACTLY as they appear - same colors, same positions, same products. Only change the camera angle for maximum visual impact.',
       custom: customPrompt || 'Render this room from a custom camera angle while MAINTAINING all furniture items EXACTLY as they appear.',
     };
 
@@ -3012,7 +3015,7 @@ ABSOLUTE REQUIREMENTS FOR CONSISTENCY:
       setAgentBUnderstanding(null);
       setAgentBQuestions([]);
       setAgentBAnswers([]);
-      setMulticamViews({ perspective: null, front: null, side: null, top: null, custom: null });
+      setMulticamViews({ perspective: null, front: null, side: null, top: null, cinematic: null, custom: null });
       setIsAIDetectionActive(false);
       setSelectedDetections([]);
       setDetectionReplacements(new Map());
@@ -3116,7 +3119,9 @@ ABSOLUTE REQUIREMENTS FOR CONSISTENCY:
             onRenderHistorySelect={handleRenderHistorySelect}
             onSelectiveEdit={handleEnterSelectionMode}
             onAIDirectorChange={handleAIDirectorChange}
-            onMulticamGenerate={() => handleMulticamGenerate('perspective')}
+            onMulticamGenerate={handleMulticamGenerate}
+            onToggleMulticamPanel={() => setShowMulticamPanel(!showMulticamPanel)}
+            showMulticamPanel={showMulticamPanel}
             onPositionFurniture={stagedItems.length > 0 && (currentRenderUrl || roomPhotoUrl) ? () => setShowPositioner(true) : undefined}
             onExport={() => setShowExportModal(true)}
             onUndo={handleUndo}

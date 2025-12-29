@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Camera, Eye, ArrowUp, ArrowRight, Box, Loader2, X, Download, Presentation, Check, Edit2, Layers, Plus, RefreshCw } from 'lucide-react';
+import { Camera, Eye, ArrowUp, ArrowRight, Box, Loader2, X, Download, Presentation, Check, Edit2, Layers, Plus, RefreshCw, Film } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
@@ -7,7 +7,7 @@ import { useToast } from '@/hooks/use-toast';
 import pptxgen from 'pptxgenjs';
 import { supabase } from '@/integrations/supabase/client';
 import { Zone } from './ZoneSelector';
-export type CameraView = 'perspective' | 'front' | 'side' | 'top' | 'custom';
+export type CameraView = 'perspective' | 'front' | 'side' | 'top' | 'cinematic' | 'custom';
 
 export interface ZoneRegion {
   x_start: number;
@@ -51,6 +51,12 @@ const VIEW_OPTIONS: { id: CameraView; label: string; icon: React.ReactNode; desc
     label: "Bird's Eye", 
     icon: <ArrowUp className="h-4 w-4" />,
     description: 'Top-down view'
+  },
+  { 
+    id: 'cinematic', 
+    label: 'Cinematic', 
+    icon: <Film className="h-4 w-4" />,
+    description: 'Dramatic wide angle'
   },
   { 
     id: 'custom', 
