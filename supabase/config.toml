@@ -20,3 +20,6 @@ verify_jwt = false
 
 [functions.find-similar-furniture]
 verify_jwt = false
+
+[functions.generate-custom-furniture]
+verify_jwt = false
