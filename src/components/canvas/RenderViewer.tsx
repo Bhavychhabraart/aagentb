@@ -50,7 +50,7 @@ export function RenderViewer({
   projectId,
   isSelectiveEditing = false,
   isMulticamGenerating = false,
-  multicamViews = { perspective: null, front: null, side: null, top: null, custom: null },
+  multicamViews = { perspective: null, front: null, side: null, top: null, cinematic: null, custom: null },
   onSetMulticamAsMain,
   allRenders = [],
   currentRenderId,
