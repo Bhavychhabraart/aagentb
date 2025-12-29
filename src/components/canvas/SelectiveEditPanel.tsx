@@ -94,9 +94,9 @@ export function SelectiveEditPanel({
   };
 
   const handleProductGenerated = (imageUrl: string, description: string, category: string) => {
-    // Don't store state - directly submit to prevent double submission via "Apply Edit" button
-    const finalPrompt = `Replace with custom ${category.toLowerCase()}: ${description}`;
-    onSubmit(finalPrompt, undefined, imageUrl);
+    // Store the generated product in state - require explicit "Apply Edit" button click to submit
+    setCreatedProductImageUrl(imageUrl);
+    setCreatedProductDescription(`${category}: ${description}`);
   };
 
   // Only allow Enter key to submit in prompt mode (text input)

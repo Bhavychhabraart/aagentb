@@ -79,6 +79,7 @@ const Index = () => {
 
   const [currentProjectId, setCurrentProjectId] = useState<string | null>(null);
   const [currentRoomId, setCurrentRoomId] = useState<string | null>(null);
+  const [currentRoomName, setCurrentRoomName] = useState<string | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [currentRenderUrl, setCurrentRenderUrl] = useState<string | null>(null);
   const [currentRenderId, setCurrentRenderId] = useState<string | null>(null);
@@ -99,6 +100,7 @@ const Index = () => {
   const [styleRefUrls, setStyleRefUrls] = useState<string[]>([]);
   const [allRenderUrls, setAllRenderUrls] = useState<string[]>([]);
   const [allRenders, setAllRenders] = useState<RenderHistoryItem[]>([]);
+  const [showAllRenders, setShowAllRenders] = useState(true); // Toggle between all renders vs room-specific
   const [isSelectiveEditing, setIsSelectiveEditing] = useState(false);
   const [isProjectSwitching, setIsProjectSwitching] = useState(false);
   const [isMulticamGenerating, setIsMulticamGenerating] = useState(false);
@@ -326,12 +328,14 @@ const Index = () => {
     }
   }, [currentProjectId]);
 
-  // Reload renders when room changes (zone-based filtering)
+  // Reload renders when room changes or toggle changes
   useEffect(() => {
-    if (currentProjectId && currentRoomId !== null) {
-      loadAllRenders(currentRoomId);
+    if (currentProjectId) {
+      // If showing all renders, pass null/undefined to get all
+      // If showing room-specific, pass currentRoomId (can be null which shows unassigned renders)
+      loadAllRenders(showAllRenders ? null : currentRoomId);
     }
-  }, [currentRoomId]);
+  }, [currentRoomId, showAllRenders]);
 
   // Load layout image for comparison view
   const loadLayoutImage = async () => {
@@ -2495,6 +2499,8 @@ ABSOLUTE REQUIREMENTS FOR CONSISTENCY:
       // Set the newly created room as current room to filter renders by it
       if (roomId) {
         setCurrentRoomId(roomId);
+        setCurrentRoomName(zone.name);
+        setShowAllRenders(false); // Auto-switch to room filter when zone is created
       }
 
       toast({ title: 'Zone created', description: `"${zone.name}" added as a new room` });
@@ -3360,6 +3366,9 @@ ABSOLUTE REQUIREMENTS FOR CONSISTENCY:
             currentRenderId={currentRenderId}
             onRenderHistorySelect={handleRenderHistorySelect}
             onDeleteRender={handleDeleteRender}
+            showAllRenders={showAllRenders}
+            onToggleShowAllRenders={() => setShowAllRenders(prev => !prev)}
+            currentRoomName={currentRoomName}
             onSelectiveEdit={handleEnterSelectionMode}
             onAIDirectorChange={handleAIDirectorChange}
             onMulticamGenerate={handleMulticamGenerate}
