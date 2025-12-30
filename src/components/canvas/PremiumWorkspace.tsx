@@ -35,7 +35,7 @@ import {
 } from 'lucide-react';
 import { RenderHistoryCarousel, RenderHistoryItem } from './RenderHistoryCarousel';
 import { CatalogFurnitureItem } from '@/services/catalogService';
-
+import { CameraView, ZoneRegion, MulticamPanel } from './MulticamPanel';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -77,11 +77,16 @@ interface PremiumWorkspaceProps {
   // Toolbar actions
   onSelectiveEdit?: () => void;
   onAIDirectorChange?: (directive: string) => void;
+  onMulticamGenerate?: (view: CameraView, customPrompt?: string, zone?: ZoneRegion) => void;
+  onToggleMulticamPanel?: () => void;
+  showMulticamPanel?: boolean;
   onPositionFurniture?: () => void;
   onExport?: () => void;
   onUndo?: () => void;
   canUndo?: boolean;
   isSelectiveEditing?: boolean;
+  isMulticamGenerating?: boolean;
+  multicamViews?: Record<CameraView, string | null>;
   onSetMulticamAsMain?: (imageUrl: string) => void;
   stagedItems?: CatalogFurnitureItem[];
   projectId?: string;
@@ -141,11 +146,17 @@ export function PremiumWorkspace({
   onDeleteRender,
   onSelectiveEdit,
   onAIDirectorChange,
+  onMulticamGenerate,
+  onToggleMulticamPanel,
+  showMulticamPanel,
+  multicamViews = { perspective: null, front: null, side: null, top: null, cinematic: null, custom: null },
+  onSetMulticamAsMain,
   onPositionFurniture,
   onExport,
   onUndo,
   canUndo,
   isSelectiveEditing,
+  isMulticamGenerating,
   projectId,
   zones = [],
   selectedZoneId,
@@ -340,6 +351,16 @@ export function PremiumWorkspace({
   ];
 
   const viewTools: ToolbarItem[] = [
+    {
+      id: 'views',
+      icon: Camera,
+      label: 'Views',
+      onClick: onToggleMulticamPanel,
+      disabled: !renderUrl || isGenerating,
+      active: showMulticamPanel,
+      shortcut: 'V',
+      group: 'view',
+    },
     {
       id: 'zones',
       icon: Layers,
@@ -739,7 +760,7 @@ export function PremiumWorkspace({
                 )}
 
                 {/* Generating overlay - enhanced with zone info */}
-                {isGenerating && renderUrl && (
+                {(isGenerating || isMulticamGenerating) && renderUrl && (
                   <div className="absolute inset-0 bg-background/70 backdrop-blur-md flex items-center justify-center z-20">
                     <div className="glass-premium rounded-2xl p-8 flex flex-col items-center gap-4 max-w-sm text-center animate-scale-in">
                       {/* Animated loader with pulse ring */}
@@ -825,6 +846,18 @@ export function PremiumWorkspace({
           </div>
         )}
 
+        {/* Multicam Panel - Floating Bottom Left */}
+        {showMulticamPanel && renderUrl && onMulticamGenerate && onToggleMulticamPanel && (
+          <MulticamPanel
+            onGenerateView={onMulticamGenerate}
+            isGenerating={isMulticamGenerating || false}
+            generatedViews={multicamViews}
+            onSelectView={(view, url) => onSetMulticamAsMain?.(url)}
+            onClose={onToggleMulticamPanel}
+            onSetAsMain={onSetMulticamAsMain}
+            projectId={projectId}
+          />
+        )}
 
         {/* Zones Panel - Floating Right */}
         {showZonesPanel && (

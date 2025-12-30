@@ -23,7 +23,7 @@ import { SelectionRegion } from '@/components/canvas/SelectionOverlay';
 import { SelectiveEditPanel } from '@/components/canvas/SelectiveEditPanel';
 import { generateSelectionMask } from '@/utils/generateSelectionMask';
 import { RenderHistoryItem } from '@/components/canvas/RenderHistoryCarousel';
-
+import { CameraView, ZoneRegion } from '@/components/canvas/MulticamPanel';
 import { LayoutUploadModal } from '@/components/creation/LayoutUploadModal';
 import { RoomPhotoModal } from '@/components/creation/RoomPhotoModal';
 import { StyleRefModal } from '@/components/creation/StyleRefModal';
@@ -101,8 +101,18 @@ const Index = () => {
   const [allRenders, setAllRenders] = useState<RenderHistoryItem[]>([]);
   const [isSelectiveEditing, setIsSelectiveEditing] = useState(false);
   const [isProjectSwitching, setIsProjectSwitching] = useState(false);
+  const [isMulticamGenerating, setIsMulticamGenerating] = useState(false);
+  const [showMulticamPanel, setShowMulticamPanel] = useState(false);
   const [generatingZoneName, setGeneratingZoneName] = useState<string | null>(null);
   const [generatingViewType, setGeneratingViewType] = useState<ViewType | null>(null);
+  const [multicamViews, setMulticamViews] = useState<Record<CameraView, string | null>>({
+    perspective: null,
+    front: null,
+    side: null,
+    top: null,
+    cinematic: null,
+    custom: null,
+  });
   
   // Camera placement state
   const [cameras, setCameras] = useState<CameraData[]>([]);
@@ -2473,7 +2483,7 @@ ABSOLUTE REQUIREMENTS FOR CONSISTENCY:
       return;
     }
 
-    setIsGenerating(true);
+    setIsMulticamGenerating(true);
     setGeneratingZoneName(zone.name);
     setGeneratingViewType(viewType);
 
@@ -2571,7 +2581,7 @@ ABSOLUTE REQUIREMENTS FOR CONSISTENCY:
       await addMessage('assistant', `Failed to generate zone view: ${message}`, { type: 'text', status: 'failed' });
       toast({ variant: 'destructive', title: 'Failed', description: message });
     } finally {
-      setIsGenerating(false);
+      setIsMulticamGenerating(false);
       setGeneratingZoneName(null);
       setGeneratingViewType(null);
     }
@@ -3169,7 +3179,7 @@ ABSOLUTE REQUIREMENTS FOR CONSISTENCY:
       setAgentBUnderstanding(null);
       setAgentBQuestions([]);
       setAgentBAnswers([]);
-      
+      setMulticamViews({ perspective: null, front: null, side: null, top: null, cinematic: null, custom: null });
       setIsAIDetectionActive(false);
       setSelectedDetections([]);
       setDetectionReplacements(new Map());
@@ -3298,11 +3308,17 @@ ABSOLUTE REQUIREMENTS FOR CONSISTENCY:
             onDeleteRender={handleDeleteRender}
             onSelectiveEdit={handleEnterSelectionMode}
             onAIDirectorChange={handleAIDirectorChange}
+            onMulticamGenerate={handleMulticamGenerate}
+            onToggleMulticamPanel={() => setShowMulticamPanel(!showMulticamPanel)}
+            showMulticamPanel={showMulticamPanel}
             onPositionFurniture={stagedItems.length > 0 && (currentRenderUrl || roomPhotoUrl) ? () => { setShowCatalogModal(false); setShowPositioner(true); } : undefined}
             onExport={() => setShowExportModal(true)}
             onUndo={handleUndo}
             canUndo={canUndo}
             isSelectiveEditing={isSelectiveEditing}
+            isMulticamGenerating={isMulticamGenerating}
+            multicamViews={multicamViews}
+            onSetMulticamAsMain={handleSetMulticamAsMain}
             stagedItems={stagedItems}
             projectId={currentProjectId || undefined}
             zones={zones}

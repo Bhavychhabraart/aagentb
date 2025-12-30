@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { ZoomIn, ZoomOut, RotateCcw, Download, X, Maximize2, LayoutGrid, Image, Move, FileDown, ShoppingCart, Crop, Undo2, Wand2, Camera, Video } from 'lucide-react';
-
+import { MulticamPanel, CameraView, ZoneRegion } from './MulticamPanel';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from '@/components/ui/tooltip';
@@ -21,8 +21,12 @@ interface RenderViewerProps {
   onStartOrder?: () => void;
   onSelectiveEdit?: (region: SelectionRegion, prompt: string, catalogItem?: CatalogFurnitureItem, referenceImageUrl?: string) => void;
   onAIDirectorChange?: (prompt: string) => void;
+  onMulticamGenerate?: (view: CameraView, customPrompt?: string, zone?: ZoneRegion) => void;
   projectId?: string;
   isSelectiveEditing?: boolean;
+  isMulticamGenerating?: boolean;
+  multicamViews?: Record<CameraView, string | null>;
+  onSetMulticamAsMain?: (imageUrl: string) => void;
   // Render history props
   allRenders?: RenderHistoryItem[];
   currentRenderId?: string | null;
@@ -42,8 +46,12 @@ export function RenderViewer({
   onStartOrder,
   onSelectiveEdit,
   onAIDirectorChange,
+  onMulticamGenerate,
   projectId,
   isSelectiveEditing = false,
+  isMulticamGenerating = false,
+  multicamViews = { perspective: null, front: null, side: null, top: null, cinematic: null, custom: null },
+  onSetMulticamAsMain,
   allRenders = [],
   currentRenderId,
   onRenderHistorySelect,
@@ -140,6 +148,13 @@ export function RenderViewer({
   const hasLayoutToCompare = !!layoutImageUrl && !!imageUrl;
   const canSelectArea = !!imageUrl && !isGenerating && !showComparison && onSelectiveEdit;
   const canUseDirector = !!imageUrl && !isGenerating && !selectionMode && onAIDirectorChange;
+  const canUseMulticam = !!imageUrl && !isGenerating && !selectionMode && onMulticamGenerate;
+
+  const handleMulticamSelect = (view: CameraView, viewImageUrl: string) => {
+    // When user clicks on a generated view, show it in the main viewer
+    // This could be enhanced to swap the main image
+    console.log('Selected view:', view, viewImageUrl);
+  };
 
   return (
     <TooltipProvider>
@@ -356,6 +371,30 @@ export function RenderViewer({
                 </Tooltip>
               </>
             )}
+            {/* Multicam button */}
+            {onMulticamGenerate && (
+              <>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={canUseMulticam ? () => setShowMulticam(!showMulticam) : undefined}
+                      disabled={!canUseMulticam}
+                      className={cn(
+                        "h-8 w-8",
+                        showMulticam ? "bg-cyan-500/30 text-cyan-400" : canUseMulticam ? "hover:bg-primary/20 text-cyan-400" : "opacity-50 cursor-not-allowed"
+                      )}
+                    >
+                      <Video className="h-4 w-4" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>{!imageUrl ? 'Generate a render first to use Multicam' : showMulticam ? 'Close Multicam' : 'Multicam - Generate different views'}</p>
+                  </TooltipContent>
+                </Tooltip>
+              </>
+            )}
             <Button
               variant="ghost"
               size="icon"
@@ -566,9 +605,21 @@ export function RenderViewer({
           />
         )}
 
+        {/* Multicam Panel */}
+        {showMulticam && canUseMulticam && (
+          <MulticamPanel
+            onGenerateView={onMulticamGenerate!}
+            isGenerating={isMulticamGenerating}
+            generatedViews={multicamViews}
+            onSelectView={handleMulticamSelect}
+            onClose={() => setShowMulticam(false)}
+            onSetAsMain={onSetMulticamAsMain}
+            projectId={projectId}
+          />
+        )}
 
         {/* Render History Carousel */}
-        {allRenders.length > 1 && onRenderHistorySelect && !showComparison && !selectionMode && !isSelectiveEditing && !showAIDirector && (
+        {allRenders.length > 1 && onRenderHistorySelect && !showComparison && !selectionMode && !isSelectiveEditing && !showAIDirector && !showMulticam && (
           <RenderHistoryCarousel
             renders={allRenders}
             currentRenderId={currentRenderId || null}
