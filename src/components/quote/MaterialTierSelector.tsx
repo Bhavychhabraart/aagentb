@@ -1,6 +1,6 @@
 import { Badge } from '@/components/ui/badge';
 import { Coins, Star, Crown, Check } from 'lucide-react';
-import { formatCurrency } from '@/utils/formatCurrency';
+import { formatINR } from '@/utils/formatCurrency';
 
 interface QuoteVersion {
   version_name: string;
@@ -88,7 +88,7 @@ export function MaterialTierSelector({
               {version ? (
                 <>
                   <p className="text-2xl font-bold">
-                    {formatCurrency(version.grand_total)}
+                    {formatINR(version.grand_total)}
                   </p>
                   <p className="text-xs text-muted-foreground mt-1">
                     {version.items.length} items
@@ -108,7 +108,7 @@ export function MaterialTierSelector({
       {versions.length === 3 && (
         <div className="flex justify-center gap-4 text-sm text-muted-foreground">
           <span>
-            Budget saves {formatCurrency(versions[2].grand_total - versions[0].grand_total)} vs Premium
+            Budget saves {formatINR(versions[2].grand_total - versions[0].grand_total)} vs Premium
           </span>
         </div>
       )}

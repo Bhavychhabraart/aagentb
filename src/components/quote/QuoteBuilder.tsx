@@ -28,7 +28,7 @@ import {
 import { QuoteItemRow } from './QuoteItemRow';
 import { MaterialTierSelector } from './MaterialTierSelector';
 import { RenderAnalysisPanel } from './RenderAnalysisPanel';
-import { formatCurrency } from '@/utils/formatCurrency';
+import { formatINR } from '@/utils/formatCurrency';
 
 interface QuoteBuilderProps {
   open: boolean;
@@ -593,17 +593,17 @@ export function QuoteBuilder({
                 <div className="bg-muted/50 rounded-lg p-4 space-y-2">
                   <div className="flex justify-between text-sm">
                     <span>Subtotal</span>
-                    <span>{formatCurrency(currentVersion.subtotal)}</span>
+                    <span>{formatINR(currentVersion.subtotal)}</span>
                   </div>
                   <div className="flex justify-between text-sm">
                     <span>Commission (15%)</span>
-                    <span>{formatCurrency(currentVersion.commission)}</span>
+                    <span>{formatINR(currentVersion.commission)}</span>
                   </div>
                   <Separator />
                   <div className="flex justify-between font-semibold text-lg">
                     <span>Grand Total</span>
                     <span className="text-primary">
-                      {formatCurrency(currentVersion.grand_total)}
+                      {formatINR(currentVersion.grand_total)}
                     </span>
                   </div>
                 </div>
@@ -718,11 +718,11 @@ export function QuoteBuilder({
                         )}
                       </div>
                       <span className="font-semibold text-lg">
-                        {formatCurrency(version.grand_total)}
+                        {formatINR(version.grand_total)}
                       </span>
                     </div>
                     <p className="text-sm text-muted-foreground mt-1">
-                      {version.items.length} items • Subtotal: {formatCurrency(version.subtotal)}
+                      {version.items.length} items • Subtotal: {formatINR(version.subtotal)}
                     </p>
                   </div>
                 ))}
