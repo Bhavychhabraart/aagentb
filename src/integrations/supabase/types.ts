@@ -433,6 +433,51 @@ export type Database = {
           },
         ]
       }
+      material_pricing: {
+        Row: {
+          base_rate: number
+          created_at: string
+          id: string
+          is_active: boolean | null
+          material_category: string
+          material_name: string
+          source: string | null
+          supplier_name: string | null
+          tier: string
+          unit: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          base_rate?: number
+          created_at?: string
+          id?: string
+          is_active?: boolean | null
+          material_category: string
+          material_name: string
+          source?: string | null
+          supplier_name?: string | null
+          tier?: string
+          unit?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          base_rate?: number
+          created_at?: string
+          id?: string
+          is_active?: boolean | null
+          material_category?: string
+          material_name?: string
+          source?: string | null
+          supplier_name?: string | null
+          tier?: string
+          unit?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       order_items: {
         Row: {
           catalog_item_id: string | null
@@ -632,6 +677,218 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      quote_items: {
+        Row: {
+          ai_confidence: number | null
+          base_price: number
+          catalog_item_id: string | null
+          created_at: string
+          custom_product_id: string | null
+          dimensions: Json | null
+          final_price: number
+          finish_id: string | null
+          finish_name: string | null
+          id: string
+          item_category: string | null
+          item_description: string | null
+          item_image_url: string | null
+          item_name: string
+          item_type: string
+          material_category: string | null
+          material_id: string | null
+          material_name: string | null
+          material_upcharge: number
+          position_x: number | null
+          position_y: number | null
+          quantity: number
+          quote_version_id: string
+          vendor_product_id: string | null
+        }
+        Insert: {
+          ai_confidence?: number | null
+          base_price?: number
+          catalog_item_id?: string | null
+          created_at?: string
+          custom_product_id?: string | null
+          dimensions?: Json | null
+          final_price?: number
+          finish_id?: string | null
+          finish_name?: string | null
+          id?: string
+          item_category?: string | null
+          item_description?: string | null
+          item_image_url?: string | null
+          item_name: string
+          item_type?: string
+          material_category?: string | null
+          material_id?: string | null
+          material_name?: string | null
+          material_upcharge?: number
+          position_x?: number | null
+          position_y?: number | null
+          quantity?: number
+          quote_version_id: string
+          vendor_product_id?: string | null
+        }
+        Update: {
+          ai_confidence?: number | null
+          base_price?: number
+          catalog_item_id?: string | null
+          created_at?: string
+          custom_product_id?: string | null
+          dimensions?: Json | null
+          final_price?: number
+          finish_id?: string | null
+          finish_name?: string | null
+          id?: string
+          item_category?: string | null
+          item_description?: string | null
+          item_image_url?: string | null
+          item_name?: string
+          item_type?: string
+          material_category?: string | null
+          material_id?: string | null
+          material_name?: string | null
+          material_upcharge?: number
+          position_x?: number | null
+          position_y?: number | null
+          quantity?: number
+          quote_version_id?: string
+          vendor_product_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "quote_items_quote_version_id_fkey"
+            columns: ["quote_version_id"]
+            isOneToOne: false
+            referencedRelation: "quote_versions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "quote_items_vendor_product_id_fkey"
+            columns: ["vendor_product_id"]
+            isOneToOne: false
+            referencedRelation: "vendor_products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      quote_versions: {
+        Row: {
+          commission: number
+          created_at: string
+          grand_total: number
+          id: string
+          is_recommended: boolean | null
+          quote_id: string
+          subtotal: number
+          tier_level: number
+          version_name: string
+        }
+        Insert: {
+          commission?: number
+          created_at?: string
+          grand_total?: number
+          id?: string
+          is_recommended?: boolean | null
+          quote_id: string
+          subtotal?: number
+          tier_level?: number
+          version_name: string
+        }
+        Update: {
+          commission?: number
+          created_at?: string
+          grand_total?: number
+          id?: string
+          is_recommended?: boolean | null
+          quote_id?: string
+          subtotal?: number
+          tier_level?: number
+          version_name?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "quote_versions_quote_id_fkey"
+            columns: ["quote_id"]
+            isOneToOne: false
+            referencedRelation: "quotes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      quotes: {
+        Row: {
+          client_email: string | null
+          client_name: string | null
+          client_phone: string | null
+          created_at: string
+          id: string
+          notes: string | null
+          project_id: string | null
+          quote_number: string
+          quote_type: string
+          room_id: string | null
+          source_layout_url: string | null
+          source_render_url: string | null
+          status: string
+          updated_at: string
+          user_id: string
+          valid_until: string | null
+        }
+        Insert: {
+          client_email?: string | null
+          client_name?: string | null
+          client_phone?: string | null
+          created_at?: string
+          id?: string
+          notes?: string | null
+          project_id?: string | null
+          quote_number: string
+          quote_type?: string
+          room_id?: string | null
+          source_layout_url?: string | null
+          source_render_url?: string | null
+          status?: string
+          updated_at?: string
+          user_id: string
+          valid_until?: string | null
+        }
+        Update: {
+          client_email?: string | null
+          client_name?: string | null
+          client_phone?: string | null
+          created_at?: string
+          id?: string
+          notes?: string | null
+          project_id?: string | null
+          quote_number?: string
+          quote_type?: string
+          room_id?: string | null
+          source_layout_url?: string | null
+          source_render_url?: string | null
+          status?: string
+          updated_at?: string
+          user_id?: string
+          valid_until?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "quotes_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "quotes_room_id_fkey"
+            columns: ["room_id"]
+            isOneToOne: false
+            referencedRelation: "rooms"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       renders: {
         Row: {
