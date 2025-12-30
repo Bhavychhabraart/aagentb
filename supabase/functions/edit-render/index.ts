@@ -5,6 +5,25 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+// Camera instruction presets for detailed view generation
+const CAMERA_INSTRUCTIONS: Record<string, string> = {
+  'eye-level': "Camera View: Standard Eye-Level perspective (approx 1.6m height).",
+  'wide': "Camera View: Wide Angle Lens (16mm). Show 3 walls if possible to maximize space visibility.",
+  'top-down': "Camera View: Isometric / 3/4 Top-Down Cutaway View. High angle looking down into the room.",
+  'low': "Camera View: Low Angle / Hero Shot from floor level looking slightly up.",
+  'corner': "Camera View: Corner Perspective. Shot from the corner of the room looking diagonally to capture the full breadth of the space.",
+  'overhead': "Camera View: 90-Degree Direct Overhead (Plan View). Photorealistic top-down view showing layout and circulation.",
+  'macro': "Camera View: Close-Up Detail Shot (Macro). Focus intensely on furniture materials, fabrics, and decor details with shallow depth of field.",
+  'fisheye': "Camera View: Fish-Eye Lens (10mm). Artistic, distorted ultra-wide view emphasizing the scale of the room.",
+  'straight-on': "Camera View: One-Point Perspective (Wes Anderson style). Perfectly symmetrical shot centered in the room, facing the back wall.",
+  'isometric': "Camera View: True Isometric Projection. Technical architectural view with parallel lines (no vanishing point), showing the layout clearly from a 45-degree angle.",
+  'dramatic': "Camera View: Cinematic Low-Key. High contrast, moody lighting, emphasizing shadows and form. Low angle, 35mm lens.",
+  'photographer': "Camera View: Editorial Style. Carefully composed shot from a standing height (1.7m), 50mm lens, perfect vertical lines, magazine quality.",
+  'detail': "Camera View: Detail Shot. Close focus on specific furniture piece with shallow depth of field.",
+  'cinematic': "Camera View: Cinematic Wide. 35mm lens, dramatic lighting, film-quality composition.",
+  'bird-eye': "Camera View: Bird's Eye Elevated view. High angle looking down from elevated position.",
+};
+
 interface FurnitureItem {
   name: string;
   category: string;
@@ -258,16 +277,8 @@ Output: The edited room image with ultra-photorealistic quality.`;
         console.log('Added cropped zone image as IMAGE', zoneIndex);
       }
       
-      // Build view-specific camera instructions
-      const viewInstructions: Record<string, string> = {
-        'detail': 'Create a detailed close-up view that shows the fine details and textures clearly.',
-        'cinematic': 'Create a cinematic view with dramatic depth of field and atmospheric lighting.',
-        'eye-level': 'Create an eye-level perspective as if standing in the room looking at this area.',
-        'dramatic': 'Create a dramatic low-angle hero shot emphasizing scale and grandeur.',
-        'bird-eye': 'Create an elevated bird-eye view looking down at this area from above.',
-      };
-      
-      const viewInstruction = viewInstructions[viewType] || viewInstructions['detail'];
+      // Build view-specific camera instructions using the detailed presets
+      const viewInstruction = CAMERA_INSTRUCTIONS[viewType] || CAMERA_INSTRUCTIONS['detail'];
       
       // Build prompt based on whether we have the cropped zone image
       let zonePrompt: string;
