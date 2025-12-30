@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Camera, Eye, ArrowUp, ArrowRight, Box, Loader2, X, Download, Presentation, Check, Edit2, Layers, Plus, RefreshCw, Film } from 'lucide-react';
+import { Camera, Eye, ArrowUp, ArrowRight, Box, Loader2, X, Download, Presentation, Check, Edit2, Layers, Plus, RefreshCw, Film, Grid2X2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
@@ -25,7 +25,19 @@ interface MulticamPanelProps {
   onSetAsMain?: (imageUrl: string) => void;
   projectId?: string;
   onStartZoneDrawing?: () => void;
+  currentRenderUrl?: string;
+  styleRefUrls?: string[];
 }
+
+// Map panel views to edge function camera types
+const VIEW_TO_CAMERA: Record<CameraView, string> = {
+  'perspective': 'eye-level',
+  'front': 'straight-on',
+  'side': 'corner',
+  'top': 'overhead',
+  'cinematic': 'dramatic',
+  'custom': 'eye-level',
+};
 
 const VIEW_OPTIONS: { id: CameraView; label: string; icon: React.ReactNode; description: string }[] = [
   { 
@@ -75,6 +87,8 @@ export function MulticamPanel({
   onSetAsMain,
   projectId,
   onStartZoneDrawing,
+  currentRenderUrl,
+  styleRefUrls,
 }: MulticamPanelProps) {
   const { toast } = useToast();
   const [generatingView, setGeneratingView] = useState<CameraView | null>(null);
@@ -84,6 +98,8 @@ export function MulticamPanel({
   const [zones, setZones] = useState<Zone[]>([]);
   const [selectedZone, setSelectedZone] = useState<Zone | null>(null);
   const [showZones, setShowZones] = useState(false);
+  const [isGeneratingAll, setIsGeneratingAll] = useState(false);
+  const [compositeGridUrl, setCompositeGridUrl] = useState<string | null>(null);
 
   // Load zones when projectId changes
   useEffect(() => {
@@ -135,6 +151,62 @@ export function MulticamPanel({
     if (onSetAsMain) {
       onSetAsMain(imageUrl);
       toast({ title: 'Main render updated', description: `${view} view set as main render.` });
+    }
+  };
+
+  // Generate all views using the composite grid endpoint
+  const handleGenerateAllViews = async () => {
+    if (!currentRenderUrl) {
+      toast({ variant: 'destructive', title: 'No render available', description: 'Please generate a render first.' });
+      return;
+    }
+
+    setIsGeneratingAll(true);
+    
+    try {
+      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-multicam`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+        },
+        body: JSON.stringify({
+          currentRenderUrl,
+          mode: 'grid',
+          views: ['eye-level', 'overhead', 'wide', 'macro'],
+          styleRefUrls,
+        }),
+      });
+
+      if (!response.ok) {
+        if (response.status === 429) {
+          throw new Error('Rate limit exceeded. Please try again later.');
+        }
+        if (response.status === 402) {
+          throw new Error('Usage limit reached. Please add credits.');
+        }
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to generate views');
+      }
+
+      const data = await response.json();
+      
+      if (data.imageUrl) {
+        setCompositeGridUrl(data.imageUrl);
+        toast({ 
+          title: 'Composite grid generated!', 
+          description: 'All 4 camera views created in a single consistent image.' 
+        });
+      }
+    } catch (error) {
+      console.error('Generate all views error:', error);
+      toast({ 
+        variant: 'destructive', 
+        title: 'Generation failed', 
+        description: error instanceof Error ? error.message : 'Unknown error' 
+      });
+    } finally {
+      setIsGeneratingAll(false);
     }
   };
 
@@ -492,8 +564,50 @@ export function MulticamPanel({
         })}
       </div>
 
+      {/* Composite Grid Preview */}
+      {compositeGridUrl && (
+        <div className="p-3 border-t border-border/30">
+          <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center gap-1.5">
+              <Grid2X2 className="h-3 w-3 text-primary" />
+              <span className="text-[10px] text-muted-foreground uppercase tracking-wider">Composite Grid</span>
+            </div>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-5 text-[10px]"
+              onClick={async () => {
+                const { formatDownloadFilename } = await import('@/utils/formatDownloadFilename');
+                const response = await fetch(compositeGridUrl);
+                const blob = await response.blob();
+                const blobUrl = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = blobUrl;
+                a.download = formatDownloadFilename('multicam', 'grid', 'png');
+                a.click();
+                URL.revokeObjectURL(blobUrl);
+              }}
+            >
+              <Download className="h-3 w-3 mr-1" />
+              Save
+            </Button>
+          </div>
+          <img 
+            src={compositeGridUrl} 
+            alt="Composite 2x2 grid" 
+            className="w-full rounded-md border border-border/30 cursor-pointer hover:opacity-90 transition-opacity"
+            onClick={() => {
+              if (onSetAsMain) {
+                onSetAsMain(compositeGridUrl);
+                toast({ title: 'Composite grid set as main render' });
+              }
+            }}
+          />
+        </div>
+      )}
+
       {/* Export actions */}
-      {hasAnyViews && (
+      {(hasAnyViews || compositeGridUrl) && (
         <div className="p-3 border-t border-border/30 flex gap-2">
           <Button
             variant="outline"
@@ -519,7 +633,24 @@ export function MulticamPanel({
       )}
 
       {/* Quick actions */}
-      <div className="p-3 border-t border-border/30">
+      <div className="p-3 border-t border-border/30 space-y-2">
+        {/* Generate Composite Grid (recommended - single consistent image) */}
+        <Button
+          variant="default"
+          size="sm"
+          className="w-full text-xs"
+          onClick={handleGenerateAllViews}
+          disabled={isGenerating || isGeneratingAll || !currentRenderUrl}
+        >
+          {isGeneratingAll ? (
+            <Loader2 className="h-3 w-3 mr-2 animate-spin" />
+          ) : (
+            <Grid2X2 className="h-3 w-3 mr-2" />
+          )}
+          {isGeneratingAll ? 'Generating 2x2 Grid...' : 'Generate Composite Grid'}
+        </Button>
+        
+        {/* Individual views (legacy) */}
         <Button
           variant="outline"
           size="sm"
@@ -534,7 +665,7 @@ export function MulticamPanel({
           disabled={isGenerating || VIEW_OPTIONS.filter(v => v.id !== 'custom').every(v => !!generatedViews[v.id])}
         >
           <Camera className="h-3 w-3 mr-2" />
-          Generate All Standard Views
+          Generate Individual Views
         </Button>
       </div>
     </div>
