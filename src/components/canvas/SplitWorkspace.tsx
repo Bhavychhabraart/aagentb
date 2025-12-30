@@ -13,7 +13,7 @@ import { RenderHistoryCarousel, RenderHistoryItem } from './RenderHistoryCarouse
 import { SelectionOverlay, SelectionRegion } from './SelectionOverlay';
 import { SelectiveEditPanel } from './SelectiveEditPanel';
 import { AIDirectorPanel } from './AIDirectorPanel';
-import { MulticamPanel, CameraView, ZoneRegion } from './MulticamPanel';
+
 import { CatalogFurnitureItem } from '@/services/catalogService';
 import { ZoneSelector, Zone } from './ZoneSelector';
 import { ZonesPanel } from './ZonesPanel';
@@ -35,16 +35,12 @@ interface SplitWorkspaceProps {
   // Toolbar actions
   onSelectiveEdit?: (region: SelectionRegion, prompt: string, catalogItem?: CatalogFurnitureItem) => void;
   onAIDirectorChange?: (prompt: string) => void;
-  onMulticamGenerate?: (view: CameraView, customPrompt?: string, zone?: ZoneRegion) => void;
   onPositionFurniture?: () => void;
   onExport?: () => void;
   onStartOrder?: () => void;
   onUndo?: () => void;
   canUndo?: boolean;
   isSelectiveEditing?: boolean;
-  isMulticamGenerating?: boolean;
-  multicamViews?: Record<CameraView, string | null>;
-  onSetMulticamAsMain?: (imageUrl: string) => void;
   // Render history
   allRenders?: RenderHistoryItem[];
   currentRenderId?: string | null;
@@ -85,16 +81,12 @@ export function SplitWorkspace({
   onOpenFullCatalog,
   onSelectiveEdit,
   onAIDirectorChange,
-  onMulticamGenerate,
   onPositionFurniture,
   onExport,
   onStartOrder,
   onUndo,
   canUndo = false,
   isSelectiveEditing = false,
-  isMulticamGenerating = false,
-  multicamViews = { perspective: null, front: null, side: null, top: null, cinematic: null, custom: null },
-  onSetMulticamAsMain,
   allRenders = [],
   currentRenderId,
   onRenderHistorySelect,
@@ -122,7 +114,6 @@ export function SplitWorkspace({
   const [selectionMode, setSelectionMode] = useState(false);
   const [currentSelection, setCurrentSelection] = useState<SelectionRegion | null>(null);
   const [showAIDirector, setShowAIDirector] = useState(false);
-  const [showMulticam, setShowMulticam] = useState(false);
   const [showComparison, setShowComparison] = useState(false);
   
   const selectedCamera = cameras.find(c => c.id === selectedCameraId);
@@ -183,7 +174,6 @@ export function SplitWorkspace({
 
   const canSelectArea = !!birdEyeRenderUrl && !isGenerating && !showComparison && onSelectiveEdit;
   const canUseDirector = !!birdEyeRenderUrl && !isGenerating && !selectionMode && onAIDirectorChange;
-  const canUseMulticam = !!birdEyeRenderUrl && !isGenerating && !selectionMode && onMulticamGenerate;
   const hasLayoutToCompare = !!layoutImageUrl && !!birdEyeRenderUrl;
 
   return (
@@ -441,28 +431,6 @@ export function SplitWorkspace({
               </Tooltip>
             )}
 
-            {/* Multicam */}
-            {onMulticamGenerate && (
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={canUseMulticam ? () => setShowMulticam(!showMulticam) : undefined}
-                    disabled={!canUseMulticam}
-                    className={cn(
-                      "h-8 w-8",
-                      showMulticam ? "bg-cyan-500/30 text-cyan-400" : canUseMulticam ? "hover:bg-primary/20 text-cyan-400" : "opacity-50"
-                    )}
-                  >
-                    <Video className="h-4 w-4" />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>
-                  <p>{showMulticam ? 'Close Multicam' : 'Multicam views'}</p>
-                </TooltipContent>
-              </Tooltip>
-            )}
 
             {/* Zones */}
             {onToggleZonesPanel && (
@@ -700,17 +668,6 @@ export function SplitWorkspace({
                 />
               )}
 
-              {/* Multicam Panel */}
-              {showMulticam && onMulticamGenerate && (
-                <MulticamPanel
-                  onGenerateView={onMulticamGenerate}
-                  onClose={() => setShowMulticam(false)}
-                  isGenerating={isMulticamGenerating}
-                  generatedViews={multicamViews}
-                  onSelectView={(view, url) => onSetMulticamAsMain?.(url)}
-                  projectId={projectId}
-                />
-              )}
 
               {/* Zones Panel */}
               {showZonesPanel && projectId && onZoneSelect && onStartZoneDrawing && onGenerateZoneView && onToggleZonesPanel && (
@@ -721,7 +678,7 @@ export function SplitWorkspace({
                   selectedZoneId={selectedZoneId || null}
                   onStartDrawing={onStartZoneDrawing}
                   onGenerateZoneView={onGenerateZoneView}
-                  isGenerating={isMulticamGenerating}
+                  isGenerating={isGenerating}
                   onClose={onToggleZonesPanel}
                 />
               )}
