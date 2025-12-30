@@ -1,6 +1,6 @@
 import { Badge } from '@/components/ui/badge';
 import { Package, Sparkles } from 'lucide-react';
-import { formatCurrency } from '@/utils/formatCurrency';
+import { formatINR } from '@/utils/formatCurrency';
 
 interface QuoteItemRowProps {
   item: any;
@@ -60,15 +60,15 @@ export function QuoteItemRow({ item, tier }: QuoteItemRowProps) {
       <div className="text-right flex-shrink-0">
         {item.material_upcharge > 0 && (
           <p className="text-xs text-muted-foreground line-through">
-            {formatCurrency(item.base_price)}
+            {formatINR(item.base_price)}
           </p>
         )}
         <p className="font-semibold text-primary">
-          {formatCurrency(item.final_price || item.base_price)}
+          {formatINR(item.final_price || item.base_price)}
         </p>
         {item.material_upcharge > 0 && (
           <p className="text-xs text-green-600">
-            +{formatCurrency(item.material_upcharge)} material
+            +{formatINR(item.material_upcharge)} material
           </p>
         )}
       </div>
