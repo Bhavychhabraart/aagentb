@@ -52,7 +52,7 @@ export default function Landing() {
   const [activeModal, setActiveModal] = useState<"layout" | "room" | "style" | "products" | "rcp" | "wall-plan" | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [memoryEnabled, setMemoryEnabledState] = useState(true);
-  const [agentBModeEnabled, setAgentBModeEnabled] = useState(true);
+  const [agentBModeEnabled, setAgentBModeEnabled] = useState(false);
 
   // Load memory settings
   useEffect(() => {
