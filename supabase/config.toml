@@ -29,3 +29,24 @@ verify_jwt = false
 
 [functions.generate-quote]
 verify_jwt = false
+
+[functions.geometry-store]
+verify_jwt = false
+
+[functions.furniture-placement]
+verify_jwt = false
+
+[functions.generate-control-signals]
+verify_jwt = false
+
+[functions.generate-render]
+verify_jwt = false
+
+[functions.edit-render]
+verify_jwt = false
+
+[functions.validate-render]
+verify_jwt = false
+
+[functions.analyze-layout]
+verify_jwt = false

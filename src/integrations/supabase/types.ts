@@ -961,6 +961,69 @@ export type Database = {
           },
         ]
       }
+      room_geometry: {
+        Row: {
+          camera_matrix: Json
+          control_signals: Json | null
+          created_at: string | null
+          floor_polygon: Json
+          furniture_anchors: Json
+          geometry_data: Json
+          id: string
+          layout_hash: string
+          project_id: string | null
+          room_id: string | null
+          updated_at: string | null
+          user_id: string
+          wall_normals: Json
+        }
+        Insert: {
+          camera_matrix?: Json
+          control_signals?: Json | null
+          created_at?: string | null
+          floor_polygon?: Json
+          furniture_anchors?: Json
+          geometry_data?: Json
+          id?: string
+          layout_hash: string
+          project_id?: string | null
+          room_id?: string | null
+          updated_at?: string | null
+          user_id: string
+          wall_normals?: Json
+        }
+        Update: {
+          camera_matrix?: Json
+          control_signals?: Json | null
+          created_at?: string | null
+          floor_polygon?: Json
+          furniture_anchors?: Json
+          geometry_data?: Json
+          id?: string
+          layout_hash?: string
+          project_id?: string | null
+          room_id?: string | null
+          updated_at?: string | null
+          user_id?: string
+          wall_normals?: Json
+        }
+        Relationships: [
+          {
+            foreignKeyName: "room_geometry_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "room_geometry_room_id_fkey"
+            columns: ["room_id"]
+            isOneToOne: false
+            referencedRelation: "rooms"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       room_uploads: {
         Row: {
           analysis_result: Json | null
