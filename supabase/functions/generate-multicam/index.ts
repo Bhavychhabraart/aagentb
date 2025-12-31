@@ -34,7 +34,12 @@ serve(async (req) => {
       singleView, // For individual mode
       customPrompt, // Custom angle for single view
       styleRefUrls,
+      preserveAspectRatio, // NEW: Aspect ratio to preserve from source image
     } = await req.json();
+
+    // Use provided aspect ratio or default to 16:9
+    const outputAspectRatio = preserveAspectRatio || '16:9';
+    console.log('Using aspect ratio:', outputAspectRatio);
     
     const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
     
@@ -159,7 +164,7 @@ Output: The room rendered from the specified camera angle.`;
         model: 'google/gemini-3-pro-image-preview',
         messages: [{ role: 'user', content }],
         modalities: ['image', 'text'],
-        generationConfig: { aspectRatio: '16:9' }
+        generationConfig: { aspectRatio: outputAspectRatio }
       }),
     });
 

@@ -139,7 +139,12 @@ serve(async (req) => {
       focusRegion, // For zone-focused camera views { x, y, width, height } as percentages
       viewType = 'detail', // Type of camera view: detail, cinematic, eye-level, dramatic, bird-eye
       zoneImageBase64, // NEW: Cropped zone image for accurate zone reproduction
+      preserveAspectRatio, // NEW: Aspect ratio to preserve from source image (e.g., '16:9', '4:3', '1:1')
     } = await req.json();
+
+    // Use provided aspect ratio or default to 16:9
+    const outputAspectRatio = preserveAspectRatio || '16:9';
+    console.log('Using aspect ratio:', outputAspectRatio);
     
     const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
     
@@ -192,12 +197,18 @@ RENDERING STYLE: RED Cinema Camera / Architectural Digest quality
 ⚠️ NEVER produce cartoon, illustrated, stylized, or CGI-looking results
 ⚠️ Output MUST be indistinguishable from professional photography
 
+⚠️ CRITICAL IMAGE PRESERVATION:
+- The output image MUST have the EXACT same dimensions, framing, and boundaries as IMAGE 1
+- Do NOT crop, zoom, pan, or reframe the image in any way
+- Maintain the EXACT same field of view as the input image
+- Keep all visible elements at their exact positions
+
 USER INSTRUCTION: ${userPrompt}
 
 CRITICAL RULES:
 1. Apply the requested changes while preserving the overall room structure
 2. Keep architectural elements (walls, windows, doors, floor) in their exact positions
-3. Maintain the same camera angle and perspective
+3. Maintain the same camera angle and perspective - NO CROPPING OR ZOOMING
 4. Preserve furniture that is NOT mentioned in the instruction
 5. Apply changes naturally with ray-traced lighting and realistic shadows
 6. The result MUST look like a professional photograph, NOT an illustration
@@ -209,6 +220,7 @@ QUALITY CHECK:
 - Must look like real architectural photography
 - Materials must look physically accurate and tangible
 - No cartoon, flat, or stylized appearance allowed
+- Output dimensions and framing MUST match input exactly
 
 Output: The edited room image with ultra-photorealistic quality.`;
 
@@ -224,7 +236,7 @@ Output: The edited room image with ultra-photorealistic quality.`;
           model: 'google/gemini-3-pro-image-preview',
           messages: [{ role: 'user', content }],
           modalities: ['image', 'text'],
-          generationConfig: { aspectRatio: "16:9" }
+          generationConfig: { aspectRatio: outputAspectRatio }
         }),
       });
 
@@ -377,7 +389,7 @@ Output: A photorealistic interior photograph showing the focused view of the spe
           model: 'google/gemini-3-pro-image-preview',
           messages: [{ role: 'user', content }],
           modalities: ['image', 'text'],
-          generationConfig: { aspectRatio: '16:9' }
+          generationConfig: { aspectRatio: outputAspectRatio }
         }),
       });
 
@@ -463,6 +475,11 @@ Use this mask as a precise boundary for your edits.`
 RENDERING STYLE: RED Cinema Camera / Architectural Digest quality
 ⚠️ NEVER produce cartoon, illustrated, or CGI-looking results
 
+⚠️ CRITICAL IMAGE PRESERVATION:
+- The output image MUST have the EXACT same dimensions, framing, and boundaries as IMAGE ${renderIndex}
+- Do NOT crop, zoom, pan, or reframe the image in any way
+- Maintain the EXACT same field of view as the input image
+
 IMAGES PROVIDED:
 - IMAGE ${renderIndex}: The room to edit
 ${maskIndex ? `- IMAGE ${maskIndex}: BLACK & WHITE MASK (WHITE = edit zone, BLACK = preserve unchanged)` : ''}
@@ -485,6 +502,7 @@ CRITICAL INPAINTING RULES:
 4. Blend edges seamlessly with ray-traced lighting and realistic shadows
 5. Materials must look physically accurate with proper reflections
 6. Apply photorealistic shadows matching the room's lighting direction
+7. NEVER crop, zoom, or change the image boundaries
 
 ${userPrompt ? `ADDITIONAL INSTRUCTIONS: ${userPrompt}` : ''}
 
@@ -492,6 +510,7 @@ QUALITY CHECK:
 - Areas outside edit zone must be IDENTICAL to IMAGE ${renderIndex}
 - Result MUST look like professional photography, NOT illustration
 - Materials must be physically accurate and tangible
+- Output dimensions and framing MUST match input exactly
 
 Output: Ultra-photorealistic room image with ONLY the masked region modified.`;
       } else if (referenceImageUrl) {
@@ -554,7 +573,7 @@ Output: The edited image with ONLY the masked/specified region modified.`;
           model: 'google/gemini-3-pro-image-preview',
           messages: [{ role: 'user', content }],
           modalities: ['image', 'text'],
-          generationConfig: { aspectRatio: '16:9' }, // Maintain consistent aspect ratio
+          generationConfig: { aspectRatio: outputAspectRatio },
         }),
       });
 
@@ -781,7 +800,7 @@ Output: ONLY the final ultra-photorealistic image.`;
           model: 'google/gemini-3-pro-image-preview',
           messages: [{ role: 'user', content }],
           modalities: ['image', 'text'],
-          generationConfig: { aspectRatio: "16:9" }
+          generationConfig: { aspectRatio: outputAspectRatio }
         }),
       });
 
@@ -994,13 +1013,13 @@ Output: ONLY the final ultra-photorealistic image.`;
         Authorization: `Bearer ${LOVABLE_API_KEY}`,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({
-        model: 'google/gemini-3-pro-image-preview',
-        messages: [{ role: 'user', content }],
-        modalities: ['image', 'text'],
-        generationConfig: { aspectRatio: "16:9" }
-      }),
-    });
+        body: JSON.stringify({
+          model: 'google/gemini-3-pro-image-preview',
+          messages: [{ role: 'user', content }],
+          modalities: ['image', 'text'],
+          generationConfig: { aspectRatio: outputAspectRatio }
+        }),
+      });
 
     if (!response.ok) {
       if (response.status === 429) {
