@@ -24,6 +24,42 @@ interface LayoutAnalysis {
   gridOverlay: string;
 }
 
+// Control signals from geometry engine
+interface ControlSignals {
+  depthMapDescription: string;
+  edgeMapDescription: string;
+  regionMaskDescription: string;
+  structuralConstraints: string;
+  furniturePlacementGuide: string;
+  lockingInstructions: string;
+}
+
+// Placement manifest from placement engine
+interface PlacementManifest {
+  items: Array<{
+    furnitureId: string;
+    anchorId: string;
+    position: { x: number; y: number };
+    rotation: number;
+    scale: { x: number; y: number };
+    boundingBox: { minX: number; maxX: number; minY: number; maxY: number };
+    valid: boolean;
+  }>;
+  collisions: string[];
+  warnings: string[];
+  valid: boolean;
+  totalItems: number;
+}
+
+// Rendering settings for determinism
+interface RenderSettings {
+  creativityLevel: number; // 0.0-1.0, lower = more structural fidelity
+  useControlSignals: boolean;
+  fixedSeed: boolean;
+  validationEnabled: boolean;
+  maxRetries: number;
+}
+
 // Build architectural specification from layout analysis
 function buildArchitecturalSpec(analysis: LayoutAnalysis): string {
   const { dimensions, walls, windows, doors, furnitureZones, cameraRecommendation, gridOverlay } = analysis;
@@ -213,7 +249,11 @@ serve(async (req) => {
       layoutImageUrl,
       roomPhotoUrl,
       styleRefUrls,
-      layoutAnalysis // NEW: Pre-parsed layout data
+      layoutAnalysis,
+      // NEW: 3-Layer Architecture inputs
+      controlSignals, // From generate-control-signals function
+      placementManifest, // From furniture-placement function
+      renderSettings, // Determinism settings
     } = await req.json();
     
     const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
@@ -222,10 +262,22 @@ serve(async (req) => {
       throw new Error('LOVABLE_API_KEY is not configured');
     }
 
+    // Default render settings for determinism
+    const settings: RenderSettings = {
+      creativityLevel: renderSettings?.creativityLevel ?? 0.2, // Low creativity for structure
+      useControlSignals: renderSettings?.useControlSignals ?? true,
+      fixedSeed: renderSettings?.fixedSeed ?? true,
+      validationEnabled: renderSettings?.validationEnabled ?? true,
+      maxRetries: renderSettings?.maxRetries ?? 3,
+    };
+
     console.log('Generating render for prompt:', prompt);
     console.log('Furniture items:', furnitureItems?.length || 0);
     console.log('Layout image:', layoutImageUrl ? 'provided' : 'none');
     console.log('Layout analysis:', layoutAnalysis ? 'provided (111% accuracy mode)' : 'none');
+    console.log('Control signals:', controlSignals ? 'provided (3-layer mode)' : 'none');
+    console.log('Placement manifest:', placementManifest ? `${placementManifest.totalItems} items` : 'none');
+    console.log('Render settings:', settings);
     console.log('Room photo:', roomPhotoUrl ? 'provided' : 'none');
     console.log('Style references:', styleRefUrls?.length || 0);
 
