@@ -8,7 +8,7 @@ import { ChatPanel, ChatMessage, ChatInputType, AgentBState } from '@/components
 import { AgentBUnderstanding } from '@/components/canvas/AgentBBrief';
 import { AgentBQuestion, AgentBAnswer } from '@/components/canvas/AgentBQuestions';
 import { RenderViewer } from '@/components/canvas/RenderViewer';
-import { PremiumWorkspace, Zone, ViewType, viewTypeOptions } from '@/components/canvas/PremiumWorkspace';
+import { PremiumWorkspace, Zone, PolygonPoint, ViewType, viewTypeOptions } from '@/components/canvas/PremiumWorkspace';
 import { SleekChatInput } from '@/components/canvas/SleekChatInput';
 import { StagedItemsDock } from '@/components/canvas/StagedItemsDock';
 import { CameraData } from '@/components/canvas/CameraPlacement';
@@ -2421,6 +2421,7 @@ ABSOLUTE REQUIREMENTS FOR CONSISTENCY:
     setZones(data?.map(z => ({
       id: z.id,
       name: z.name,
+      polygon_points: (z.polygon_points as unknown as PolygonPoint[] | null) || [],
       x_start: Number(z.x_start),
       y_start: Number(z.y_start),
       x_end: Number(z.x_end),
@@ -2442,15 +2443,16 @@ ABSOLUTE REQUIREMENTS FOR CONSISTENCY:
 
     const { data, error } = await supabase
       .from('staging_zones')
-      .insert({
+      .insert([{
         project_id: currentProjectId,
         user_id: user.id,
         name: zone.name,
+        polygon_points: JSON.parse(JSON.stringify(zone.polygon_points)),
         x_start: zone.x_start,
         y_start: zone.y_start,
         x_end: zone.x_end,
         y_end: zone.y_end,
-      })
+      }])
       .select()
       .single();
 
@@ -2463,6 +2465,7 @@ ABSOLUTE REQUIREMENTS FOR CONSISTENCY:
     const newZone: Zone = {
       id: data.id,
       name: data.name,
+      polygon_points: (data.polygon_points as unknown as PolygonPoint[] | null) || [],
       x_start: Number(data.x_start),
       y_start: Number(data.y_start),
       x_end: Number(data.x_end),

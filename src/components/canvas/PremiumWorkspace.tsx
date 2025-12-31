@@ -58,14 +58,9 @@ export const viewTypeOptions: ViewTypeOption[] = [
   { id: 'bird-eye', icon: ArrowUp, label: 'Bird Eye', description: 'Elevated overview' },
 ];
 
-export interface Zone {
-  id: string;
-  name: string;
-  x_start: number;
-  y_start: number;
-  x_end: number;
-  y_end: number;
-}
+// Import Zone from ZoneSelector for consistency
+import { Zone, PolygonPoint } from './ZoneSelector';
+export type { Zone, PolygonPoint };
 
 interface PremiumWorkspaceProps {
   renderUrl: string | null;
@@ -248,7 +243,14 @@ export function PremiumWorkspace({
     const y_end = Math.max(drawStart.y, drawCurrent.y);
     
     if (x_end - x_start > 5 && y_end - y_start > 5) {
-      setPendingZone({ x_start, y_start, x_end, y_end });
+      // Create polygon points from rectangle corners (backward compatible)
+      const polygonPoints: PolygonPoint[] = [
+        { x: x_start, y: y_start },
+        { x: x_end, y: y_start },
+        { x: x_end, y: y_end },
+        { x: x_start, y: y_end },
+      ];
+      setPendingZone({ polygon_points: polygonPoints, x_start, y_start, x_end, y_end });
       setShowNameInput(true);
       setNewZoneName(`Zone ${zones.length + 1}`);
     }
