@@ -121,6 +121,7 @@ export function MulticamPanel({
       setZones(data.map(z => ({
         id: z.id,
         name: z.name,
+        polygon_points: (z.polygon_points as { x: number; y: number }[] | null) || [],
         x_start: Number(z.x_start),
         y_start: Number(z.y_start),
         x_end: Number(z.x_end),
