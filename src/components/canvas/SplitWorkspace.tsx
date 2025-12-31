@@ -636,31 +636,77 @@ export function SplitWorkspace({
                     </div>
                   )}
 
-                  {/* Zone Overlays when not drawing */}
+                  {/* Zone Overlays when not drawing - now renders polygons */}
                   {!isDrawingZone && !selectionMode && zones.length > 0 && (
-                    <div className="absolute inset-0 pointer-events-none">
-                      {zones.map((zone) => (
-                        <div
-                          key={zone.id}
-                          className={cn(
-                            "absolute border-2 transition-all",
-                            selectedZoneId === zone.id
-                              ? "border-primary bg-primary/10"
-                              : "border-amber-500/50 bg-amber-500/5"
-                          )}
-                          style={{
-                            left: `${zone.x_start}%`,
-                            top: `${zone.y_start}%`,
-                            width: `${zone.x_end - zone.x_start}%`,
-                            height: `${zone.y_end - zone.y_start}%`,
-                          }}
-                        >
-                          <div className="absolute top-1 left-1 px-1.5 py-0.5 bg-black/60 rounded text-[10px] text-white font-medium">
-                            {zone.name}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
+                    <svg className="absolute inset-0 pointer-events-none w-full h-full">
+                      {zones.map((zone) => {
+                        // Render as polygon if polygon_points exist, otherwise fallback to rect
+                        if (zone.polygon_points && zone.polygon_points.length >= 3) {
+                          const points = zone.polygon_points.map(p => `${p.x}%,${p.y}%`).join(' ');
+                          return (
+                            <g key={zone.id}>
+                              <polygon
+                                points={zone.polygon_points.map(p => `${p.x},${p.y}`).join(' ')}
+                                className={cn(
+                                  "transition-all",
+                                  selectedZoneId === zone.id
+                                    ? "fill-primary/10 stroke-primary"
+                                    : "fill-amber-500/5 stroke-amber-500/50"
+                                )}
+                                strokeWidth="0.3"
+                                style={{
+                                  transform: 'scale(1)',
+                                  transformOrigin: 'center',
+                                }}
+                                vectorEffect="non-scaling-stroke"
+                              />
+                              {/* Zone label */}
+                              <foreignObject
+                                x={`${zone.x_start}%`}
+                                y={`${zone.y_start}%`}
+                                width="100"
+                                height="20"
+                                className="overflow-visible"
+                              >
+                                <div className="px-1.5 py-0.5 bg-black/60 rounded text-[10px] text-white font-medium w-fit">
+                                  {zone.name}
+                                </div>
+                              </foreignObject>
+                            </g>
+                          );
+                        }
+                        
+                        // Fallback to rectangle for legacy zones
+                        return (
+                          <g key={zone.id}>
+                            <rect
+                              x={`${zone.x_start}%`}
+                              y={`${zone.y_start}%`}
+                              width={`${zone.x_end - zone.x_start}%`}
+                              height={`${zone.y_end - zone.y_start}%`}
+                              className={cn(
+                                "transition-all",
+                                selectedZoneId === zone.id
+                                  ? "fill-primary/10 stroke-primary"
+                                  : "fill-amber-500/5 stroke-amber-500/50"
+                              )}
+                              strokeWidth="2"
+                            />
+                            <foreignObject
+                              x={`${zone.x_start}%`}
+                              y={`${zone.y_start}%`}
+                              width="100"
+                              height="20"
+                              className="overflow-visible"
+                            >
+                              <div className="px-1.5 py-0.5 bg-black/60 rounded text-[10px] text-white font-medium w-fit">
+                                {zone.name}
+                              </div>
+                            </foreignObject>
+                          </g>
+                        );
+                      })}
+                    </svg>
                   )}
 
                   {/* Locked overlay */}
