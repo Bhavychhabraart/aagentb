@@ -24,13 +24,19 @@ serve(async (req) => {
       baseRenderUrl, 
       furniturePlacements,
       layoutImageUrl,
-      styleRefUrls 
+      styleRefUrls,
+      preserveAspectRatio, // NEW: Aspect ratio to preserve from source image
     }: {
       baseRenderUrl: string;
       furniturePlacements: FurniturePlacement[];
       layoutImageUrl?: string;
       styleRefUrls?: string[];
+      preserveAspectRatio?: string;
     } = await req.json();
+
+    // Use provided aspect ratio or default to 16:9
+    const outputAspectRatio = preserveAspectRatio || '16:9';
+    console.log('Using aspect ratio:', outputAspectRatio);
     
     const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
     
@@ -201,7 +207,7 @@ The goal is 100% visual accuracy - as if the catalog image was cut out and paste
         ],
         modalities: ['image', 'text'],
         generationConfig: {
-          aspectRatio: "16:9"
+          aspectRatio: outputAspectRatio
         }
       }),
     });

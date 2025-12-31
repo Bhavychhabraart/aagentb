@@ -47,6 +47,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { cropZoneFromRender } from '@/utils/cropZoneImage';
+import { getImageAspectRatio } from '@/utils/imageAspectRatio';
 import {
   getMemorySettings,
   setMemoryEnabled,
@@ -914,6 +915,10 @@ Ready to generate a render! Describe your vision.`;
         { type: 'text', status: 'pending' }
       );
 
+      // Detect aspect ratio to preserve from source image
+      const sourceAspectRatio = await getImageAspectRatio(currentRenderUrl);
+      console.log('Preserving aspect ratio:', sourceAspectRatio);
+
       const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/edit-render`, {
         method: 'POST',
         headers: {
@@ -937,6 +942,8 @@ Ready to generate a render! Describe your vision.`;
           textOnlyEdit: !hasFurniture,
           // NEW: Pass layout analysis for 111% accuracy mode
           layoutAnalysis,
+          // NEW: Preserve source image aspect ratio
+          preserveAspectRatio: sourceAspectRatio,
         }),
       });
 
@@ -1884,6 +1891,9 @@ Ready to generate a render! Describe your vision.`;
         { type: 'text', status: 'pending' }
       );
 
+      // Detect aspect ratio to preserve from source image
+      const sourceAspectRatio = await getImageAspectRatio(currentRenderUrl);
+
       const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/edit-render`, {
         method: 'POST',
         headers: {
@@ -1903,6 +1913,7 @@ Ready to generate a render! Describe your vision.`;
           })),
           layoutImageUrl: references.layoutUrl,
           styleRefUrls: references.styleRefUrls,
+          preserveAspectRatio: sourceAspectRatio,
         }),
       });
 
@@ -1993,6 +2004,9 @@ Ready to generate a render! Describe your vision.`;
         status: 'pending',
       });
 
+      // Detect aspect ratio to preserve from source image
+      const sourceAspectRatio = await getImageAspectRatio(currentRenderUrl);
+
       const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/edit-render`, {
         method: 'POST',
         headers: {
@@ -2013,6 +2027,7 @@ Ready to generate a render! Describe your vision.`;
           referenceImageUrl, // NEW: Pass reference image for upload mode
           layoutImageUrl: references.layoutUrl,
           styleRefUrls: references.styleRefUrls,
+          preserveAspectRatio: sourceAspectRatio,
         }),
       });
 
@@ -2149,6 +2164,9 @@ Ready to generate a render! Describe your vision.`;
 
       await addMessage('user', `🎬 AI Director: ${prompt}`, { type: 'text' });
 
+      // Detect aspect ratio to preserve from source image
+      const sourceAspectRatio = await getImageAspectRatio(currentRenderUrl);
+
       // Call edit-render with the global prompt
       const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/edit-render`, {
         method: 'POST',
@@ -2159,6 +2177,7 @@ Ready to generate a render! Describe your vision.`;
         body: JSON.stringify({
           currentRenderUrl: currentRenderUrl,
           userPrompt: prompt,
+          preserveAspectRatio: sourceAspectRatio,
           // No region = global edit
         }),
       });
@@ -2295,6 +2314,9 @@ ABSOLUTE REQUIREMENTS FOR CONSISTENCY:
         imageUrl: item.imageUrl,
       }));
 
+      // Detect aspect ratio to preserve from source image
+      const sourceAspectRatio = await getImageAspectRatio(currentRenderUrl);
+
       const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/edit-render`, {
         method: 'POST',
         headers: {
@@ -2317,6 +2339,7 @@ ABSOLUTE REQUIREMENTS FOR CONSISTENCY:
           } : undefined,
           // Indicate this is a multicam view for consistency handling
           viewType: view === 'top' ? 'bird-eye' : view === 'perspective' ? 'cinematic' : 'eye-level',
+          preserveAspectRatio: sourceAspectRatio,
         }),
       });
 
@@ -2527,6 +2550,9 @@ ABSOLUTE REQUIREMENTS FOR CONSISTENCY:
 
       await addMessage('user', `🎯 Generating ${viewLabel} view for zone: ${zone.name}...`, { type: 'text' });
 
+      // Detect aspect ratio to preserve from source image
+      const sourceAspectRatio = await getImageAspectRatio(currentRenderUrl);
+
       const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/edit-render`, {
         method: 'POST',
         headers: {
@@ -2545,6 +2571,7 @@ ABSOLUTE REQUIREMENTS FOR CONSISTENCY:
           zoneImageBase64: zoneImageBase64, // Pass cropped zone as visual reference
           viewType: viewType,
           styleRefUrls: styleRefUrls,
+          preserveAspectRatio: sourceAspectRatio,
         }),
       });
 
@@ -2746,6 +2773,9 @@ ABSOLUTE REQUIREMENTS FOR CONSISTENCY:
       await addMessage('user', `📷 ${camera.name}: ${prompt}`, { type: 'text' });
       await addMessage('assistant', `Generating view from ${camera.name}...`, { type: 'text', status: 'pending' });
       
+      // Detect aspect ratio to preserve from source image
+      const sourceAspectRatio = await getImageAspectRatio(currentRenderUrl);
+
       const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/edit-render`, {
         method: 'POST',
         headers: {
@@ -2761,6 +2791,7 @@ ABSOLUTE REQUIREMENTS FOR CONSISTENCY:
             rotation: camera.rotation,
             fov: camera.fovAngle,
           },
+          preserveAspectRatio: sourceAspectRatio,
         }),
       });
       
