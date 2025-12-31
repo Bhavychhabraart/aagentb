@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { X, Camera, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { cropZoneFromRender } from '@/utils/cropZoneImage';
+import { cropPolygonFromRender, cropZoneFromRender } from '@/utils/cropZoneImage';
 import { Zone } from './ZoneSelector';
 
 interface ZonePreviewConfirmProps {
@@ -28,12 +28,21 @@ export function ZonePreviewConfirm({
       setIsLoading(true);
       setError(null);
       try {
-        const cropped = await cropZoneFromRender(renderUrl, {
-          x: zone.x_start,
-          y: zone.y_start,
-          width: zone.x_end - zone.x_start,
-          height: zone.y_end - zone.y_start,
-        });
+        let cropped: string;
+        
+        // Use polygon cropping if polygon points exist, otherwise fall back to rectangle
+        if (zone.polygon_points && zone.polygon_points.length >= 3) {
+          cropped = await cropPolygonFromRender(renderUrl, zone.polygon_points);
+        } else {
+          // Fallback for legacy rectangular zones
+          cropped = await cropZoneFromRender(renderUrl, {
+            x: zone.x_start,
+            y: zone.y_start,
+            width: zone.x_end - zone.x_start,
+            height: zone.y_end - zone.y_start,
+          });
+        }
+        
         setPreviewUrl(cropped);
       } catch (err) {
         console.error('Failed to crop zone preview:', err);
@@ -93,7 +102,10 @@ export function ZonePreviewConfirm({
           <div className="mt-3 flex items-center justify-between text-xs text-muted-foreground">
             <span className="font-medium text-foreground">{zone.name}</span>
             <span>
-              {(zone.x_end - zone.x_start).toFixed(0)}% × {(zone.y_end - zone.y_start).toFixed(0)}%
+              {zone.polygon_points && zone.polygon_points.length >= 3 
+                ? `${zone.polygon_points.length} point polygon`
+                : `${(zone.x_end - zone.x_start).toFixed(0)}% × ${(zone.y_end - zone.y_start).toFixed(0)}%`
+              }
             </span>
           </div>
         </div>

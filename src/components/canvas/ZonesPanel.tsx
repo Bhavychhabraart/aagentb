@@ -1,10 +1,10 @@
 import { useState, useEffect } from 'react';
-import { Layers, Plus, Trash2, Camera, Eye, X } from 'lucide-react';
+import { Layers, Plus, Trash2, Camera, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { Zone } from './ZoneSelector';
+import { Zone, PolygonPoint } from './ZoneSelector';
 import { ZonePreviewConfirm } from './ZonePreviewConfirm';
 
 interface ZonesPanelProps {
@@ -50,6 +50,7 @@ export function ZonesPanel({
       setZones(data?.map(z => ({
         id: z.id,
         name: z.name,
+        polygon_points: (z.polygon_points as unknown as PolygonPoint[] | null) || [],
         x_start: Number(z.x_start),
         y_start: Number(z.y_start),
         x_end: Number(z.x_end),
@@ -82,6 +83,12 @@ export function ZonesPanel({
       console.error('Failed to delete zone:', error);
       toast.error('Failed to delete zone');
     }
+  };
+
+  // Generate SVG points for zone thumbnail
+  const getZoneThumbnailPoints = (points: PolygonPoint[]): string => {
+    if (!points || points.length < 3) return '';
+    return points.map(p => `${p.x},${p.y}`).join(' ');
   };
 
   return (
@@ -120,7 +127,7 @@ export function ZonesPanel({
           <div className="text-center py-6 text-muted-foreground">
             <Layers className="h-8 w-8 mx-auto mb-2 opacity-50" />
             <p className="text-xs">No zones defined</p>
-            <p className="text-[10px] mt-1">Click "Add Zone" to draw a zone on your render</p>
+            <p className="text-[10px] mt-1">Click "Add Zone" to draw a polygon zone on your render</p>
           </div>
         ) : (
           <div className="space-y-1">
@@ -135,27 +142,39 @@ export function ZonesPanel({
                 )}
                 onClick={() => onZoneSelect(zone)}
               >
-                {/* Zone preview (color swatch showing position) */}
+                {/* Zone preview (polygon shape) */}
                 <div 
                   className="w-8 h-8 rounded bg-muted/50 relative overflow-hidden flex-shrink-0"
-                  title={`${zone.x_start.toFixed(0)}%-${zone.x_end.toFixed(0)}% x ${zone.y_start.toFixed(0)}%-${zone.y_end.toFixed(0)}%`}
+                  title={`${zone.polygon_points?.length || 0} points`}
                 >
-                  <div
-                    className="absolute bg-amber-500/60 border border-amber-500"
-                    style={{
-                      left: `${zone.x_start}%`,
-                      top: `${zone.y_start}%`,
-                      width: `${zone.x_end - zone.x_start}%`,
-                      height: `${zone.y_end - zone.y_start}%`,
-                    }}
-                  />
+                  <svg viewBox="0 0 100 100" className="w-full h-full">
+                    {zone.polygon_points && zone.polygon_points.length >= 3 ? (
+                      <polygon
+                        points={getZoneThumbnailPoints(zone.polygon_points)}
+                        className="fill-amber-500/60 stroke-amber-500"
+                        strokeWidth="3"
+                      />
+                    ) : (
+                      <rect
+                        x={zone.x_start}
+                        y={zone.y_start}
+                        width={zone.x_end - zone.x_start}
+                        height={zone.y_end - zone.y_start}
+                        className="fill-amber-500/60 stroke-amber-500"
+                        strokeWidth="3"
+                      />
+                    )}
+                  </svg>
                 </div>
 
                 {/* Zone info */}
                 <div className="flex-1 min-w-0">
                   <p className="text-xs font-medium truncate">{zone.name}</p>
                   <p className="text-[10px] text-muted-foreground">
-                    {(zone.x_end - zone.x_start).toFixed(0)}% × {(zone.y_end - zone.y_start).toFixed(0)}%
+                    {zone.polygon_points && zone.polygon_points.length >= 3 
+                      ? `${zone.polygon_points.length} points`
+                      : `${(zone.x_end - zone.x_start).toFixed(0)}% × ${(zone.y_end - zone.y_start).toFixed(0)}%`
+                    }
                   </p>
                 </div>
 

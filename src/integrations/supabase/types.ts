@@ -1191,6 +1191,7 @@ export type Database = {
           created_at: string
           id: string
           name: string
+          polygon_points: Json | null
           project_id: string
           room_id: string | null
           thumbnail_url: string | null
@@ -1206,6 +1207,7 @@ export type Database = {
           created_at?: string
           id?: string
           name?: string
+          polygon_points?: Json | null
           project_id: string
           room_id?: string | null
           thumbnail_url?: string | null
@@ -1221,6 +1223,7 @@ export type Database = {
           created_at?: string
           id?: string
           name?: string
+          polygon_points?: Json | null
           project_id?: string
           room_id?: string | null
           thumbnail_url?: string | null
