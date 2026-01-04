@@ -296,15 +296,6 @@ export function PremiumWorkspace({
       shortcut: 'Z',
       group: 'view',
     },
-    {
-      id: 'compare-zone',
-      icon: Columns2,
-      label: 'Compare',
-      onClick: () => selectedZone && onCompareZone?.(selectedZone),
-      disabled: !selectedZone,
-      shortcut: 'K',
-      group: 'view',
-    },
   ];
 
   const stagedItemsCount = stagedItems?.length || 0;
