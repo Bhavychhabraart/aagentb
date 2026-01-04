@@ -194,6 +194,9 @@ export function PremiumWorkspace({
   const [selectionStart, setSelectionStart] = useState<{ x: number; y: number } | null>(null);
   const [selectionCurrent, setSelectionCurrent] = useState<{ x: number; y: number } | null>(null);
 
+  // Get selected zone from zones array
+  const selectedZone = zones.find(z => z.id === selectedZoneId);
+
   const handleDirectorSubmit = () => {
     if (directorPrompt.trim() && onAIDirectorChange) {
       onAIDirectorChange(directorPrompt);
@@ -865,6 +868,8 @@ export function PremiumWorkspace({
             currentRenderId={currentRenderId}
             onSelect={onRenderHistorySelect}
             onDelete={onDeleteRender}
+            hasZoneComparison={!!selectedZone}
+            onCompareZone={selectedZone ? () => onCompareZone?.(selectedZone) : undefined}
           />
         )}
       </div>

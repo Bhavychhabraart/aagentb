@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
-import { History, ChevronDown, ChevronUp, Trash2, Camera, Paintbrush, Layers, Eye, Sparkles } from 'lucide-react';
+import { History, ChevronDown, ChevronUp, Trash2, Camera, Paintbrush, Layers, Eye, Sparkles, Columns2 } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import {
   Carousel,
   CarouselContent,
@@ -35,6 +36,8 @@ interface RenderHistoryCarouselProps {
   currentRenderId: string | null;
   onSelect: (render: RenderHistoryItem) => void;
   onDelete?: (renderId: string) => void;
+  onCompareZone?: () => void;
+  hasZoneComparison?: boolean;
 }
 
 export function RenderHistoryCarousel({
@@ -42,6 +45,8 @@ export function RenderHistoryCarousel({
   currentRenderId,
   onSelect,
   onDelete,
+  onCompareZone,
+  hasZoneComparison,
 }: RenderHistoryCarouselProps) {
   const [isExpanded, setIsExpanded] = useState(true);
   const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -60,27 +65,38 @@ export function RenderHistoryCarousel({
     <div className="absolute bottom-24 left-1/2 -translate-x-1/2 z-20 w-full max-w-2xl px-4">
       <div className="glass-premium rounded-xl border border-border/20 overflow-hidden">
         {/* Header - Always visible, clickable to toggle */}
-        <button
-          onClick={() => setIsExpanded(!isExpanded)}
-          className="w-full flex items-center justify-between p-3 hover:bg-muted/20 transition-colors"
-        >
-          <div className="flex items-center gap-2">
+        <div className="flex items-center justify-between p-3">
+          <button
+            onClick={() => setIsExpanded(!isExpanded)}
+            className="flex items-center gap-2 hover:bg-muted/20 transition-colors rounded px-2 py-1 -ml-2"
+          >
             <History className="h-3.5 w-3.5 text-primary" />
             <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
               Render History
             </span>
-          </div>
-          <div className="flex items-center gap-2">
             <span className="text-xs font-mono text-muted-foreground">
-              {renders.length} version{renders.length !== 1 ? 's' : ''}
+              ({renders.length})
             </span>
             {isExpanded ? (
               <ChevronDown className="h-4 w-4 text-muted-foreground" />
             ) : (
               <ChevronUp className="h-4 w-4 text-muted-foreground" />
             )}
-          </div>
-        </button>
+          </button>
+          
+          {/* Compare Zone Button */}
+          {hasZoneComparison && onCompareZone && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={onCompareZone}
+              className="h-7 gap-1.5 text-xs border-primary/30 hover:bg-primary/10"
+            >
+              <Columns2 className="h-3.5 w-3.5" />
+              Compare Zone
+            </Button>
+          )}
+        </div>
         
         {/* Collapsible content */}
         <div

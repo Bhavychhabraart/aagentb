@@ -128,6 +128,7 @@ export function SplitWorkspace({
   const [showComparison, setShowComparison] = useState(false);
   
   const selectedCamera = cameras.find(c => c.id === selectedCameraId);
+  const selectedZone = zones.find(z => z.id === selectedZoneId);
 
   // Handle 'A' key for fullscreen catalog
   useEffect(() => {
@@ -853,6 +854,8 @@ export function SplitWorkspace({
               renders={allRenders}
               currentRenderId={currentRenderId}
               onSelect={onRenderHistorySelect}
+              hasZoneComparison={!!selectedZone}
+              onCompareZone={selectedZone ? () => onCompareZone?.(selectedZone) : undefined}
             />
           )}
 
