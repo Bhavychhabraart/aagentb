@@ -293,6 +293,16 @@ Output: The edited room image with ultra-photorealistic quality.`;
         // LAYOUT-BASED ZONE GENERATION - Uses 2D layout as source of truth
         console.log('Using LAYOUT-BASED zone generation mode');
         
+        // Extract zone bounds from focusRegion for explicit coordinates
+        const zoneBounds = focusRegion ? {
+          x_start: focusRegion.x,
+          y_start: focusRegion.y,
+          x_end: focusRegion.x + focusRegion.width,
+          y_end: focusRegion.y + focusRegion.height,
+          width: focusRegion.width,
+          height: focusRegion.height,
+        } : null;
+        
         // IMAGE 1: Cropped zone from 2D layout (the source of truth)
         content.push({ type: 'image_url', image_url: { url: layoutZoneBase64 } });
         const layoutZoneIndex = imageIndex++;
@@ -318,12 +328,26 @@ IMAGES PROVIDED:
 ${fullLayoutIndex ? `- IMAGE ${fullLayoutIndex}: Full 2D floor plan (for overall spatial context)` : ''}
 ${renderIndex ? `- IMAGE ${renderIndex}: Existing 3D render of the room (for style/material reference)` : ''}
 
+${zoneBounds ? `
+╔═══════════════════════════════════════════════════════════════════════════════╗
+║                    ZONE BOUNDING BOX COORDINATES                              ║
+╠═══════════════════════════════════════════════════════════════════════════════╣
+║  Left edge:   ${zoneBounds.x_start.toFixed(1)}% from layout left                                      ║
+║  Top edge:    ${zoneBounds.y_start.toFixed(1)}% from layout top                                       ║
+║  Right edge:  ${zoneBounds.x_end.toFixed(1)}% from layout left                                       ║
+║  Bottom edge: ${zoneBounds.y_end.toFixed(1)}% from layout top                                        ║
+║  Width:       ${zoneBounds.width.toFixed(1)}% of full layout                                         ║
+║  Height:      ${zoneBounds.height.toFixed(1)}% of full layout                                        ║
+╚═══════════════════════════════════════════════════════════════════════════════╝
+` : ''}
+
 ═══════════════════════════════════════════════════════════════
      LAYOUT-TO-3D ZONE RENDER - HIGHEST ACCURACY MODE
 ═══════════════════════════════════════════════════════════════
 
 YOUR TASK:
 Transform the cropped 2D floor plan zone (IMAGE ${layoutZoneIndex}) into a photorealistic 3D interior render.
+Render ONLY what appears within the specified bounding box - nothing more, nothing less.
 
 CRITICAL INTERPRETATION REQUIREMENTS:
 

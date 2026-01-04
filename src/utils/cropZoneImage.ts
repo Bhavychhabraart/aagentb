@@ -1,12 +1,12 @@
 import { PolygonPoint } from '@/components/canvas/ZoneSelector';
 
 /**
- * Crops a rectangular zone region from a render image and returns a base64 data URL
- * @deprecated Use cropPolygonFromRender instead
+ * Crops a rectangular zone from an image using bounding box coordinates (percentages)
+ * Optimized for rectangle zones - faster and more accurate than polygon cropping
  */
-export async function cropZoneFromRender(
-  renderUrl: string,
-  zone: { x: number; y: number; width: number; height: number }
+export async function cropRectangleFromImage(
+  imageUrl: string,
+  bounds: { x_start: number; y_start: number; x_end: number; y_end: number }
 ): Promise<string> {
   return new Promise((resolve, reject) => {
     const img = new Image();
@@ -15,15 +15,15 @@ export async function cropZoneFromRender(
     img.onload = () => {
       try {
         // Calculate pixel coordinates from percentage values
-        const cropX = (zone.x / 100) * img.naturalWidth;
-        const cropY = (zone.y / 100) * img.naturalHeight;
-        const cropWidth = (zone.width / 100) * img.naturalWidth;
-        const cropHeight = (zone.height / 100) * img.naturalHeight;
+        const cropX = (bounds.x_start / 100) * img.naturalWidth;
+        const cropY = (bounds.y_start / 100) * img.naturalHeight;
+        const cropWidth = ((bounds.x_end - bounds.x_start) / 100) * img.naturalWidth;
+        const cropHeight = ((bounds.y_end - bounds.y_start) / 100) * img.naturalHeight;
         
         // Create canvas with the cropped dimensions
         const canvas = document.createElement('canvas');
-        canvas.width = cropWidth;
-        canvas.height = cropHeight;
+        canvas.width = Math.max(1, Math.round(cropWidth));
+        canvas.height = Math.max(1, Math.round(cropHeight));
         
         const ctx = canvas.getContext('2d');
         if (!ctx) {
@@ -35,13 +35,13 @@ export async function cropZoneFromRender(
         ctx.drawImage(
           img,
           cropX, cropY, cropWidth, cropHeight, // Source rect
-          0, 0, cropWidth, cropHeight          // Dest rect
+          0, 0, canvas.width, canvas.height    // Dest rect
         );
         
-        // Convert to base64 data URL
+        // Convert to base64 data URL (JPEG for smaller size)
         const dataUrl = canvas.toDataURL('image/jpeg', 0.95);
         
-        console.log(`Cropped zone: ${cropWidth.toFixed(0)}x${cropHeight.toFixed(0)}px from ${zone.x.toFixed(1)}%,${zone.y.toFixed(1)}%`);
+        console.log(`Cropped rectangle: ${canvas.width}x${canvas.height}px from (${bounds.x_start.toFixed(1)}%, ${bounds.y_start.toFixed(1)}%) to (${bounds.x_end.toFixed(1)}%, ${bounds.y_end.toFixed(1)}%)`);
         
         resolve(dataUrl);
       } catch (err) {
@@ -53,7 +53,23 @@ export async function cropZoneFromRender(
       reject(new Error('Failed to load image for cropping'));
     };
     
-    img.src = renderUrl;
+    img.src = imageUrl;
+  });
+}
+
+/**
+ * Crops a rectangular zone region from a render image and returns a base64 data URL
+ * @deprecated Use cropRectangleFromImage instead
+ */
+export async function cropZoneFromRender(
+  renderUrl: string,
+  zone: { x: number; y: number; width: number; height: number }
+): Promise<string> {
+  return cropRectangleFromImage(renderUrl, {
+    x_start: zone.x,
+    y_start: zone.y,
+    x_end: zone.x + zone.width,
+    y_end: zone.y + zone.height,
   });
 }
 

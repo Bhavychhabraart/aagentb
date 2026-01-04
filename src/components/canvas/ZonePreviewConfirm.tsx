@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { X, Camera, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { cropPolygonFromRender, cropZoneFromRender } from '@/utils/cropZoneImage';
+import { cropRectangleFromImage } from '@/utils/cropZoneImage';
 import { Zone } from './ZoneSelector';
 
 interface ZonePreviewConfirmProps {
@@ -28,21 +28,13 @@ export function ZonePreviewConfirm({
       setIsLoading(true);
       setError(null);
       try {
-        let cropped: string;
-        
-        // Use polygon cropping if polygon points exist, otherwise fall back to rectangle
-        // Crop from the LAYOUT image (not the render)
-        if (zone.polygon_points && zone.polygon_points.length >= 3) {
-          cropped = await cropPolygonFromRender(layoutImageUrl, zone.polygon_points);
-        } else {
-          // Fallback for legacy rectangular zones
-          cropped = await cropZoneFromRender(layoutImageUrl, {
-            x: zone.x_start,
-            y: zone.y_start,
-            width: zone.x_end - zone.x_start,
-            height: zone.y_end - zone.y_start,
-          });
-        }
+        // Use optimized rectangle cropping (all zones are now rectangles)
+        const cropped = await cropRectangleFromImage(layoutImageUrl, {
+          x_start: zone.x_start,
+          y_start: zone.y_start,
+          x_end: zone.x_end,
+          y_end: zone.y_end,
+        });
         
         setPreviewUrl(cropped);
       } catch (err) {
@@ -103,10 +95,7 @@ export function ZonePreviewConfirm({
           <div className="mt-3 flex items-center justify-between text-xs text-muted-foreground">
             <span className="font-medium text-foreground">{zone.name}</span>
             <span>
-              {zone.polygon_points && zone.polygon_points.length >= 3 
-                ? `${zone.polygon_points.length} point polygon`
-                : `${(zone.x_end - zone.x_start).toFixed(0)}% × ${(zone.y_end - zone.y_start).toFixed(0)}%`
-              }
+              {`${(zone.x_end - zone.x_start).toFixed(0)}% × ${(zone.y_end - zone.y_start).toFixed(0)}%`}
             </span>
           </div>
         </div>
