@@ -50,3 +50,6 @@ verify_jwt = false
 
 [functions.analyze-layout]
 verify_jwt = false
+
+[functions.identify-and-mask]
+verify_jwt = false
