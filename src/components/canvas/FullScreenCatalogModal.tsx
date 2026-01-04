@@ -1,6 +1,7 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { X, Search, Loader2, Check, Plus, ShoppingBag, Maximize2, Sparkles } from 'lucide-react';
-import { Dialog, DialogContent } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogTitle, DialogDescription } from '@/components/ui/dialog';
+import * as VisuallyHidden from '@radix-ui/react-visually-hidden';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -84,6 +85,10 @@ export function FullScreenCatalogModal({
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
       <DialogContent className="max-w-6xl w-[95vw] h-[90vh] p-0 overflow-hidden bg-background border-border flex flex-col">
+        <VisuallyHidden.Root>
+          <DialogTitle>Product Catalog</DialogTitle>
+          <DialogDescription>Browse and select products from the furniture catalog</DialogDescription>
+        </VisuallyHidden.Root>
         {/* Header */}
         <div className="flex items-center justify-between p-4 border-b border-border shrink-0">
           <div className="flex flex-col gap-1">
