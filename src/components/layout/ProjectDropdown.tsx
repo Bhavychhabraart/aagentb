@@ -136,7 +136,6 @@ export function ProjectDropdown({ currentProjectId, onProjectSelect, onNewProjec
                       <img 
                         src={project.thumbnail_url} 
                         alt={project.name} 
-                        loading="lazy"
                         className="w-full h-full object-cover"
                       />
                     ) : (

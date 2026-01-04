@@ -1,9 +1,8 @@
-import { useState, useCallback } from 'react';
+import { useState } from 'react';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { History, ChevronDown, ChevronUp, Trash2, Camera, Paintbrush, Layers, Eye, Sparkles, Columns2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Skeleton } from '@/components/ui/skeleton';
 import {
   Carousel,
   CarouselContent,
@@ -51,11 +50,6 @@ export function RenderHistoryCarousel({
 }: RenderHistoryCarouselProps) {
   const [isExpanded, setIsExpanded] = useState(true);
   const [deletingId, setDeletingId] = useState<string | null>(null);
-  const [loadedImages, setLoadedImages] = useState<Set<string>>(new Set());
-
-  const handleImageLoad = useCallback((renderId: string) => {
-    setLoadedImages(prev => new Set(prev).add(renderId));
-  }, []);
 
   if (renders.length === 0) return null;
 
@@ -157,18 +151,10 @@ export function RenderHistoryCarousel({
                               : 'border-border/30 hover:border-primary/50'
                           )}
                         >
-                          {!loadedImages.has(render.id) && (
-                            <Skeleton className="absolute inset-0 w-full h-full" />
-                          )}
                           <img
                             src={render.render_url}
                             alt={`Render ${index + 1}`}
-                            loading="lazy"
-                            onLoad={() => handleImageLoad(render.id)}
-                            className={cn(
-                              "absolute inset-0 w-full h-full object-cover transition-opacity",
-                              !loadedImages.has(render.id) && "opacity-0"
-                            )}
+                            className="absolute inset-0 w-full h-full object-cover"
                             draggable={false}
                           />
                           

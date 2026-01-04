@@ -187,42 +187,29 @@ export default function Dashboard() {
   const fetchDashboardData = async () => {
     setLoading(true);
     try {
-      // Fetch all data in parallel for faster loading
-      const [projectsResult, rendersForProjectsResult, rendersResult, ordersResult] = await Promise.all([
-        supabase
-          .from('projects')
-          .select('*')
-          .order('updated_at', { ascending: false }),
-        supabase
-          .from('renders')
-          .select('project_id, render_url, created_at')
-          .eq('status', 'completed')
-          .order('created_at', { ascending: false })
-          .limit(200), // Limit to recent renders for project thumbnails
-        supabase
-          .from('renders')
-          .select('id, render_url, prompt, created_at, project_id')
-          .eq('status', 'completed')
-          .order('created_at', { ascending: false })
-          .limit(20),
-        supabase
-          .from('orders')
-          .select('*')
-          .order('created_at', { ascending: false })
-          .limit(50),
-      ]);
+      // Fetch projects
+      const { data: projectsData } = await supabase
+        .from('projects')
+        .select('*')
+        .order('updated_at', { ascending: false });
 
-      const projectsData = projectsResult.data;
-      const allRenders = rendersForProjectsResult.data;
+      // Fetch all completed renders to get latest per project and counts
+      const { data: allRenders } = await supabase
+        .from('renders')
+        .select('project_id, render_url, created_at')
+        .eq('status', 'completed')
+        .order('created_at', { ascending: false });
 
       // Build maps for latest render URL and render count per project
       const latestRenderByProject = new Map<string, string>();
       const renderCountByProject = new Map<string, number>();
       
       allRenders?.forEach(r => {
+        // Track latest render URL
         if (!latestRenderByProject.has(r.project_id) && r.render_url) {
           latestRenderByProject.set(r.project_id, r.render_url);
         }
+        // Track render count
         renderCountByProject.set(r.project_id, (renderCountByProject.get(r.project_id) || 0) + 1);
       });
 
@@ -235,31 +222,43 @@ export default function Dashboard() {
 
       setProjects(projectsWithRenders);
 
-      // Process renders with project names
-      const rendersData = rendersResult.data;
-      const ordersData = ordersResult.data;
-      
-      // Get all unique project IDs from renders and orders
-      const allProjectIds = new Set<string>();
-      rendersData?.forEach(r => allProjectIds.add(r.project_id));
-      ordersData?.forEach(o => allProjectIds.add(o.project_id));
-      
-      // Fetch project names in one query
-      const { data: projectNames } = await supabase
-        .from('projects')
-        .select('id, name')
-        .in('id', [...allProjectIds]);
+      // Fetch renders with project names
+      const { data: rendersData } = await supabase
+        .from('renders')
+        .select('id, render_url, prompt, created_at, project_id')
+        .eq('status', 'completed')
+        .order('created_at', { ascending: false })
+        .limit(20);
 
-      const projectNameMap = new Map(projectNames?.map(p => [p.id, p.name]));
-      
+      // Get project names for renders
       if (rendersData) {
+        const projectIds = [...new Set(rendersData.map(r => r.project_id))];
+        const { data: projectNames } = await supabase
+          .from('projects')
+          .select('id, name')
+          .in('id', projectIds);
+
+        const projectNameMap = new Map(projectNames?.map(p => [p.id, p.name]));
         setRenders(rendersData.map(r => ({ 
           ...r, 
           project_name: projectNameMap.get(r.project_id) || 'Unknown' 
         })));
       }
 
+      // Fetch orders with project names
+      const { data: ordersData } = await supabase
+        .from('orders')
+        .select('*')
+        .order('created_at', { ascending: false });
+
       if (ordersData) {
+        const projectIds = [...new Set(ordersData.map(o => o.project_id))];
+        const { data: projectNames } = await supabase
+          .from('projects')
+          .select('id, name')
+          .in('id', projectIds);
+
+        const projectNameMap = new Map(projectNames?.map(p => [p.id, p.name]));
         setOrders(ordersData.map(o => ({ 
           ...o, 
           project_name: projectNameMap.get(o.project_id) || 'Unknown' 
@@ -482,7 +481,6 @@ export default function Dashboard() {
                           <img 
                             src={project.latestRenderUrl} 
                             alt={project.name} 
-                            loading="lazy"
                             className="w-full h-full object-cover group-hover:scale-105 transition-transform"
                           />
                         ) : project.thumbnail_url ? (

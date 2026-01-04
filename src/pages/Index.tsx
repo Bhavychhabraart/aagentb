@@ -333,27 +333,36 @@ const Index = () => {
     }
   }, [currentProjectId]);
 
-  // Load layout image and room photo in a single query for comparison view
-  const loadLayoutAndRoomPhoto = async () => {
+  // Load layout image for comparison view
+  const loadLayoutImage = async () => {
     if (!currentProjectId) return;
     
-    const { data: uploads } = await supabase
+    const { data } = await supabase
       .from('room_uploads')
-      .select('file_url, upload_type')
+      .select('file_url')
       .eq('project_id', currentProjectId)
-      .in('upload_type', ['layout', 'room_photo'])
-      .order('created_at', { ascending: false });
+      .eq('upload_type', 'layout')
+      .limit(1)
+      .maybeSingle();
     
-    const layoutUrl = uploads?.find(u => u.upload_type === 'layout')?.file_url || null;
-    const roomPhotoUrlFound = uploads?.find(u => u.upload_type === 'room_photo')?.file_url || null;
-    
-    setLayoutImageUrl(layoutUrl);
-    setRoomPhotoUrl(roomPhotoUrlFound);
+    setLayoutImageUrl(data?.file_url || null);
   };
 
-  // Keep individual functions for compatibility but use combined loader
-  const loadLayoutImage = async () => loadLayoutAndRoomPhoto();
-  const loadRoomPhoto = async () => {}; // Handled by loadLayoutAndRoomPhoto
+  // Load room photo for staging mode
+  const loadRoomPhoto = async () => {
+    if (!currentProjectId) return;
+    
+    const { data } = await supabase
+      .from('room_uploads')
+      .select('file_url')
+      .eq('project_id', currentProjectId)
+      .eq('upload_type', 'room_photo')
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    
+    setRoomPhotoUrl(data?.file_url || null);
+  };
 
   // Add staging mode welcome message
   const addStagingWelcomeMessage = async () => {
