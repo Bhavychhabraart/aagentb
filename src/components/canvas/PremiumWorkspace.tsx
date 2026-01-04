@@ -16,8 +16,6 @@ import {
   User,
   ArrowUp,
   Clapperboard,
-  SquareStack,
-  Eraser,
   ScanSearch,
   Package,
   ShoppingCart,
@@ -97,12 +95,8 @@ interface PremiumWorkspaceProps {
   generatingZoneName?: string | null;
   generatingViewType?: ViewType | null;
   // New enhanced tools
-  onToggleMultiSelect?: () => void;
-  isMultiSelectMode?: boolean;
   onToggleAIDetection?: () => void;
   isAIDetectionActive?: boolean;
-  onToggleEraser?: () => void;
-  isEraserMode?: boolean;
   onToggleAutoFurnish?: () => void;
   showAutoFurnish?: boolean;
   onToggleAssetsPanel?: () => void;
@@ -164,12 +158,8 @@ export function PremiumWorkspace({
   generatingZoneName,
   generatingViewType,
   // New enhanced tools
-  onToggleMultiSelect,
-  isMultiSelectMode,
   onToggleAIDetection,
   isAIDetectionActive,
-  onToggleEraser,
-  isEraserMode,
   onToggleAutoFurnish,
   showAutoFurnish,
   onToggleAssetsPanel,
@@ -217,29 +207,9 @@ export function PremiumWorkspace({
       shortcut: 'S',
       group: 'selection',
     },
-    {
-      id: 'multiselect',
-      icon: SquareStack,
-      label: 'Multi',
-      onClick: onToggleMultiSelect,
-      disabled: !renderUrl || isGenerating,
-      active: isMultiSelectMode,
-      shortcut: 'M',
-      group: 'selection',
-    },
   ];
 
   const editingTools: ToolbarItem[] = [
-    {
-      id: 'eraser',
-      icon: Eraser,
-      label: 'Erase',
-      onClick: onToggleEraser,
-      disabled: !renderUrl || isGenerating,
-      active: isEraserMode,
-      shortcut: 'E',
-      group: 'editing',
-    },
     {
       id: 'director',
       icon: Wand2,
