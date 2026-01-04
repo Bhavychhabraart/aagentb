@@ -3395,8 +3395,6 @@ ABSOLUTE REQUIREMENTS FOR CONSISTENCY:
             generatingZoneName={generatingZoneName}
             generatingViewType={generatingViewType}
             // Enhanced tools props
-            onToggleMultiSelect={handleToggleMultiSelect}
-            isMultiSelectMode={isMultiSelectMode}
             onToggleAIDetection={() => {
               if (!currentRenderUrl && !roomPhotoUrl) {
                 toast({
@@ -3409,13 +3407,6 @@ ABSOLUTE REQUIREMENTS FOR CONSISTENCY:
               setIsAIDetectionActive(prev => !prev);
             }}
             isAIDetectionActive={isAIDetectionActive}
-            onToggleEraser={() => {
-              setIsEraserMode(prev => !prev);
-              if (!isEraserMode) {
-                setIsAIDetectionActive(true);
-              }
-            }}
-            isEraserMode={isEraserMode}
             onToggleAutoFurnish={() => setShowAutoFurnish(prev => !prev)}
             showAutoFurnish={showAutoFurnish}
             onToggleAssetsPanel={() => setShowAssetsPanel(prev => !prev)}
