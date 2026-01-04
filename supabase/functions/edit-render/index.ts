@@ -780,81 +780,69 @@ Output: The FULL edited image (same dimensions as input) with ONLY the masked/sp
    - Description: ${ref.product.description || 'Premium furniture piece'}`;
       }).join('\n\n');
 
-      const batchPrompt = `You are a MASTER STAGING ARCHITECT using Gemini 3 Pro for ULTRA-PRECISE furniture placement.
+      const batchPrompt = `You are performing PRECISION FURNITURE INPAINTING on an existing room photograph.
 
 ═══════════════════════════════════════════════════════════════
-     ⚠️⚠️⚠️ ABSOLUTE CRITICAL - IMAGE PRESERVATION ⚠️⚠️⚠️
+     🔒 CAMERA LOCK - ZERO MODIFICATION TO FRAME 🔒
 ═══════════════════════════════════════════════════════════════
 
-🚨 NON-NEGOTIABLE RULES - VIOLATION = COMPLETE FAILURE:
-1. OUTPUT IMAGE MUST HAVE **IDENTICAL DIMENSIONS** AS IMAGE ${baseImageIndex}
-2. DO NOT CROP, ZOOM, PAN, TILT, OR REFRAME THE IMAGE - ANY CROPPING IS WRONG
-3. The ENTIRE original room must be visible in output - same framing, same boundaries
-4. Keep the EXACT same camera angle and field of view
-5. Preserve ALL architectural elements (walls, windows, doors, floor) EXACTLY
+THIS IS AN INPAINTING TASK - NOT A RE-GENERATION:
+• The output MUST show the EXACT SAME VIEW as IMAGE ${baseImageIndex}
+• Every pixel along all 4 edges of IMAGE ${baseImageIndex} must appear in output
+• Camera position: LOCKED - do not move, pan, tilt, or zoom
+• Field of view: LOCKED - do not widen or narrow
+• Framing: LOCKED - do not crop, reframe, or change composition
+
+❌ REJECT: Zooming in on furniture placement areas
+❌ REJECT: Cropping out any walls, ceiling, floor, or edges
+❌ REJECT: Changing the camera angle or perspective
+❌ REJECT: Re-composing the scene in any way
+❌ REJECT: Any output that doesn't show 100% of the original boundaries
+
+✅ REQUIRED: Output shows 100% of the original room boundaries
+✅ REQUIRED: All corners and edges match the input exactly
+✅ REQUIRED: Same exact framing and composition as input
 
 ═══════════════════════════════════════════════════════════════
-     BATCH FURNITURE REPLACEMENT - ${typedBatchMarkers.length} ITEMS
+     FURNITURE INPAINTING - ${typedBatchMarkers.length} ITEMS
 ═══════════════════════════════════════════════════════════════
 
-BASE IMAGE: The room to modify (IMAGE ${baseImageIndex})
+TASK: Add/replace furniture at specific coordinates WITHOUT changing anything else.
 
-REPLACEMENT LIST:
+BASE IMAGE: IMAGE ${baseImageIndex} (preserve this view EXACTLY - do NOT zoom or crop)
+
+PLACEMENT INSTRUCTIONS:
 ${replacementList}
 
 ═══════════════════════════════════════════════════════════════
-     PLACEMENT PRECISION REQUIREMENTS
+     PLACEMENT TECHNIQUE
 ═══════════════════════════════════════════════════════════════
 
-For EACH product placement:
+For each product:
+1. LOCATE the coordinate (X%, Y%) in the base image
+2. If furniture exists there → REPLACE it with the reference product
+3. If empty space → ADD the product naturally
+4. MATCH the product exactly from its reference image
+5. Apply correct perspective scaling for room depth
+6. Add realistic shadows matching room lighting
 
-1. EXACT POSITION: Place the product CENTER at the specified (X%, Y%) coordinate
-   - X% is measured from LEFT edge (0% = far left, 100% = far right)
-   - Y% is measured from TOP edge (0% = top, 100% = bottom)
-
-2. PERFECT PRODUCT FIDELITY: Copy each product EXACTLY from its reference image
-   - Same shape, proportions, and silhouette
-   - Same colors, materials, and textures
-   - Same design details and features
-
-3. PERSPECTIVE MATCHING:
-   - Scale each product appropriately for its position in the room
-   - Apply correct perspective distortion based on camera angle
-   - Products in foreground should be larger, background smaller
-
-4. LIGHTING & SHADOWS:
-   - Match the room's existing lighting direction
-   - Apply realistic ray-traced shadows under each product
-   - Maintain consistent ambient occlusion
-
-5. REPLACE OR ADD:
-   - If existing furniture is at a marker location, REPLACE it
-   - If empty space, ADD the new product naturally
-   - Remove any overlapped/conflicting furniture
+CRITICAL REMINDERS:
+• Do NOT focus or zoom on the furniture being placed
+• Keep the ENTIRE room visible at all times
+• The output must look like someone placed real furniture in the photo
+• Preserve the original photograph's framing completely
 
 ═══════════════════════════════════════════════════════════════
-     ULTRA-PHOTOREALISTIC OUTPUT QUALITY
+     OUTPUT REQUIREMENTS
 ═══════════════════════════════════════════════════════════════
 
-RENDERING STANDARD: RED Cinema Camera / Architectural Digest quality
-- 8K equivalent sharpness and detail
-- Physically-based materials with accurate reflections
-- Ray-traced global illumination
-- Professional photography color grading
+• SAME DIMENSIONS as IMAGE ${baseImageIndex}
+• SAME FRAMING as IMAGE ${baseImageIndex}  
+• SAME VIEW as IMAGE ${baseImageIndex}
+• Photorealistic quality - indistinguishable from real photo
+• All ${typedBatchMarkers.length} products placed at specified coordinates
 
-⛔ INSTANT REJECTION IF:
-- Output looks like CGI, illustration, or cartoon
-- Any cropping or dimension change from input
-- Products don't match their reference images
-- Inconsistent lighting or floating objects
-
-✅ SUCCESS CRITERIA:
-- Indistinguishable from professional architectural photography
-- All ${batchMarkers.length} products placed at their exact coordinates
-- Products look CUT from reference images and PASTED into scene
-- Seamless integration with room environment
-
-Output: The COMPLETE room image (same dimensions as input) with ALL ${batchMarkers.length} products placed.`;
+OUTPUT: The COMPLETE, UNMODIFIED FRAME of the room with only the furniture changed.`;
 
       content.push({ type: 'text', text: batchPrompt });
 
