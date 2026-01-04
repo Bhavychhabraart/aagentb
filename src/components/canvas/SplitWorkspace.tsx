@@ -62,6 +62,7 @@ interface SplitWorkspaceProps {
   onStartZoneDrawing?: () => void;
   onStopZoneDrawing?: () => void;
   onGenerateZoneView?: (zone: Zone) => void;
+  onCompareZone?: (zone: Zone) => void;
   onToggleZonesPanel?: () => void;
   // Start Over and Upscale props
   onStartOver?: () => void;
@@ -111,6 +112,7 @@ export function SplitWorkspace({
   onStartZoneDrawing,
   onStopZoneDrawing,
   onGenerateZoneView,
+  onCompareZone,
   onToggleZonesPanel,
   // Start Over and Upscale props
   onStartOver,
@@ -768,6 +770,7 @@ export function SplitWorkspace({
                   selectedZoneId={selectedZoneId || null}
                   onEditZones={onToggleZonesPanel}
                   onGenerateZoneView={onGenerateZoneView}
+                  onCompareZone={onCompareZone}
                   isGenerating={isMulticamGenerating}
                   onClose={onToggleZonesPanel}
                 />

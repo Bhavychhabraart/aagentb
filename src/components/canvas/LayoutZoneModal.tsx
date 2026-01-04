@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { X, Layers, Plus, Trash2, Camera, Edit3 } from 'lucide-react';
+import { X, Layers, Plus, Trash2, Camera, Edit3, Columns2 } from 'lucide-react';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -19,6 +19,7 @@ interface LayoutZoneModalProps {
   onZoneCreate: (zone: Omit<Zone, 'id'>, layoutUrl: string) => Promise<void>;
   onZoneDelete: (zoneId: string) => Promise<void>;
   onGenerateZoneView: (zone: Zone, viewType: ViewType) => void;
+  onCompareZone?: (zone: Zone) => void;
   isGenerating: boolean;
 }
 
@@ -31,6 +32,7 @@ export function LayoutZoneModal({
   onZoneCreate,
   onZoneDelete,
   onGenerateZoneView,
+  onCompareZone,
   isGenerating,
 }: LayoutZoneModalProps) {
   const [zones, setZones] = useState<Zone[]>([]);
@@ -226,6 +228,21 @@ export function LayoutZoneModal({
 
                       {/* Actions */}
                       <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                        {/* Compare zone button */}
+                        {onCompareZone && renderUrl && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7 text-cyan-400 hover:text-cyan-300"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onCompareZone(zone);
+                            }}
+                            title="Compare zone with generated render"
+                          >
+                            <Columns2 className="h-3.5 w-3.5" />
+                          </Button>
+                        )}
                         <Button
                           variant="ghost"
                           size="icon"
