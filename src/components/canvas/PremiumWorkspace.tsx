@@ -17,7 +17,6 @@ import {
   ArrowUp,
   Clapperboard,
   Package,
-  ShoppingCart,
   Download,
   Maximize2,
   RefreshCcw,
@@ -25,7 +24,8 @@ import {
   X,
   Trash2,
   Columns2,
-  Target
+  Target,
+  SplitSquareHorizontal
 } from 'lucide-react';
 import { RenderHistoryCarousel, RenderHistoryItem } from './RenderHistoryCarousel';
 import { CatalogFurnitureItem } from '@/services/catalogService';
@@ -112,6 +112,9 @@ interface PremiumWorkspaceProps {
   // Marker staging props
   onToggleMarkerStaging?: () => void;
   showMarkerStaging?: boolean;
+  // Comparison props
+  onToggleComparison?: () => void;
+  showComparison?: boolean;
 }
 
 interface ToolbarItem {
@@ -179,6 +182,9 @@ export function PremiumWorkspace({
   // Marker staging props
   onToggleMarkerStaging,
   showMarkerStaging,
+  // Comparison props
+  onToggleComparison,
+  showComparison,
 }: PremiumWorkspaceProps) {
   const [showDirectorInput, setShowDirectorInput] = useState(false);
   const [directorPrompt, setDirectorPrompt] = useState('');
@@ -262,6 +268,16 @@ export function PremiumWorkspace({
       shortcut: 'Z',
       group: 'view',
     },
+    {
+      id: 'compare',
+      icon: SplitSquareHorizontal,
+      label: 'Compare',
+      onClick: onToggleComparison,
+      disabled: !renderUrl || isGenerating,
+      active: showComparison,
+      shortcut: 'K',
+      group: 'view',
+    },
   ];
 
   const stagedItemsCount = stagedItems?.length || 0;
@@ -297,14 +313,6 @@ export function PremiumWorkspace({
       onClick: onToggleAssetsPanel,
       active: showAssetsPanel,
       shortcut: 'G',
-      group: 'panels',
-    },
-    {
-      id: 'catalog',
-      icon: ShoppingCart,
-      label: 'Catalog',
-      onClick: onOpenCatalog,
-      shortcut: 'C',
       group: 'panels',
     },
   ];

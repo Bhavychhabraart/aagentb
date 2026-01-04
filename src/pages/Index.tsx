@@ -28,6 +28,7 @@ import { CameraView, ZoneRegion } from '@/components/canvas/MulticamPanel';
 import { LayoutUploadModal } from '@/components/creation/LayoutUploadModal';
 import { LayoutZoneModal } from '@/components/canvas/LayoutZoneModal';
 import { ZoneComparisonModal } from '@/components/canvas/ZoneComparisonModal';
+import { RenderComparisonModal } from '@/components/canvas/RenderComparisonModal';
 import { RoomPhotoModal } from '@/components/creation/RoomPhotoModal';
 import { StyleRefModal } from '@/components/creation/StyleRefModal';
 import { ProductPickerModal, ProductItem } from '@/components/creation/ProductPickerModal';
@@ -141,6 +142,9 @@ const Index = () => {
   
   // Zone comparison state
   const [comparisonZone, setComparisonZone] = useState<Zone | null>(null);
+  
+  // Render comparison modal state
+  const [showComparisonModal, setShowComparisonModal] = useState(false);
 
   // Agent B state
   const [agentBEnabled, setAgentBEnabled] = useState(false);
@@ -1890,9 +1894,9 @@ Ready to generate a render! Describe your vision.`;
 
       if (response.error) throw response.error;
 
-      if (response.data?.editedUrl) {
-        setCurrentRenderUrl(response.data.editedUrl);
-        setAllRenderUrls(prev => [...prev, response.data.editedUrl]);
+      if (response.data?.imageUrl) {
+        setCurrentRenderUrl(response.data.imageUrl);
+        setAllRenderUrls(prev => [...prev, response.data.imageUrl]);
         
         // Add selected items to staged items
         const newStagedItems = selectedItems.filter(item => !stagedItems.some(s => s.id === item.id));
@@ -3659,6 +3663,9 @@ ABSOLUTE REQUIREMENTS FOR CONSISTENCY:
             isUpscaling={isUpscaling}
             onToggleMarkerStaging={() => setShowMarkerStaging(prev => !prev)}
             showMarkerStaging={showMarkerStaging}
+            // Comparison props
+            onToggleComparison={() => setShowComparisonModal(prev => !prev)}
+            showComparison={showComparisonModal}
           />
 
           {/* Selection is now handled inside PremiumWorkspace */}
@@ -4002,6 +4009,16 @@ ABSOLUTE REQUIREMENTS FOR CONSISTENCY:
           layoutImageUrl={layoutImageUrl}
           generatedRenderUrl={currentRenderUrl}
           onClose={() => setComparisonZone(null)}
+        />
+      )}
+
+      {/* Render Comparison Modal */}
+      {showComparisonModal && currentRenderUrl && (
+        <RenderComparisonModal
+          layoutImageUrl={layoutImageUrl}
+          currentRenderUrl={currentRenderUrl}
+          selectedZone={selectedZoneId ? zones.find(z => z.id === selectedZoneId) : null}
+          onClose={() => setShowComparisonModal(false)}
         />
       )}
     </div>
