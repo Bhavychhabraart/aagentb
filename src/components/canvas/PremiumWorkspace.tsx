@@ -16,7 +16,6 @@ import {
   User,
   ArrowUp,
   Clapperboard,
-  ScanSearch,
   Package,
   ShoppingCart,
   Download,
@@ -230,16 +229,6 @@ export function PremiumWorkspace({
   ];
 
   const aiTools: ToolbarItem[] = [
-    {
-      id: 'detect',
-      icon: ScanSearch,
-      label: 'Detect',
-      onClick: onToggleAIDetection,
-      disabled: !renderUrl || isGenerating,
-      active: isAIDetectionActive,
-      shortcut: 'F',
-      group: 'ai',
-    },
     {
       id: 'autofurnish',
       icon: Sparkles,

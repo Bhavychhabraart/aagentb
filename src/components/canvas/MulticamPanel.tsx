@@ -1,12 +1,12 @@
 import { useState, useEffect } from 'react';
-import { Camera, Eye, ArrowUp, ArrowRight, Box, Loader2, X, Download, Presentation, Check, Edit2, Layers, Plus, RefreshCw, Film, Grid2X2 } from 'lucide-react';
+import { Camera, Loader2, X, Download, Presentation, Grid2X2, RefreshCw, Layers, Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 import pptxgen from 'pptxgenjs';
 import { supabase } from '@/integrations/supabase/client';
 import { Zone } from './ZoneSelector';
+
 export type CameraView = 'perspective' | 'front' | 'side' | 'top' | 'cinematic' | 'custom';
 
 export interface ZoneRegion {
@@ -29,55 +29,6 @@ interface MulticamPanelProps {
   styleRefUrls?: string[];
 }
 
-// Map panel views to edge function camera types
-const VIEW_TO_CAMERA: Record<CameraView, string> = {
-  'perspective': 'eye-level',
-  'front': 'straight-on',
-  'side': 'corner',
-  'top': 'overhead',
-  'cinematic': 'dramatic',
-  'custom': 'eye-level',
-};
-
-const VIEW_OPTIONS: { id: CameraView; label: string; icon: React.ReactNode; description: string }[] = [
-  { 
-    id: 'perspective', 
-    label: 'Perspective', 
-    icon: <Box className="h-4 w-4" />,
-    description: '3/4 angle view'
-  },
-  { 
-    id: 'front', 
-    label: 'Front', 
-    icon: <Eye className="h-4 w-4" />,
-    description: 'Straight-on view'
-  },
-  { 
-    id: 'side', 
-    label: 'Side', 
-    icon: <ArrowRight className="h-4 w-4" />,
-    description: 'Left or right view'
-  },
-  { 
-    id: 'top', 
-    label: "Bird's Eye", 
-    icon: <ArrowUp className="h-4 w-4" />,
-    description: 'Top-down view'
-  },
-  { 
-    id: 'cinematic', 
-    label: 'Cinematic', 
-    icon: <Film className="h-4 w-4" />,
-    description: 'Dramatic wide angle'
-  },
-  { 
-    id: 'custom', 
-    label: 'Custom', 
-    icon: <Edit2 className="h-4 w-4" />,
-    description: 'Your own angle'
-  },
-];
-
 export function MulticamPanel({ 
   onGenerateView, 
   isGenerating, 
@@ -91,14 +42,10 @@ export function MulticamPanel({
   styleRefUrls,
 }: MulticamPanelProps) {
   const { toast } = useToast();
-  const [generatingView, setGeneratingView] = useState<CameraView | null>(null);
-  const [customAngle, setCustomAngle] = useState('');
-  const [showCustomInput, setShowCustomInput] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
   const [zones, setZones] = useState<Zone[]>([]);
   const [selectedZone, setSelectedZone] = useState<Zone | null>(null);
-  const [showZones, setShowZones] = useState(false);
-  const [isGeneratingAll, setIsGeneratingAll] = useState(false);
+  const [isGeneratingGrid, setIsGeneratingGrid] = useState(false);
   const [compositeGridUrl, setCompositeGridUrl] = useState<string | null>(null);
 
   // Load zones when projectId changes
@@ -131,40 +78,23 @@ export function MulticamPanel({
     }
   };
 
-  const handleGenerate = (view: CameraView, customPrompt?: string) => {
-    setGeneratingView(view);
-    const zone = selectedZone ? {
-      x_start: selectedZone.x_start,
-      y_start: selectedZone.y_start,
-      x_end: selectedZone.x_end,
-      y_end: selectedZone.y_end,
-    } : undefined;
-    onGenerateView(view, customPrompt, zone);
-  };
-
-  const handleCustomGenerate = () => {
-    if (!customAngle.trim()) return;
-    handleGenerate('custom', customAngle.trim());
-    setShowCustomInput(false);
-  };
-
-  const handleSetAsMain = (view: CameraView, imageUrl: string) => {
-    if (onSetAsMain) {
-      onSetAsMain(imageUrl);
-      toast({ title: 'Main render updated', description: `${view} view set as main render.` });
-    }
-  };
-
-  // Generate all views using the composite grid endpoint
-  const handleGenerateAllViews = async () => {
+  // Generate 2x2 grid using the composite endpoint
+  const handleGenerateGrid = async () => {
     if (!currentRenderUrl) {
       toast({ variant: 'destructive', title: 'No render available', description: 'Please generate a render first.' });
       return;
     }
 
-    setIsGeneratingAll(true);
+    setIsGeneratingGrid(true);
     
     try {
+      const zone = selectedZone ? {
+        x_start: selectedZone.x_start,
+        y_start: selectedZone.y_start,
+        x_end: selectedZone.x_end,
+        y_end: selectedZone.y_end,
+      } : undefined;
+
       const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-multicam`, {
         method: 'POST',
         headers: {
@@ -176,6 +106,7 @@ export function MulticamPanel({
           mode: 'grid',
           views: ['eye-level', 'overhead', 'wide', 'macro'],
           styleRefUrls,
+          zone,
         }),
       });
 
@@ -187,7 +118,7 @@ export function MulticamPanel({
           throw new Error('Usage limit reached. Please add credits.');
         }
         const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to generate views');
+        throw new Error(errorData.error || 'Failed to generate grid');
       }
 
       const data = await response.json();
@@ -195,58 +126,44 @@ export function MulticamPanel({
       if (data.imageUrl) {
         setCompositeGridUrl(data.imageUrl);
         toast({ 
-          title: 'Composite grid generated!', 
-          description: 'All 4 camera views created in a single consistent image.' 
+          title: '2x2 Grid Generated!', 
+          description: 'All 4 camera angles in one image.' 
         });
       }
     } catch (error) {
-      console.error('Generate all views error:', error);
+      console.error('Generate grid error:', error);
       toast({ 
         variant: 'destructive', 
         title: 'Generation failed', 
         description: error instanceof Error ? error.message : 'Unknown error' 
       });
     } finally {
-      setIsGeneratingAll(false);
+      setIsGeneratingGrid(false);
     }
   };
 
-  const handleDownloadAll = async () => {
-    const viewsWithImages = Object.entries(generatedViews).filter(([_, url]) => url !== null);
-    if (viewsWithImages.length === 0) {
-      toast({ variant: 'destructive', title: 'No views to download' });
-      return;
-    }
-
-    setIsExporting(true);
+  const handleDownloadGrid = async () => {
+    if (!compositeGridUrl) return;
+    
     try {
       const { formatDownloadFilename } = await import('@/utils/formatDownloadFilename');
-      // Download each image and create a zip-like experience (download all sequentially)
-      for (const [view, url] of viewsWithImages) {
-        if (!url) continue;
-        const response = await fetch(url);
-        const blob = await response.blob();
-        const blobUrl = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = blobUrl;
-        a.download = formatDownloadFilename('multicam', 'project', 'png', view);
-        a.click();
-        URL.revokeObjectURL(blobUrl);
-        // Small delay between downloads
-        await new Promise(r => setTimeout(r, 300));
-      }
-      toast({ title: 'Downloaded all views!' });
+      const response = await fetch(compositeGridUrl);
+      const blob = await response.blob();
+      const blobUrl = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = blobUrl;
+      a.download = formatDownloadFilename('multicam', 'grid', 'png');
+      a.click();
+      URL.revokeObjectURL(blobUrl);
+      toast({ title: 'Grid downloaded!' });
     } catch (error) {
       toast({ variant: 'destructive', title: 'Download failed' });
-    } finally {
-      setIsExporting(false);
     }
   };
 
   const handleExportToPPT = async () => {
-    const viewsWithImages = Object.entries(generatedViews).filter(([_, url]) => url !== null);
-    if (viewsWithImages.length === 0) {
-      toast({ variant: 'destructive', title: 'No views to export' });
+    if (!compositeGridUrl) {
+      toast({ variant: 'destructive', title: 'No grid to export' });
       return;
     }
 
@@ -254,37 +171,44 @@ export function MulticamPanel({
     try {
       const pptx = new pptxgen();
       pptx.author = 'Design Studio';
-      pptx.title = 'Multicam Views';
-      pptx.subject = 'Room Design Views';
+      pptx.title = 'Camera Views Grid';
+      pptx.subject = 'Room Design - 4 Camera Angles';
 
-      for (const [view, url] of viewsWithImages) {
-        if (!url) continue;
-        const slide = pptx.addSlide();
-        
-        // Add title
-        slide.addText(view.charAt(0).toUpperCase() + view.slice(1) + ' View', {
-          x: 0.5,
-          y: 0.3,
-          w: '90%',
-          h: 0.5,
-          fontSize: 24,
-          bold: true,
-          color: '363636',
-        });
+      const slide = pptx.addSlide();
+      
+      // Add title
+      slide.addText('Camera Views - 2x2 Grid', {
+        x: 0.5,
+        y: 0.3,
+        w: '90%',
+        h: 0.5,
+        fontSize: 24,
+        bold: true,
+        color: '363636',
+      });
 
-        // Add image
-        slide.addImage({
-          path: url,
-          x: 0.5,
-          y: 1,
-          w: 9,
-          h: 5,
-          sizing: { type: 'contain', w: 9, h: 5 },
-        });
-      }
+      // Add subtitle with view labels
+      slide.addText('Eye Level | Overhead | Wide Angle | Detail Shot', {
+        x: 0.5,
+        y: 0.8,
+        w: '90%',
+        h: 0.3,
+        fontSize: 12,
+        color: '666666',
+      });
+
+      // Add the composite grid image
+      slide.addImage({
+        path: compositeGridUrl,
+        x: 0.5,
+        y: 1.2,
+        w: 9,
+        h: 5,
+        sizing: { type: 'contain', w: 9, h: 5 },
+      });
 
       const { formatDownloadFilename } = await import('@/utils/formatDownloadFilename');
-      await pptx.writeFile({ fileName: formatDownloadFilename('ppt', 'multicamviews', 'pptx') });
+      await pptx.writeFile({ fileName: formatDownloadFilename('ppt', 'camera-views', 'pptx') });
       toast({ title: 'PowerPoint exported!' });
     } catch (error) {
       console.error('PPT export failed:', error);
@@ -294,15 +218,20 @@ export function MulticamPanel({
     }
   };
 
-  const hasAnyViews = Object.values(generatedViews).some(v => v !== null);
+  const handleSetAsMain = () => {
+    if (compositeGridUrl && onSetAsMain) {
+      onSetAsMain(compositeGridUrl);
+      toast({ title: 'Grid set as main render' });
+    }
+  };
 
   return (
-    <div className="absolute bottom-24 left-4 z-20 w-96 bg-black/80 backdrop-blur-md rounded-lg border border-border/50 shadow-xl overflow-hidden">
+    <div className="absolute bottom-24 left-4 z-20 w-80 bg-black/80 backdrop-blur-md rounded-lg border border-border/50 shadow-xl overflow-hidden">
       {/* Header */}
       <div className="flex items-center justify-between p-3 border-b border-border/30">
         <div className="flex items-center gap-2">
-          <Camera className="h-4 w-4 text-primary" />
-          <span className="text-sm font-medium">Multicam Views</span>
+          <Grid2X2 className="h-4 w-4 text-primary" />
+          <span className="text-sm font-medium">Camera Views</span>
           {selectedZone && (
             <span className="text-[10px] px-1.5 py-0.5 bg-amber-500/20 text-amber-400 rounded">
               {selectedZone.name}
@@ -353,272 +282,79 @@ export function MulticamPanel({
               </Button>
             ))}
           </div>
-          {selectedZone && (
-            <p className="text-[10px] text-amber-400/80 mt-1.5">
-              Generating views focused on "{selectedZone.name}" region only
-            </p>
-          )}
         </div>
       )}
 
-      {/* View Grid */}
-      <div className="p-3 grid grid-cols-3 gap-2">
-        {VIEW_OPTIONS.map((view) => {
-          const hasImage = !!generatedViews[view.id];
-          const isCurrentlyGenerating = isGenerating && generatingView === view.id;
-          
-          // Special handling for custom view
-          if (view.id === 'custom') {
-            return (
-              <div
-                key={view.id}
-                className={cn(
-                  "relative rounded-lg border overflow-hidden transition-all",
-                  hasImage 
-                    ? "border-primary/50 bg-primary/10" 
-                    : "border-border/30 bg-muted/20 hover:border-primary/30"
-                )}
-              >
-                <div className="aspect-video relative">
-                  {hasImage ? (
-                    <>
-                      <img 
-                        src={generatedViews[view.id]!} 
-                        alt={view.label}
-                        className="w-full h-full object-cover cursor-pointer hover:opacity-90 transition-opacity"
-                        onClick={() => onSelectView(view.id, generatedViews[view.id]!)}
-                      />
-                      {/* Hover overlay with Set as Main and Regenerate options */}
-                      <div 
-                        className="absolute inset-0 bg-black/60 opacity-0 hover:opacity-100 transition-opacity flex flex-col items-center justify-center gap-2"
-                      >
-                        {onSetAsMain && (
-                          <button
-                            className="flex items-center gap-1 text-[10px] text-white hover:text-primary transition-colors"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleSetAsMain(view.id, generatedViews[view.id]!);
-                            }}
-                          >
-                            <Check className="h-3 w-3" />
-                            Set as Main
-                          </button>
-                        )}
-                        <button
-                          className="flex items-center gap-1 text-[10px] text-white hover:text-amber-400 transition-colors"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setShowCustomInput(true);
-                          }}
-                          disabled={isGenerating}
-                        >
-                          <RefreshCw className="h-3 w-3" />
-                          Regenerate
-                        </button>
-                      </div>
-                    </>
-                  ) : showCustomInput ? (
-                    <div className="absolute inset-0 p-2 flex flex-col gap-1">
-                      <Input
-                        value={customAngle}
-                        onChange={(e) => setCustomAngle(e.target.value)}
-                        placeholder="e.g., 45° from corner"
-                        className="h-6 text-[10px] bg-background/80"
-                        onKeyDown={(e) => e.key === 'Enter' && handleCustomGenerate()}
-                      />
-                      <Button size="sm" className="h-5 text-[10px]" onClick={handleCustomGenerate}>
-                        Go
-                      </Button>
-                    </div>
-                  ) : isCurrentlyGenerating ? (
-                    <div className="absolute inset-0 flex items-center justify-center">
-                      <Loader2 className="h-5 w-5 animate-spin text-primary" />
-                    </div>
-                  ) : (
-                    <div 
-                      className="absolute inset-0 flex flex-col items-center justify-center gap-1 cursor-pointer"
-                      onClick={() => setShowCustomInput(true)}
-                    >
-                      <div className="p-2 rounded-full bg-muted/30">
-                        {view.icon}
-                      </div>
-                      <span className="text-[10px] text-muted-foreground">{view.description}</span>
-                    </div>
-                  )}
-                </div>
-                <div className="p-1.5 flex items-center justify-between">
-                  <span className="text-[10px] font-medium">{view.label}</span>
-                  {hasImage && !isCurrentlyGenerating && (
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-5 w-5"
-                      onClick={() => setShowCustomInput(true)}
-                      disabled={isGenerating}
-                      title="Regenerate custom view"
-                    >
-                      <RefreshCw className="h-3 w-3" />
-                    </Button>
-                  )}
-                </div>
-              </div>
-            );
-          }
-          
-          return (
-            <div
-              key={view.id}
-              className={cn(
-                "relative rounded-lg border overflow-hidden transition-all",
-                hasImage 
-                  ? "border-primary/50 bg-primary/10" 
-                  : "border-border/30 bg-muted/20 hover:border-primary/30"
-              )}
-            >
-              {/* Thumbnail or placeholder */}
-              <div className="aspect-video relative">
-                {hasImage ? (
-                  <>
-                    <img 
-                      src={generatedViews[view.id]!} 
-                      alt={view.label}
-                      className="w-full h-full object-cover cursor-pointer hover:opacity-90 transition-opacity"
-                      onClick={() => onSelectView(view.id, generatedViews[view.id]!)}
-                    />
-                    {/* Hover overlay with Set as Main and Regenerate options */}
-                    <div 
-                      className="absolute inset-0 bg-black/60 opacity-0 hover:opacity-100 transition-opacity flex flex-col items-center justify-center gap-2"
-                    >
-                      {onSetAsMain && (
-                        <button
-                          className="flex items-center gap-1 text-[10px] text-white hover:text-primary transition-colors"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleSetAsMain(view.id, generatedViews[view.id]!);
-                          }}
-                        >
-                          <Check className="h-3 w-3" />
-                          Set as Main
-                        </button>
-                      )}
-                      <button
-                        className="flex items-center gap-1 text-[10px] text-white hover:text-amber-400 transition-colors"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleGenerate(view.id);
-                        }}
-                        disabled={isGenerating}
-                      >
-                        <RefreshCw className={cn("h-3 w-3", isCurrentlyGenerating && "animate-spin")} />
-                        Regenerate
-                      </button>
-                    </div>
-                  </>
-                ) : (
-                  <div className="absolute inset-0 flex flex-col items-center justify-center gap-1">
-                    {isCurrentlyGenerating ? (
-                      <Loader2 className="h-5 w-5 animate-spin text-primary" />
-                    ) : (
-                      <>
-                        <div className="p-2 rounded-full bg-muted/30">
-                          {view.icon}
-                        </div>
-                        <span className="text-[10px] text-muted-foreground">{view.description}</span>
-                      </>
-                    )}
-                  </div>
-                )}
-              </div>
-
-              {/* Label and action */}
-              <div className="p-1.5 flex items-center justify-between">
-                <span className="text-[10px] font-medium">{view.label}</span>
-                {!hasImage && !isCurrentlyGenerating && (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-5 px-1.5 text-[10px]"
-                    onClick={() => handleGenerate(view.id)}
-                    disabled={isGenerating}
-                  >
-                    Gen
-                  </Button>
-                )}
-                {isCurrentlyGenerating && (
-                  <Loader2 className="h-3 w-3 animate-spin text-primary" />
-                )}
-                {hasImage && !isCurrentlyGenerating && (
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-5 w-5"
-                    onClick={() => handleGenerate(view.id)}
-                    disabled={isGenerating}
-                    title="Regenerate this view"
-                  >
-                    <RefreshCw className="h-3 w-3" />
-                  </Button>
-                )}
-              </div>
+      {/* Grid Preview or Placeholder */}
+      <div className="p-4">
+        {compositeGridUrl ? (
+          <div className="space-y-3">
+            <img 
+              src={compositeGridUrl} 
+              alt="2x2 Camera Grid" 
+              className="w-full rounded-lg border border-border/30 cursor-pointer hover:opacity-90 transition-opacity"
+              onClick={handleSetAsMain}
+            />
+            <p className="text-[10px] text-muted-foreground text-center">
+              Click image to set as main render
+            </p>
+          </div>
+        ) : (
+          <div className="aspect-square bg-muted/10 rounded-lg border border-dashed border-border/30 flex flex-col items-center justify-center p-4">
+            <Grid2X2 className="h-10 w-10 text-muted-foreground/50 mb-3" />
+            <p className="text-sm font-medium text-foreground/80 mb-1">2x2 Camera Grid</p>
+            <p className="text-[10px] text-muted-foreground text-center leading-relaxed">
+              Generate a single image with 4 different camera angles of your room
+            </p>
+            <div className="mt-3 grid grid-cols-2 gap-1 text-[9px] text-muted-foreground/70">
+              <span className="px-2 py-1 bg-muted/10 rounded">Eye Level</span>
+              <span className="px-2 py-1 bg-muted/10 rounded">Overhead</span>
+              <span className="px-2 py-1 bg-muted/10 rounded">Wide Angle</span>
+              <span className="px-2 py-1 bg-muted/10 rounded">Detail Shot</span>
             </div>
-          );
-        })}
+          </div>
+        )}
       </div>
 
-      {/* Composite Grid Preview */}
-      {compositeGridUrl && (
-        <div className="p-3 border-t border-border/30">
-          <div className="flex items-center justify-between mb-2">
-            <div className="flex items-center gap-1.5">
-              <Grid2X2 className="h-3 w-3 text-primary" />
-              <span className="text-[10px] text-muted-foreground uppercase tracking-wider">Composite Grid</span>
-            </div>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-5 text-[10px]"
-              onClick={async () => {
-                const { formatDownloadFilename } = await import('@/utils/formatDownloadFilename');
-                const response = await fetch(compositeGridUrl);
-                const blob = await response.blob();
-                const blobUrl = URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = blobUrl;
-                a.download = formatDownloadFilename('multicam', 'grid', 'png');
-                a.click();
-                URL.revokeObjectURL(blobUrl);
-              }}
-            >
-              <Download className="h-3 w-3 mr-1" />
-              Save
-            </Button>
-          </div>
-          <img 
-            src={compositeGridUrl} 
-            alt="Composite 2x2 grid" 
-            className="w-full rounded-md border border-border/30 cursor-pointer hover:opacity-90 transition-opacity"
-            onClick={() => {
-              if (onSetAsMain) {
-                onSetAsMain(compositeGridUrl);
-                toast({ title: 'Composite grid set as main render' });
-              }
-            }}
-          />
-        </div>
-      )}
+      {/* Generate Button */}
+      <div className="px-4 pb-3">
+        <Button
+          variant="default"
+          size="sm"
+          className="w-full text-sm gap-2"
+          onClick={handleGenerateGrid}
+          disabled={isGeneratingGrid || !currentRenderUrl}
+        >
+          {isGeneratingGrid ? (
+            <>
+              <Loader2 className="h-4 w-4 animate-spin" />
+              Generating Grid...
+            </>
+          ) : compositeGridUrl ? (
+            <>
+              <RefreshCw className="h-4 w-4" />
+              Regenerate Grid
+            </>
+          ) : (
+            <>
+              <Grid2X2 className="h-4 w-4" />
+              Generate 2x2 Grid
+            </>
+          )}
+        </Button>
+      </div>
 
-      {/* Export actions */}
-      {(hasAnyViews || compositeGridUrl) && (
-        <div className="p-3 border-t border-border/30 flex gap-2">
+      {/* Export Actions (shown when grid exists) */}
+      {compositeGridUrl && (
+        <div className="px-4 pb-4 flex gap-2">
           <Button
             variant="outline"
             size="sm"
             className="flex-1 text-xs gap-1.5"
-            onClick={handleDownloadAll}
-            disabled={isExporting}
+            onClick={handleDownloadGrid}
           >
-            {isExporting ? <Loader2 className="h-3 w-3 animate-spin" /> : <Download className="h-3 w-3" />}
-            Download All
+            <Download className="h-3 w-3" />
+            Download
           </Button>
           <Button
             variant="outline"
@@ -627,48 +363,15 @@ export function MulticamPanel({
             onClick={handleExportToPPT}
             disabled={isExporting}
           >
-            {isExporting ? <Loader2 className="h-3 w-3 animate-spin" /> : <Presentation className="h-3 w-3" />}
+            {isExporting ? (
+              <Loader2 className="h-3 w-3 animate-spin" />
+            ) : (
+              <Presentation className="h-3 w-3" />
+            )}
             Export PPT
           </Button>
         </div>
       )}
-
-      {/* Quick actions */}
-      <div className="p-3 border-t border-border/30 space-y-2">
-        {/* Generate Composite Grid (recommended - single consistent image) */}
-        <Button
-          variant="default"
-          size="sm"
-          className="w-full text-xs"
-          onClick={handleGenerateAllViews}
-          disabled={isGenerating || isGeneratingAll || !currentRenderUrl}
-        >
-          {isGeneratingAll ? (
-            <Loader2 className="h-3 w-3 mr-2 animate-spin" />
-          ) : (
-            <Grid2X2 className="h-3 w-3 mr-2" />
-          )}
-          {isGeneratingAll ? 'Generating 2x2 Grid...' : 'Generate Composite Grid'}
-        </Button>
-        
-        {/* Individual views (legacy) */}
-        <Button
-          variant="outline"
-          size="sm"
-          className="w-full text-xs"
-          onClick={() => {
-            VIEW_OPTIONS.filter(v => v.id !== 'custom').forEach(v => {
-              if (!generatedViews[v.id]) {
-                handleGenerate(v.id);
-              }
-            });
-          }}
-          disabled={isGenerating || VIEW_OPTIONS.filter(v => v.id !== 'custom').every(v => !!generatedViews[v.id])}
-        >
-          <Camera className="h-3 w-3 mr-2" />
-          Generate Individual Views
-        </Button>
-      </div>
     </div>
   );
 }
