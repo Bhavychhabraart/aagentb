@@ -759,13 +759,13 @@ export function SplitWorkspace({
               )}
 
               {/* Zones Panel */}
-              {showZonesPanel && projectId && onZoneSelect && onStartZoneDrawing && onGenerateZoneView && onToggleZonesPanel && (
+              {showZonesPanel && projectId && onZoneSelect && onToggleZonesPanel && onGenerateZoneView && (
                 <ZonesPanel
                   projectId={projectId}
                   renderUrl={birdEyeRenderUrl}
                   onZoneSelect={onZoneSelect}
                   selectedZoneId={selectedZoneId || null}
-                  onStartDrawing={onStartZoneDrawing}
+                  onEditZones={onToggleZonesPanel}
                   onGenerateZoneView={onGenerateZoneView}
                   isGenerating={isMulticamGenerating}
                   onClose={onToggleZonesPanel}

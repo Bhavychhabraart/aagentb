@@ -1253,6 +1253,7 @@ export type Database = {
           camera_position: string | null
           created_at: string
           id: string
+          layout_reference_url: string | null
           name: string
           polygon_points: Json | null
           project_id: string
@@ -1269,6 +1270,7 @@ export type Database = {
           camera_position?: string | null
           created_at?: string
           id?: string
+          layout_reference_url?: string | null
           name?: string
           polygon_points?: Json | null
           project_id: string
@@ -1285,6 +1287,7 @@ export type Database = {
           camera_position?: string | null
           created_at?: string
           id?: string
+          layout_reference_url?: string | null
           name?: string
           polygon_points?: Json | null
           project_id?: string
