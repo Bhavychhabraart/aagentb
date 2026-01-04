@@ -1,12 +1,9 @@
 import { useState, useEffect } from 'react';
-import { Send, X, Loader2, Crop, Type, Package, Paintbrush, Upload, Eye, Eraser, Plus } from 'lucide-react';
+import { Send, X, Loader2, Crop, Type, Paintbrush, Eye } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { SelectionRegion } from './SelectionOverlay';
-import { SelectiveEditCatalog } from './SelectiveEditCatalog';
 import { SelectiveEditFinishes } from './SelectiveEditFinishes';
-import { SelectiveEditUploader } from './SelectiveEditUploader';
-import { SelectiveEditCreateProduct } from './SelectiveEditCreateProduct';
 import { CatalogFurnitureItem } from '@/services/catalogService';
 import { FinishItem } from '@/services/finishesLibrary';
 import { cn } from '@/lib/utils';
@@ -14,13 +11,13 @@ import { generateSelectionPreview } from '@/utils/generateSelectionMask';
 
 interface SelectiveEditPanelProps {
   selection: SelectionRegion;
-  renderUrl: string; // Current render URL for preview generation
+  renderUrl: string;
   onSubmit: (prompt: string, catalogItem?: CatalogFurnitureItem, referenceImageUrl?: string) => void;
   onCancel: () => void;
   isProcessing: boolean;
 }
 
-type EditMode = 'prompt' | 'catalog' | 'finish' | 'upload' | 'erase' | 'create';
+type EditMode = 'prompt' | 'finish';
 
 export function SelectiveEditPanel({ 
   selection, 
@@ -31,13 +28,9 @@ export function SelectiveEditPanel({
 }: SelectiveEditPanelProps) {
   const [prompt, setPrompt] = useState('');
   const [editMode, setEditMode] = useState<EditMode>('prompt');
-  const [selectedCatalogItem, setSelectedCatalogItem] = useState<CatalogFurnitureItem | null>(null);
   const [selectedFinish, setSelectedFinish] = useState<FinishItem | null>(null);
   const [additionalInstructions, setAdditionalInstructions] = useState('');
-  const [uploadedImageUrls, setUploadedImageUrls] = useState<string[]>([]);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
-  const [createdProductImageUrl, setCreatedProductImageUrl] = useState<string | null>(null);
-  const [createdProductDescription, setCreatedProductDescription] = useState('');
 
   // Generate selection preview when component mounts or selection changes
   useEffect(() => {
@@ -56,13 +49,6 @@ export function SelectiveEditPanel({
       if (prompt.trim()) {
         onSubmit(prompt.trim());
       }
-    } else if (editMode === 'catalog') {
-      if (selectedCatalogItem) {
-        const finalPrompt = additionalInstructions.trim() 
-          ? `Replace with ${selectedCatalogItem.name}. ${additionalInstructions.trim()}`
-          : `Replace with ${selectedCatalogItem.name}`;
-        onSubmit(finalPrompt, selectedCatalogItem);
-      }
     } else if (editMode === 'finish') {
       if (selectedFinish) {
         const finalPrompt = additionalInstructions.trim()
@@ -70,37 +56,10 @@ export function SelectiveEditPanel({
           : `Apply ${selectedFinish.name} (${selectedFinish.category}) finish to this area`;
         onSubmit(finalPrompt);
       }
-    } else if (editMode === 'upload') {
-      if (uploadedImageUrls.length > 0) {
-        const finalPrompt = additionalInstructions.trim()
-          ? `Use these ${uploadedImageUrls.length} reference image(s) to modify the selected area. ${additionalInstructions.trim()}`
-          : `Apply the uploaded reference image(s) to this area`;
-        // Pass the first image URL as the primary reference (edge function will receive all via array)
-        onSubmit(finalPrompt, undefined, uploadedImageUrls[0]);
-      }
-    } else if (editMode === 'erase') {
-      const finalPrompt = additionalInstructions.trim()
-        ? `Remove this element and fill with matching background. ${additionalInstructions.trim()}`
-        : 'Remove this element and fill with matching background that blends naturally with the surroundings';
-      onSubmit(finalPrompt);
-    } else if (editMode === 'create') {
-      if (createdProductImageUrl) {
-        const finalPrompt = additionalInstructions.trim()
-          ? `Replace with custom product: ${createdProductDescription}. ${additionalInstructions.trim()}`
-          : `Replace with custom product: ${createdProductDescription}`;
-        onSubmit(finalPrompt, undefined, createdProductImageUrl);
-      }
     }
   };
 
-  const handleProductGenerated = (imageUrl: string, description: string, category: string) => {
-    // Don't store state - directly submit to prevent double submission via "Apply Edit" button
-    const finalPrompt = `Replace with custom ${category.toLowerCase()}: ${description}`;
-    onSubmit(finalPrompt, undefined, imageUrl);
-  };
-
   // Only allow Enter key to submit in prompt mode (text input)
-  // For other modes, require explicit button click to prevent accidental submission
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Escape') {
       onCancel();
@@ -116,15 +75,7 @@ export function SelectiveEditPanel({
 
   const canSubmit = editMode === 'prompt' 
     ? prompt.trim().length > 0 
-    : editMode === 'catalog'
-      ? selectedCatalogItem !== null
-      : editMode === 'finish'
-        ? selectedFinish !== null
-        : editMode === 'erase'
-          ? true // Erase is always ready
-          : editMode === 'create'
-            ? createdProductImageUrl !== null
-            : uploadedImageUrls.length > 0;
+    : selectedFinish !== null;
 
   return (
     <div className="absolute bottom-[12%] left-1/2 -translate-x-1/2 z-30 w-full max-w-lg px-4">
@@ -170,78 +121,30 @@ export function SelectiveEditPanel({
 
         {/* Mode Toggle */}
         <div className="px-4 pt-3 pb-2">
-          <div className="flex gap-1">
+          <div className="flex gap-2">
             <button
               onClick={() => setEditMode('prompt')}
               className={cn(
-                "flex-1 flex items-center justify-center gap-1 py-2 px-1.5 rounded-lg text-xs font-medium transition-colors",
+                "flex-1 flex items-center justify-center gap-2 py-2.5 px-3 rounded-lg text-sm font-medium transition-colors",
                 editMode === 'prompt'
                   ? "bg-primary text-primary-foreground"
                   : "bg-muted text-muted-foreground hover:bg-muted/80"
               )}
             >
-              <Type className="h-3 w-3" />
+              <Type className="h-4 w-4" />
               Prompt
-            </button>
-            <button
-              onClick={() => setEditMode('catalog')}
-              className={cn(
-                "flex-1 flex items-center justify-center gap-1 py-2 px-1.5 rounded-lg text-xs font-medium transition-colors",
-                editMode === 'catalog'
-                  ? "bg-primary text-primary-foreground"
-                  : "bg-muted text-muted-foreground hover:bg-muted/80"
-              )}
-            >
-              <Package className="h-3 w-3" />
-              Product
             </button>
             <button
               onClick={() => setEditMode('finish')}
               className={cn(
-                "flex-1 flex items-center justify-center gap-1 py-2 px-1.5 rounded-lg text-xs font-medium transition-colors",
+                "flex-1 flex items-center justify-center gap-2 py-2.5 px-3 rounded-lg text-sm font-medium transition-colors",
                 editMode === 'finish'
                   ? "bg-primary text-primary-foreground"
                   : "bg-muted text-muted-foreground hover:bg-muted/80"
               )}
             >
-              <Paintbrush className="h-3 w-3" />
+              <Paintbrush className="h-4 w-4" />
               Finish
-            </button>
-            <button
-              onClick={() => setEditMode('upload')}
-              className={cn(
-                "flex-1 flex items-center justify-center gap-1 py-2 px-1.5 rounded-lg text-xs font-medium transition-colors",
-                editMode === 'upload'
-                  ? "bg-primary text-primary-foreground"
-                  : "bg-muted text-muted-foreground hover:bg-muted/80"
-              )}
-            >
-              <Upload className="h-3 w-3" />
-              Upload
-            </button>
-            <button
-              onClick={() => setEditMode('erase')}
-              className={cn(
-                "flex-1 flex items-center justify-center gap-1 py-2 px-1.5 rounded-lg text-xs font-medium transition-colors",
-                editMode === 'erase'
-                  ? "bg-destructive text-destructive-foreground"
-                  : "bg-muted text-muted-foreground hover:bg-muted/80"
-              )}
-            >
-              <Eraser className="h-3 w-3" />
-              Erase
-            </button>
-            <button
-              onClick={() => setEditMode('create')}
-              className={cn(
-                "flex-1 flex items-center justify-center gap-1 py-2 px-1.5 rounded-lg text-xs font-medium transition-colors",
-                editMode === 'create'
-                  ? "bg-green-600 text-white"
-                  : "bg-muted text-muted-foreground hover:bg-muted/80"
-              )}
-            >
-              <Plus className="h-3 w-3" />
-              Create
             </button>
           </div>
         </div>
@@ -257,26 +160,6 @@ export function SelectiveEditPanel({
               className="min-h-[80px] resize-none mb-3"
               autoFocus
             />
-          )}
-          
-          {editMode === 'catalog' && (
-            <div className="mb-3">
-              <SelectiveEditCatalog
-                selectedItem={selectedCatalogItem}
-                onItemSelect={setSelectedCatalogItem}
-              />
-              
-              {/* Optional additional instructions */}
-              <div className="mt-3">
-                <Textarea
-                  value={additionalInstructions}
-                  onChange={(e) => setAdditionalInstructions(e.target.value)}
-                  placeholder="Optional: Additional instructions (e.g., 'Make it slightly larger' or 'Face towards the left')"
-                  disabled={isProcessing}
-                  className="min-h-[50px] resize-none text-xs"
-                />
-              </div>
-            </div>
           )}
 
           {editMode === 'finish' && (
@@ -298,79 +181,14 @@ export function SelectiveEditPanel({
               </div>
             </div>
           )}
-
-          {editMode === 'upload' && (
-            <div className="mb-3">
-              <SelectiveEditUploader
-                selectedImages={uploadedImageUrls}
-                onImagesChange={setUploadedImageUrls}
-                maxImages={5}
-              />
-              
-              {/* Instructions for how to apply the upload */}
-              <div className="mt-3">
-                <Textarea
-                  value={additionalInstructions}
-                  onChange={(e) => setAdditionalInstructions(e.target.value)}
-                  placeholder="Describe how to apply these images (e.g., 'Use as fabric texture' or 'Replace with this chair')"
-                  disabled={isProcessing}
-                  className="min-h-[50px] resize-none text-xs"
-                />
-              </div>
-            </div>
-          )}
-
-          {editMode === 'erase' && (
-            <div className="mb-3">
-              <div className="bg-destructive/10 border border-destructive/20 rounded-lg p-4 text-center">
-                <Eraser className="h-8 w-8 text-destructive mx-auto mb-2" />
-                <p className="text-sm font-medium text-foreground">Remove Selected Element</p>
-                <p className="text-xs text-muted-foreground mt-1">
-                  The selected area will be erased and filled with matching background
-                </p>
-              </div>
-              
-              {/* Optional additional instructions */}
-              <div className="mt-3">
-                <Textarea
-                  value={additionalInstructions}
-                  onChange={(e) => setAdditionalInstructions(e.target.value)}
-                  placeholder="Optional: Specify what to fill with (e.g., 'empty floor' or 'plain wall')"
-                  disabled={isProcessing}
-                  className="min-h-[50px] resize-none text-xs"
-                />
-              </div>
-            </div>
-          )}
-
-          {editMode === 'create' && (
-            <div className="mb-3">
-              <SelectiveEditCreateProduct
-                onProductGenerated={handleProductGenerated}
-                isDisabled={isProcessing}
-              />
-            </div>
-          )}
           
           <div className="flex items-center justify-between">
             <p className="text-xs text-muted-foreground">
               {editMode === 'prompt' 
                 ? 'Press Enter to apply, Esc to cancel'
-                : editMode === 'catalog'
-                  ? selectedCatalogItem 
-                    ? `Selected: ${selectedCatalogItem.name}`
-                    : 'Select a product, then click Apply Edit'
-                  : editMode === 'finish'
-                    ? selectedFinish
-                      ? `Selected: ${selectedFinish.name}`
-                      : 'Select a finish, then click Apply Edit'
-                    : editMode === 'erase'
-                      ? 'Ready to erase - click Apply Edit'
-                      : editMode === 'create'
-                        ? 'Generate a custom product with AI'
-                        : uploadedImageUrls.length > 0
-                          ? `${uploadedImageUrls.length} image(s) ready - click Apply Edit`
-                          : 'Upload image(s), then click Apply Edit'}
+                : selectedFinish
+                  ? `Selected: ${selectedFinish.name}`
+                  : 'Select a finish, then click Apply Edit'}
             </p>
             <div className="flex gap-2">
               <Button

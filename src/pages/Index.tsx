@@ -1877,9 +1877,9 @@ Ready to generate a render! Describe your vision.`;
       // Call edit-render with actual catalog item images
       const response = await supabase.functions.invoke('edit-render', {
         body: {
-          originalUrl: currentRenderUrl,
-          prompt,
-          stagedItems: selectedItems.map(item => ({
+          currentRenderUrl: currentRenderUrl,
+          userPrompt: prompt,
+          furnitureItems: selectedItems.map(item => ({
             id: item.id,
             name: item.name,
             category: item.category,
