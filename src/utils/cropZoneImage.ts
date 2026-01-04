@@ -14,11 +14,23 @@ export async function cropRectangleFromImage(
     
     img.onload = () => {
       try {
+        // CLAMP coordinates to valid range 0-100
+        const x_start = Math.max(0, Math.min(100, bounds.x_start));
+        const y_start = Math.max(0, Math.min(100, bounds.y_start));
+        const x_end = Math.max(0, Math.min(100, bounds.x_end));
+        const y_end = Math.max(0, Math.min(100, bounds.y_end));
+        
+        console.log('Crop input bounds:', bounds);
+        console.log('Clamped bounds:', { x_start, y_start, x_end, y_end });
+        console.log('Image dimensions:', img.naturalWidth, 'x', img.naturalHeight);
+        
         // Calculate pixel coordinates from percentage values
-        const cropX = (bounds.x_start / 100) * img.naturalWidth;
-        const cropY = (bounds.y_start / 100) * img.naturalHeight;
-        const cropWidth = ((bounds.x_end - bounds.x_start) / 100) * img.naturalWidth;
-        const cropHeight = ((bounds.y_end - bounds.y_start) / 100) * img.naturalHeight;
+        const cropX = (x_start / 100) * img.naturalWidth;
+        const cropY = (y_start / 100) * img.naturalHeight;
+        const cropWidth = ((x_end - x_start) / 100) * img.naturalWidth;
+        const cropHeight = ((y_end - y_start) / 100) * img.naturalHeight;
+        
+        console.log('Crop rectangle (pixels):', { cropX, cropY, cropWidth, cropHeight });
         
         // Create canvas with the cropped dimensions
         const canvas = document.createElement('canvas');
@@ -41,7 +53,7 @@ export async function cropRectangleFromImage(
         // Convert to base64 data URL (JPEG for smaller size)
         const dataUrl = canvas.toDataURL('image/jpeg', 0.95);
         
-        console.log(`Cropped rectangle: ${canvas.width}x${canvas.height}px from (${bounds.x_start.toFixed(1)}%, ${bounds.y_start.toFixed(1)}%) to (${bounds.x_end.toFixed(1)}%, ${bounds.y_end.toFixed(1)}%)`);
+        console.log(`Cropped rectangle: ${canvas.width}x${canvas.height}px from (${x_start.toFixed(1)}%, ${y_start.toFixed(1)}%) to (${x_end.toFixed(1)}%, ${y_end.toFixed(1)}%)`);
         
         resolve(dataUrl);
       } catch (err) {

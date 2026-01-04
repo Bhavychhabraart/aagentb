@@ -174,11 +174,13 @@ export function ZoneSelector({
 
   const handleConfirmZone = () => {
     if (pendingRect && newZoneName.trim()) {
-      // Calculate normalized bounds (ensure start < end)
-      const x_start = Math.min(pendingRect.start.x, pendingRect.end.x);
-      const y_start = Math.min(pendingRect.start.y, pendingRect.end.y);
-      const x_end = Math.max(pendingRect.start.x, pendingRect.end.x);
-      const y_end = Math.max(pendingRect.start.y, pendingRect.end.y);
+      // Calculate normalized bounds (ensure start < end) and CLAMP to 0-100
+      const x_start = Math.max(0, Math.min(100, Math.min(pendingRect.start.x, pendingRect.end.x)));
+      const y_start = Math.max(0, Math.min(100, Math.min(pendingRect.start.y, pendingRect.end.y)));
+      const x_end = Math.max(0, Math.min(100, Math.max(pendingRect.start.x, pendingRect.end.x)));
+      const y_end = Math.max(0, Math.min(100, Math.max(pendingRect.start.y, pendingRect.end.y)));
+      
+      console.log('Zone created with bounds:', { x_start, y_start, x_end, y_end });
       
       // Store as 4 corner points for backwards compatibility
       const polygon_points: PolygonPoint[] = [

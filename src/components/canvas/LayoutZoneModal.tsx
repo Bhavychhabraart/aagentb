@@ -275,8 +275,8 @@ export function LayoutZoneModal({
             zone={previewZone}
             layoutImageUrl={layoutImageUrl}
             isGenerating={isGenerating}
-            onConfirm={() => {
-              onGenerateZoneView(previewZone, 'detail');
+            onConfirm={(viewType) => {
+              onGenerateZoneView(previewZone, viewType);
               setPreviewZone(null);
               onClose();
             }}
