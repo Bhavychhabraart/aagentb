@@ -10,6 +10,7 @@ import { ZonePreviewConfirm } from './ZonePreviewConfirm';
 interface ZonesPanelProps {
   projectId: string;
   renderUrl: string | null;
+  layoutImageUrl: string | null;
   onZoneSelect: (zone: Zone | null) => void;
   selectedZoneId: string | null;
   onEditZones: () => void;
@@ -21,6 +22,7 @@ interface ZonesPanelProps {
 export function ZonesPanel({
   projectId,
   renderUrl,
+  layoutImageUrl,
   onZoneSelect,
   selectedZoneId,
   onEditZones,
@@ -220,10 +222,10 @@ export function ZonesPanel({
       )}
 
       {/* Zone Preview Confirmation Modal */}
-      {previewZone && renderUrl && (
+      {previewZone && layoutImageUrl && (
         <ZonePreviewConfirm
           zone={previewZone}
-          renderUrl={renderUrl}
+          layoutImageUrl={layoutImageUrl}
           isGenerating={isGenerating}
           onConfirm={() => {
             onGenerateZoneView(previewZone);

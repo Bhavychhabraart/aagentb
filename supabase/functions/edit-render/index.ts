@@ -138,8 +138,10 @@ serve(async (req) => {
       textOnlyEdit = false, // NEW: For text-only edits without furniture
       focusRegion, // For zone-focused camera views { x, y, width, height } as percentages
       viewType = 'detail', // Type of camera view: detail, cinematic, eye-level, dramatic, bird-eye
-      zoneImageBase64, // NEW: Cropped zone image for accurate zone reproduction
-      preserveAspectRatio, // NEW: Aspect ratio to preserve from source image (e.g., '16:9', '4:3', '1:1')
+      zoneImageBase64, // Cropped zone image for accurate zone reproduction (from render)
+      layoutZoneBase64, // NEW: Cropped zone from 2D layout (source of truth for layout-based zones)
+      layoutBasedZone = false, // NEW: Flag indicating this is a layout-based zone generation
+      preserveAspectRatio, // Aspect ratio to preserve from source image (e.g., '16:9', '4:3', '1:1')
     } = await req.json();
 
     // Use provided aspect ratio or default to 16:9
@@ -169,6 +171,8 @@ serve(async (req) => {
     console.log('Reference image:', referenceImageUrl ? 'provided' : 'none');
     console.log('Focus region:', focusRegion ? `${focusRegion.x}%,${focusRegion.y}% (${focusRegion.width}%×${focusRegion.height}%)` : 'none');
     console.log('View type:', viewType);
+    console.log('Layout-based zone:', layoutBasedZone);
+    console.log('Layout zone image:', layoutZoneBase64 ? 'provided (base64)' : 'none');
     console.log('Edit instruction length:', userPrompt?.length || 0);
 
     // Handle TEXT-ONLY EDIT mode (no furniture items, just a prompt)
@@ -272,31 +276,113 @@ Output: The edited room image with ultra-photorealistic quality.`;
     // Handle ZONE FOCUS / CAMERA VIEW mode - for generating focused views of specific regions
     if (focusRegion && userPrompt && !maskRegion) {
       console.log('Using ZONE FOCUS mode with viewType:', viewType);
-      console.log('Zone image provided:', zoneImageBase64 ? 'yes (base64)' : 'no');
+      console.log('Layout-based zone:', layoutBasedZone);
+      console.log('Layout zone image provided:', layoutZoneBase64 ? 'yes (base64)' : 'no');
+      console.log('Render zone image provided:', zoneImageBase64 ? 'yes (base64)' : 'no');
       
       const content: Array<{ type: string; text?: string; image_url?: { url: string } }> = [];
       let imageIndex = 1;
       
-      // IMAGE 1: Full room render (for context)
-      content.push({ type: 'image_url', image_url: { url: currentRenderUrl } });
-      const fullRoomIndex = imageIndex++;
-      
-      // IMAGE 2: Cropped zone image (the EXACT content to reproduce) - if provided
-      let zoneIndex: number | null = null;
-      if (zoneImageBase64) {
-        content.push({ type: 'image_url', image_url: { url: zoneImageBase64 } });
-        zoneIndex = imageIndex++;
-        console.log('Added cropped zone image as IMAGE', zoneIndex);
-      }
-      
       // Build view-specific camera instructions using the detailed presets
       const viewInstruction = CAMERA_INSTRUCTIONS[viewType] || CAMERA_INSTRUCTIONS['detail'];
       
-      // Build prompt based on whether we have the cropped zone image
+      // Build prompt based on whether this is a layout-based zone generation
       let zonePrompt: string;
       
-      if (zoneIndex) {
-        // We have the cropped zone - use it as the primary reference
+      if (layoutBasedZone && layoutZoneBase64) {
+        // LAYOUT-BASED ZONE GENERATION - Uses 2D layout as source of truth
+        console.log('Using LAYOUT-BASED zone generation mode');
+        
+        // IMAGE 1: Cropped zone from 2D layout (the source of truth)
+        content.push({ type: 'image_url', image_url: { url: layoutZoneBase64 } });
+        const layoutZoneIndex = imageIndex++;
+        
+        // IMAGE 2: Full 2D layout for context (if available)
+        let fullLayoutIndex: number | null = null;
+        if (layoutImageUrl) {
+          content.push({ type: 'image_url', image_url: { url: layoutImageUrl } });
+          fullLayoutIndex = imageIndex++;
+        }
+        
+        // IMAGE 3: Current render for style reference (if available and different from layout)
+        let renderIndex: number | null = null;
+        if (currentRenderUrl && currentRenderUrl !== layoutImageUrl) {
+          content.push({ type: 'image_url', image_url: { url: currentRenderUrl } });
+          renderIndex = imageIndex++;
+        }
+        
+        zonePrompt = `You are an expert interior designer and architectural renderer creating magazine-quality 3D visualizations from 2D floor plans.
+
+IMAGES PROVIDED:
+- IMAGE ${layoutZoneIndex}: CROPPED 2D FLOOR PLAN ZONE - THIS IS THE EXACT AREA YOU MUST RENDER IN 3D
+${fullLayoutIndex ? `- IMAGE ${fullLayoutIndex}: Full 2D floor plan (for overall spatial context)` : ''}
+${renderIndex ? `- IMAGE ${renderIndex}: Existing 3D render of the room (for style/material reference)` : ''}
+
+═══════════════════════════════════════════════════════════════
+     LAYOUT-TO-3D ZONE RENDER - HIGHEST ACCURACY MODE
+═══════════════════════════════════════════════════════════════
+
+YOUR TASK:
+Transform the cropped 2D floor plan zone (IMAGE ${layoutZoneIndex}) into a photorealistic 3D interior render.
+
+CRITICAL INTERPRETATION REQUIREMENTS:
+
+1. FLOOR PLAN READING (HIGHEST PRIORITY):
+   - Interpret ALL furniture symbols, shapes, and icons from the 2D layout
+   - Rectangular shapes = tables, desks, beds, sofas (based on proportions)
+   - Circles/ovals = occasional tables, rugs, or seating arrangements
+   - Small squares near walls = chairs, side tables, plants
+   - Dashed lines = ceiling features, overhead elements
+   - Wall openings = windows or doors (interpret contextually)
+
+2. SPATIAL ACCURACY:
+   - Maintain EXACT proportions and positions from the floor plan
+   - Furniture placement must match the 2D layout precisely
+   - Wall lengths and room shape must be accurate
+   - DO NOT add, remove, or reposition any elements
+
+3. 3D INTERPRETATION:
+   - Convert 2D symbols into appropriate 3D furniture pieces
+   - Use contextually appropriate furniture styles (modern, traditional, etc.)
+   - Apply realistic materials: wood, fabric, metal, glass as appropriate
+   - Add ceiling, lighting fixtures, and architectural details
+
+4. PHOTOREALISTIC QUALITY:
+   - RED Cinema Camera / Architectural Digest magazine quality
+   - 8K resolution equivalent with natural depth of field
+   - Ray-traced global illumination with realistic shadows
+   - Physically-based materials with accurate reflections
+
+5. CAMERA VIEW:
+   ${viewInstruction}
+   - Frame the shot to feature the zone prominently
+   - Use natural, professional interior photography composition
+
+${renderIndex ? `6. STYLE MATCHING:
+   - Match the visual style, color palette, and materials from IMAGE ${renderIndex}
+   - Use similar lighting mood and atmosphere
+   - Maintain design consistency with existing renders` : ''}
+
+ADDITIONAL DIRECTION: ${userPrompt}
+
+⚠️ CRITICAL ANTI-ILLUSTRATION DIRECTIVE:
+NEVER produce cartoon, illustrated, stylized, CGI, or video game aesthetics.
+Output MUST be indistinguishable from professional architectural photography.
+
+OUTPUT: A photorealistic 3D render of the floor plan zone with accurate furniture placement.
+═══════════════════════════════════════════════════════════════`;
+      } else if (zoneImageBase64) {
+        // RENDER-BASED ZONE (existing behavior) - Uses cropped render as reference
+        console.log('Using RENDER-BASED zone generation mode (legacy)');
+        
+        // IMAGE 1: Full room render (for context)
+        content.push({ type: 'image_url', image_url: { url: currentRenderUrl } });
+        const fullRoomIndex = imageIndex++;
+        
+        // IMAGE 2: Cropped zone image from render
+        content.push({ type: 'image_url', image_url: { url: zoneImageBase64 } });
+        const zoneIndex = imageIndex++;
+        
         zonePrompt = `You are an expert architectural photographer creating magazine-quality interior photography.
 
 IMAGES PROVIDED:
@@ -347,6 +433,11 @@ QUALITY CHECK: Output will be REJECTED if it looks illustrated, cartoon, or CGI.
 ═══════════════════════════════════════════════════════════════`;
       } else {
         // Fallback: No cropped zone image, use coordinate-based approach
+        console.log('Using COORDINATE-BASED zone generation mode (fallback)');
+        
+        content.push({ type: 'image_url', image_url: { url: currentRenderUrl } });
+        const fullRoomIndex = imageIndex++;
+        
         zonePrompt = `You are a professional interior photography director. Create a new camera view of this room focusing on a specific zone.
 
 CURRENT ROOM IMAGE (IMAGE ${fullRoomIndex}): The attached image shows the full room.
@@ -417,7 +508,7 @@ Output: A photorealistic interior photograph showing the focused view of the spe
         throw new Error('No image generated from zone focus request');
       }
 
-      console.log('Zone focus view completed successfully:', viewType, zoneIndex ? '(with zone image reference)' : '(coordinates only)');
+      console.log('Zone focus view completed successfully:', viewType, layoutBasedZone ? '(layout-based)' : (zoneImageBase64 ? '(render-based)' : '(coordinates only)'));
       return new Response(JSON.stringify({ imageUrl, mode: 'zone-focus', viewType }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });

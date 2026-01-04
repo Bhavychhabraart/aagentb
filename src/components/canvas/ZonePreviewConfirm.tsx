@@ -6,7 +6,7 @@ import { Zone } from './ZoneSelector';
 
 interface ZonePreviewConfirmProps {
   zone: Zone;
-  renderUrl: string;
+  layoutImageUrl: string;
   onConfirm: () => void;
   onCancel: () => void;
   isGenerating: boolean;
@@ -14,7 +14,7 @@ interface ZonePreviewConfirmProps {
 
 export function ZonePreviewConfirm({
   zone,
-  renderUrl,
+  layoutImageUrl,
   onConfirm,
   onCancel,
   isGenerating,
@@ -31,11 +31,12 @@ export function ZonePreviewConfirm({
         let cropped: string;
         
         // Use polygon cropping if polygon points exist, otherwise fall back to rectangle
+        // Crop from the LAYOUT image (not the render)
         if (zone.polygon_points && zone.polygon_points.length >= 3) {
-          cropped = await cropPolygonFromRender(renderUrl, zone.polygon_points);
+          cropped = await cropPolygonFromRender(layoutImageUrl, zone.polygon_points);
         } else {
           // Fallback for legacy rectangular zones
-          cropped = await cropZoneFromRender(renderUrl, {
+          cropped = await cropZoneFromRender(layoutImageUrl, {
             x: zone.x_start,
             y: zone.y_start,
             width: zone.x_end - zone.x_start,
@@ -53,7 +54,7 @@ export function ZonePreviewConfirm({
     };
 
     loadPreview();
-  }, [zone, renderUrl]);
+  }, [zone, layoutImageUrl]);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
@@ -63,7 +64,7 @@ export function ZonePreviewConfirm({
           <div>
             <h3 className="text-sm font-semibold">Zone Preview</h3>
             <p className="text-xs text-muted-foreground mt-0.5">
-              Confirm this is the correct area
+              This area from your layout will be rendered
             </p>
           </div>
           <Button

@@ -237,7 +237,7 @@ export function LayoutZoneModal({
                             e.stopPropagation();
                             setPreviewZone(zone);
                           }}
-                          disabled={isGenerating || !renderUrl}
+                          disabled={isGenerating}
                           title="Generate view of this zone"
                         >
                           <Camera className="h-3.5 w-3.5" />
@@ -265,10 +265,7 @@ export function LayoutZoneModal({
             {zones.length > 0 && (
               <div className="p-4 border-t border-border">
                 <p className="text-xs text-muted-foreground text-center">
-                  {renderUrl 
-                    ? "Click the camera icon to generate focused views"
-                    : "Generate a render first to create zone views"
-                  }
+                  Click the camera icon to generate focused views from layout zones
                 </p>
               </div>
             )}
@@ -276,10 +273,10 @@ export function LayoutZoneModal({
         </div>
 
         {/* Zone Preview Confirmation Modal */}
-        {previewZone && renderUrl && (
+        {previewZone && layoutImageUrl && (
           <ZonePreviewConfirm
             zone={previewZone}
-            renderUrl={renderUrl}
+            layoutImageUrl={layoutImageUrl}
             isGenerating={isGenerating}
             onConfirm={() => {
               onGenerateZoneView(previewZone, 'detail');

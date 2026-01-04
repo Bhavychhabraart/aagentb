@@ -47,7 +47,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { cropZoneFromRender } from '@/utils/cropZoneImage';
+import { cropZoneFromRender, cropPolygonFromRender } from '@/utils/cropZoneImage';
 import { getImageAspectRatio } from '@/utils/imageAspectRatio';
 import {
   getMemorySettings,
@@ -2507,8 +2507,8 @@ ABSOLUTE REQUIREMENTS FOR CONSISTENCY:
 
   // Generate a focused render of a zone with specific view type
   const handleGenerateZoneView = useCallback(async (zone: Zone, viewType: ViewType = 'detail') => {
-    if (!user || !currentProjectId || !currentRenderUrl) {
-      toast({ variant: 'destructive', title: 'Error', description: 'Generate a render first to create zone views' });
+    if (!user || !currentProjectId || !layoutImageUrl) {
+      toast({ variant: 'destructive', title: 'Error', description: 'Upload a layout first to create zone views' });
       return;
     }
 
@@ -2536,28 +2536,34 @@ ABSOLUTE REQUIREMENTS FOR CONSISTENCY:
 
       if (renderError) throw renderError;
 
-      // Crop the zone from the current render to provide visual reference
-      await addMessage('user', `🎯 Cropping zone "${zone.name}" for accurate rendering...`, { type: 'text' });
+      // Crop the zone from the LAYOUT IMAGE (not the render) to provide visual reference
+      await addMessage('user', `🎯 Cropping zone "${zone.name}" from layout for accurate rendering...`, { type: 'text' });
       
-      let zoneImageBase64: string | null = null;
+      let layoutZoneBase64: string | null = null;
       try {
-        zoneImageBase64 = await cropZoneFromRender(currentRenderUrl, {
-          x: zone.x_start,
-          y: zone.y_start,
-          width: zone.x_end - zone.x_start,
-          height: zone.y_end - zone.y_start,
-        });
-        console.log('Zone cropped successfully, sending to AI for accurate reproduction');
+        // Use polygon cropping if available, otherwise fall back to rectangle
+        if (zone.polygon_points && zone.polygon_points.length >= 3 && layoutImageUrl) {
+          layoutZoneBase64 = await cropPolygonFromRender(layoutImageUrl, zone.polygon_points);
+          console.log('Zone cropped from layout (polygon) successfully');
+        } else if (layoutImageUrl) {
+          layoutZoneBase64 = await cropZoneFromRender(layoutImageUrl, {
+            x: zone.x_start,
+            y: zone.y_start,
+            width: zone.x_end - zone.x_start,
+            height: zone.y_end - zone.y_start,
+          });
+          console.log('Zone cropped from layout (rectangle) successfully');
+        }
       } catch (cropError) {
-        console.warn('Failed to crop zone, proceeding without visual reference:', cropError);
+        console.warn('Failed to crop zone from layout, proceeding without visual reference:', cropError);
       }
 
-      const zonePrompt = `Generate a ${viewLabel.toLowerCase()} view showing EXACTLY the content from the cropped zone image. Zone: "${zone.name}".`;
+      const zonePrompt = `Generate a photorealistic 3D render of this specific area from the 2D floor plan. Zone: "${zone.name}". Interpret the 2D layout and create an immersive ${viewLabel.toLowerCase()} perspective view.`;
 
       await addMessage('user', `🎯 Generating ${viewLabel} view for zone: ${zone.name}...`, { type: 'text' });
 
-      // Detect aspect ratio to preserve from source image
-      const sourceAspectRatio = await getImageAspectRatio(currentRenderUrl);
+      // Detect aspect ratio to preserve from source image (use render if exists, otherwise default)
+      const sourceAspectRatio = currentRenderUrl ? await getImageAspectRatio(currentRenderUrl) : '16:9';
 
       const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/edit-render`, {
         method: 'POST',
@@ -2566,7 +2572,9 @@ ABSOLUTE REQUIREMENTS FOR CONSISTENCY:
           'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
         },
         body: JSON.stringify({
-          currentRenderUrl: currentRenderUrl,
+          currentRenderUrl: currentRenderUrl || layoutImageUrl, // Use layout as base if no render
+          layoutImageUrl: layoutImageUrl, // Full layout for context
+          layoutZoneBase64: layoutZoneBase64, // Cropped layout section (the source of truth)
           userPrompt: zonePrompt,
           focusRegion: {
             x: zone.x_start,
@@ -2574,10 +2582,10 @@ ABSOLUTE REQUIREMENTS FOR CONSISTENCY:
             width: zone.x_end - zone.x_start,
             height: zone.y_end - zone.y_start,
           },
-          zoneImageBase64: zoneImageBase64, // Pass cropped zone as visual reference
           viewType: viewType,
           styleRefUrls: styleRefUrls,
           preserveAspectRatio: sourceAspectRatio,
+          layoutBasedZone: true, // Flag to use layout-based generation
         }),
       });
 
@@ -2618,7 +2626,7 @@ ABSOLUTE REQUIREMENTS FOR CONSISTENCY:
       setGeneratingZoneName(null);
       setGeneratingViewType(null);
     }
-  }, [user, currentProjectId, currentRenderUrl, currentRenderId, currentUpload, styleRefUrls, addMessage, toast, loadAllRenders]);
+  }, [user, currentProjectId, currentRenderUrl, currentRenderId, currentUpload, styleRefUrls, layoutImageUrl, addMessage, toast, loadAllRenders]);
 
   // =========== CAMERA CRUD OPERATIONS ===========
 
