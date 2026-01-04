@@ -2638,12 +2638,20 @@ ABSOLUTE REQUIREMENTS FOR CONSISTENCY:
   const loadCameras = useCallback(async () => {
     if (!currentProjectId) return;
     
-    const { data, error } = await supabase
+    let query = supabase
       .from('cameras')
       .select('*')
       .eq('project_id', currentProjectId)
-      .eq('room_id', currentRoomId)
       .order('created_at', { ascending: true });
+    
+    // Use .is() for null, .eq() for non-null values (PostgreSQL requires IS NULL syntax)
+    if (currentRoomId === null) {
+      query = query.is('room_id', null);
+    } else {
+      query = query.eq('room_id', currentRoomId);
+    }
+    
+    const { data, error } = await query;
     
     if (error) {
       console.error('Failed to load cameras:', error);
