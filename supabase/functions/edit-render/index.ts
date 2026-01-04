@@ -142,6 +142,7 @@ serve(async (req) => {
       layoutZoneBase64, // NEW: Cropped zone from 2D layout (source of truth for layout-based zones)
       layoutBasedZone = false, // NEW: Flag indicating this is a layout-based zone generation
       preserveAspectRatio, // Aspect ratio to preserve from source image (e.g., '16:9', '4:3', '1:1')
+      batchMarkers, // Batch marker staging - array of { position: {x,y}, product: {...} }
     } = await req.json();
 
     // Use provided aspect ratio or default to 16:9
@@ -738,15 +739,15 @@ Output: The FULL edited image (same dimensions as input) with ONLY the masked/sp
     // BATCH MARKER STAGING MODE - Gemini 3 Pro
     // =============================================
     // Handle batch marker staging - multiple products placed at specific coordinates in one call
-    const requestBody = await req.clone().json().catch(() => ({}));
-    const batchMarkers = requestBody.batchMarkers as Array<{
+    // batchMarkers is already destructured from the initial req.json() call above
+    const typedBatchMarkers = batchMarkers as Array<{
       position: { x: number; y: number };
       product: { name: string; category: string; description?: string; imageUrl: string };
     }> | undefined;
 
-    if (batchMarkers && batchMarkers.length > 0) {
+    if (typedBatchMarkers && typedBatchMarkers.length > 0) {
       console.log('Using BATCH MARKER STAGING mode with Gemini 3 Pro');
-      console.log('Number of markers:', batchMarkers.length);
+      console.log('Number of markers:', typedBatchMarkers.length);
 
       const content: Array<{ type: string; text?: string; image_url?: { url: string } }> = [];
       let imageIndex = 1;
@@ -756,10 +757,10 @@ Output: The FULL edited image (same dimensions as input) with ONLY the masked/sp
       const baseImageIndex = imageIndex++;
 
       // Add product reference images
-      const productImageRefs: Array<{ markerIdx: number; imageIdx: number; product: typeof batchMarkers[0]['product'] }> = [];
+      const productImageRefs: Array<{ markerIdx: number; imageIdx: number; product: typeof typedBatchMarkers[0]['product'] }> = [];
       
-      for (let i = 0; i < batchMarkers.length; i++) {
-        const marker = batchMarkers[i];
+      for (let i = 0; i < typedBatchMarkers.length; i++) {
+        const marker = typedBatchMarkers[i];
         if (marker.product.imageUrl) {
           content.push({ type: 'image_url', image_url: { url: marker.product.imageUrl } });
           productImageRefs.push({
@@ -772,7 +773,7 @@ Output: The FULL edited image (same dimensions as input) with ONLY the masked/sp
 
       // Build the batch prompt
       const replacementList = productImageRefs.map((ref, idx) => {
-        const marker = batchMarkers[ref.markerIdx];
+        const marker = typedBatchMarkers[ref.markerIdx];
         const posDesc = getPositionDescription(marker.position.x, marker.position.y);
         return `${idx + 1}. At coordinates (${Math.round(marker.position.x)}%, ${Math.round(marker.position.y)}%): Place "${ref.product.name}" (${ref.product.category}) → Reference: IMAGE ${ref.imageIdx}
    - Position: ${posDesc}
@@ -793,7 +794,7 @@ Output: The FULL edited image (same dimensions as input) with ONLY the masked/sp
 5. Preserve ALL architectural elements (walls, windows, doors, floor) EXACTLY
 
 ═══════════════════════════════════════════════════════════════
-     BATCH FURNITURE REPLACEMENT - ${batchMarkers.length} ITEMS
+     BATCH FURNITURE REPLACEMENT - ${typedBatchMarkers.length} ITEMS
 ═══════════════════════════════════════════════════════════════
 
 BASE IMAGE: The room to modify (IMAGE ${baseImageIndex})

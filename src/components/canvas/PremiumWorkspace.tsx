@@ -25,7 +25,8 @@ import {
   Plus,
   X,
   Trash2,
-  Columns2
+  Columns2,
+  Target
 } from 'lucide-react';
 import { RenderHistoryCarousel, RenderHistoryItem } from './RenderHistoryCarousel';
 import { CatalogFurnitureItem } from '@/services/catalogService';
@@ -109,6 +110,9 @@ interface PremiumWorkspaceProps {
   onStartOver?: () => void;
   onUpscale?: () => void;
   isUpscaling?: boolean;
+  // Marker staging props
+  onToggleMarkerStaging?: () => void;
+  showMarkerStaging?: boolean;
 }
 
 interface ToolbarItem {
@@ -173,6 +177,9 @@ export function PremiumWorkspace({
   onStartOver,
   onUpscale,
   isUpscaling,
+  // Marker staging props
+  onToggleMarkerStaging,
+  showMarkerStaging,
 }: PremiumWorkspaceProps) {
   const [showDirectorInput, setShowDirectorInput] = useState(false);
   const [directorPrompt, setDirectorPrompt] = useState('');
@@ -279,6 +286,16 @@ export function PremiumWorkspace({
       disabled: !onPositionFurniture || stagedItemsCount === 0,
       active: stagedItemsCount > 0,
       shortcut: 'P',
+      group: 'placement',
+    },
+    {
+      id: 'markers',
+      icon: Target,
+      label: 'Markers',
+      onClick: onToggleMarkerStaging,
+      disabled: !renderUrl || isGenerating,
+      active: showMarkerStaging,
+      shortcut: 'M',
       group: 'placement',
     },
   ];

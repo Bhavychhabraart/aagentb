@@ -3606,6 +3606,8 @@ ABSOLUTE REQUIREMENTS FOR CONSISTENCY:
             onStartOver={() => setShowStartOverDialog(true)}
             onUpscale={handleUpscaleRender}
             isUpscaling={isUpscaling}
+            onToggleMarkerStaging={() => setShowMarkerStaging(prev => !prev)}
+            showMarkerStaging={showMarkerStaging}
           />
 
           {/* Selection is now handled inside PremiumWorkspace */}
@@ -3683,7 +3685,6 @@ ABSOLUTE REQUIREMENTS FOR CONSISTENCY:
                 onClearAll={handleClearStagedItems}
                 onRemoveItem={handleCatalogItemSelect}
                 onViewAll={() => setShowStagedItemsModal(true)}
-                onPlaceMarkers={() => setShowMarkerStaging(true)}
                 canPosition={!!(currentRenderUrl || roomPhotoUrl)}
                 isGenerating={isGenerating}
               />
