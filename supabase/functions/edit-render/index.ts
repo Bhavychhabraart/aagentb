@@ -237,7 +237,7 @@ Output: The edited room image with ultra-photorealistic quality.`;
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          model: 'google/gemini-3-pro-image-preview',
+          model: 'google/gemini-2.5-flash-image-preview',
           messages: [{ role: 'user', content }],
           modalities: ['image', 'text'],
           generationConfig: { aspectRatio: outputAspectRatio }
@@ -501,7 +501,7 @@ Output: A photorealistic interior photograph showing the focused view of the spe
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          model: 'google/gemini-3-pro-image-preview',
+          model: 'google/gemini-2.5-flash-image-preview',
           messages: [{ role: 'user', content }],
           modalities: ['image', 'text'],
           generationConfig: { aspectRatio: outputAspectRatio }
@@ -685,7 +685,7 @@ Output: The edited image with ONLY the masked/specified region modified.`;
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          model: 'google/gemini-3-pro-image-preview',
+          model: 'google/gemini-2.5-flash-image-preview',
           messages: [{ role: 'user', content }],
           modalities: ['image', 'text'],
           generationConfig: { aspectRatio: outputAspectRatio },
@@ -912,7 +912,7 @@ Output: ONLY the final ultra-photorealistic image.`;
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          model: 'google/gemini-3-pro-image-preview',
+          model: 'google/gemini-2.5-flash-image-preview',
           messages: [{ role: 'user', content }],
           modalities: ['image', 'text'],
           generationConfig: { aspectRatio: outputAspectRatio }
@@ -1129,7 +1129,7 @@ Output: ONLY the final ultra-photorealistic image.`;
         'Content-Type': 'application/json',
       },
         body: JSON.stringify({
-          model: 'google/gemini-3-pro-image-preview',
+          model: 'google/gemini-2.5-flash-image-preview',
           messages: [{ role: 'user', content }],
           modalities: ['image', 'text'],
           generationConfig: { aspectRatio: outputAspectRatio }
