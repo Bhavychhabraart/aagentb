@@ -680,15 +680,16 @@ export function PremiumWorkspace({
 
         {/* Multicam Panel - Floating Bottom Left */}
         {showMulticamPanel && renderUrl && onMulticamGenerate && onToggleMulticamPanel && (
-          <MulticamPanel
-            onGenerateView={onMulticamGenerate}
-            isGenerating={isMulticamGenerating || false}
-            generatedViews={multicamViews}
-            onSelectView={(view, url) => onSetMulticamAsMain?.(url)}
-            onClose={onToggleMulticamPanel}
-            onSetAsMain={onSetMulticamAsMain}
-            projectId={projectId}
-          />
+              <MulticamPanel
+                onGenerateView={onMulticamGenerate}
+                isGenerating={isMulticamGenerating || false}
+                generatedViews={multicamViews}
+                onSelectView={(view, url) => onSetMulticamAsMain?.(url)}
+                onClose={onToggleMulticamPanel}
+                onSetAsMain={onSetMulticamAsMain}
+                projectId={projectId}
+                currentRenderUrl={renderUrl}
+              />
         )}
 
         {/* Zones Panel - Floating Right */}
