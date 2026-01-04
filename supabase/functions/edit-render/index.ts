@@ -584,19 +584,25 @@ Use this mask as a precise boundary for your edits.`
         selectivePrompt = `You are an expert architectural photographer performing precision INPAINTING.
 
 ═══════════════════════════════════════════════════════════════
+     ⚠️⚠️⚠️ ABSOLUTE CRITICAL - IMAGE PRESERVATION ⚠️⚠️⚠️
+═══════════════════════════════════════════════════════════════
+
+🚨 NON-NEGOTIABLE RULES - VIOLATION = COMPLETE FAILURE:
+1. OUTPUT IMAGE MUST HAVE **IDENTICAL DIMENSIONS** AS IMAGE ${renderIndex}
+2. DO NOT CROP, ZOOM, PAN, TILT, OR REFRAME THE IMAGE - ANY CROPPING IS WRONG
+3. The ENTIRE original room must be visible in output - same framing, same boundaries
+4. If the input is 1920x1080, output MUST be 1920x1080 - EXACT SAME PIXELS
+5. Keep the EXACT same camera angle and field of view
+
+═══════════════════════════════════════════════════════════════
      MANDATORY: ULTRA-PHOTOREALISTIC OUTPUT QUALITY
 ═══════════════════════════════════════════════════════════════
 
 RENDERING STYLE: RED Cinema Camera / Architectural Digest quality
 ⚠️ NEVER produce cartoon, illustrated, or CGI-looking results
 
-⚠️ CRITICAL IMAGE PRESERVATION:
-- The output image MUST have the EXACT same dimensions, framing, and boundaries as IMAGE ${renderIndex}
-- Do NOT crop, zoom, pan, or reframe the image in any way
-- Maintain the EXACT same field of view as the input image
-
 IMAGES PROVIDED:
-- IMAGE ${renderIndex}: The room to edit
+- IMAGE ${renderIndex}: The room to edit (PRESERVE EXACT DIMENSIONS AND FRAMING)
 ${maskIndex ? `- IMAGE ${maskIndex}: BLACK & WHITE MASK (WHITE = edit zone, BLACK = preserve unchanged)` : ''}
 - IMAGE ${refIndex}: The product to place (COPY THIS EXACTLY)
 
@@ -617,17 +623,17 @@ CRITICAL INPAINTING RULES:
 4. Blend edges seamlessly with ray-traced lighting and realistic shadows
 5. Materials must look physically accurate with proper reflections
 6. Apply photorealistic shadows matching the room's lighting direction
-7. NEVER crop, zoom, or change the image boundaries
+7. 🚨 NEVER CROP OR ZOOM - output must show the ENTIRE ROOM exactly as input
 
 ${userPrompt ? `ADDITIONAL INSTRUCTIONS: ${userPrompt}` : ''}
 
-QUALITY CHECK: 
-- Areas outside edit zone must be IDENTICAL to IMAGE ${renderIndex}
-- Result MUST look like professional photography, NOT illustration
-- Materials must be physically accurate and tangible
-- Output dimensions and framing MUST match input exactly
+FINAL QUALITY CHECK: 
+✓ Output dimensions = Input dimensions (EXACT MATCH REQUIRED)
+✓ Areas outside edit zone = IDENTICAL to IMAGE ${renderIndex}
+✓ Result = professional photography, NOT illustration
+✓ Entire room visible with same boundaries as input
 
-Output: Ultra-photorealistic room image with ONLY the masked region modified.`;
+Output: The FULL room image (same dimensions) with ONLY the masked region modified.`;
       } else if (referenceImageUrl) {
         // Upload-based selective edit with reference image
         selectivePrompt = `You are a precise image editor performing INPAINTING. Apply the reference image to the masked region.
@@ -655,8 +661,13 @@ Output: The room with ONLY the masked/specified region modified using the refere
         // Text-based selective edit
         selectivePrompt = `You are a precise image editor performing INPAINTING. Edit ONLY the masked region of this room image.
 
+⚠️ CRITICAL - DO NOT CROP OR ZOOM:
+- Output image MUST have EXACT same dimensions as IMAGE ${renderIndex}
+- Keep the ENTIRE room visible with same framing and boundaries
+- NO cropping, zooming, panning, or reframing allowed
+
 IMAGES PROVIDED:
-- IMAGE ${renderIndex}: The room to edit
+- IMAGE ${renderIndex}: The room to edit (PRESERVE EXACT DIMENSIONS)
 ${maskIndex ? `- IMAGE ${maskIndex}: BLACK & WHITE MASK (WHITE = edit zone, BLACK = preserve unchanged)` : ''}
 
 REGION TO EDIT:
@@ -672,8 +683,9 @@ CRITICAL INPAINTING RULES:
 3. Maintain consistent lighting, shadows, and perspective with surrounding areas
 4. The edit should blend seamlessly with the rest of the image
 5. Preserve the same camera angle and image quality
+6. 🚨 Output dimensions MUST match input dimensions exactly
 
-Output: The edited image with ONLY the masked/specified region modified.`;
+Output: The FULL edited image (same dimensions as input) with ONLY the masked/specified region modified.`;
       }
 
       content.push({ type: 'text', text: selectivePrompt });

@@ -8,7 +8,8 @@ import {
   X, 
   ChevronUp, 
   ChevronDown,
-  Trash2
+  Trash2,
+  Maximize2
 } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -19,6 +20,7 @@ interface StagedItemsDockProps {
   onGenerateWithItems: () => void;
   onClearAll: () => void;
   onRemoveItem: (item: CatalogFurnitureItem) => void;
+  onViewAll: () => void;
   canPosition: boolean;
   isGenerating?: boolean;
 }
@@ -29,6 +31,7 @@ export function StagedItemsDock({
   onGenerateWithItems,
   onClearAll,
   onRemoveItem,
+  onViewAll,
   canPosition,
   isGenerating,
 }: StagedItemsDockProps) {
@@ -66,6 +69,22 @@ export function StagedItemsDock({
                 </span>
               </div>
               <div className="flex items-center gap-2">
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      className="h-7 w-7 p-0"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onViewAll();
+                      }}
+                    >
+                      <Maximize2 className="h-3.5 w-3.5" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>View all items</TooltipContent>
+                </Tooltip>
                 <Button 
                   variant="ghost" 
                   size="sm" 

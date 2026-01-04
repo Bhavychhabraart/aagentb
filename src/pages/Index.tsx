@@ -11,6 +11,7 @@ import { RenderViewer } from '@/components/canvas/RenderViewer';
 import { PremiumWorkspace, Zone, PolygonPoint, ViewType, viewTypeOptions } from '@/components/canvas/PremiumWorkspace';
 import { SleekChatInput } from '@/components/canvas/SleekChatInput';
 import { StagedItemsDock } from '@/components/canvas/StagedItemsDock';
+import { StagedItemsModal } from '@/components/canvas/StagedItemsModal';
 import { CameraData } from '@/components/canvas/CameraPlacement';
 import { UploadDialog } from '@/components/canvas/UploadDialog';
 import { ExportModal } from '@/components/canvas/ExportModal';
@@ -189,6 +190,7 @@ const Index = () => {
   // Start Over and Upscale state
   const [showStartOverDialog, setShowStartOverDialog] = useState(false);
   const [isUpscaling, setIsUpscaling] = useState(false);
+  const [showStagedItemsModal, setShowStagedItemsModal] = useState(false);
 
   // Load memory settings on user login
   useEffect(() => {
@@ -2082,11 +2084,17 @@ Ready to generate a render! Describe your vision.`;
   ) => {
     if (currentSelection) {
       handleSelectiveEdit(currentSelection, prompt, catalogItem, referenceImageUrl);
+      
+      // Add catalog item to staged items if used and not already staged
+      if (catalogItem && !stagedItems.find(i => i.id === catalogItem.id)) {
+        handleCatalogItemSelect(catalogItem);
+      }
+      
       // Clear selection after submitting
       setCurrentSelection(null);
       setSelectionMode(false);
     }
-  }, [currentSelection, handleSelectiveEdit]);
+  }, [currentSelection, handleSelectiveEdit, stagedItems, handleCatalogItemSelect]);
 
   // Handle render selection from history carousel
   const handleRenderHistorySelect = useCallback((render: RenderHistoryItem) => {
@@ -3503,6 +3511,7 @@ ABSOLUTE REQUIREMENTS FOR CONSISTENCY:
                 }}
                 onClearAll={handleClearStagedItems}
                 onRemoveItem={handleCatalogItemSelect}
+                onViewAll={() => setShowStagedItemsModal(true)}
                 canPosition={!!(currentRenderUrl || roomPhotoUrl)}
                 isGenerating={isGenerating}
               />
@@ -3591,6 +3600,21 @@ ABSOLUTE REQUIREMENTS FOR CONSISTENCY:
           toast({ title: 'Order created successfully!' });
           loadStagedFurniture();
         }}
+      />
+
+      <StagedItemsModal
+        open={showStagedItemsModal}
+        onOpenChange={setShowStagedItemsModal}
+        stagedItems={stagedItems}
+        onRemoveItem={handleCatalogItemSelect}
+        onClearAll={handleClearStagedItems}
+        onPositionFurniture={() => {
+          setShowStagedItemsModal(false);
+          setShowPositioner(true);
+        }}
+        onOpenInvoice={() => setShowExportModal(true)}
+        onOpenPPT={() => setShowExportModal(true)}
+        canPosition={!!(currentRenderUrl || roomPhotoUrl)}
       />
 
       {showPositioner && (currentRenderUrl || roomPhotoUrl) && (
