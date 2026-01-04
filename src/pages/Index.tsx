@@ -37,6 +37,7 @@ import { FloatingAssetsPanel } from '@/components/canvas/FloatingAssetsPanel';
 import { AutoFurnishPanel } from '@/components/canvas/AutoFurnishPanel';
 import { FullScreenCatalogModal } from '@/components/canvas/FullScreenCatalogModal';
 import { MarkerStagingPanel, StagingMarker } from '@/components/canvas/MarkerStagingPanel';
+import { MarkerProductSourceModal } from '@/components/canvas/MarkerProductSourceModal';
 import { Button } from '@/components/ui/button';
 import { Move, Plus } from 'lucide-react';
 import { formatDownloadFilename } from '@/utils/formatDownloadFilename';
@@ -204,6 +205,8 @@ const Index = () => {
   }>>([]);
   const [activeMarkerId, setActiveMarkerId] = useState<string | null>(null);
   const [isMarkerCatalogOpen, setIsMarkerCatalogOpen] = useState(false);
+  const [showMarkerSourceModal, setShowMarkerSourceModal] = useState(false);
+  const [customLibraryItems, setCustomLibraryItems] = useState<CatalogFurnitureItem[]>([]);
 
   // Load memory settings on user login
   useEffect(() => {
@@ -219,6 +222,42 @@ const Index = () => {
   useEffect(() => {
     fetchFurnitureCatalog().then(setCatalogItems);
   }, []);
+
+  // Load custom library items (uploaded/generated products)
+  const fetchCustomLibraryItems = useCallback(async () => {
+    if (!user || !currentProjectId) return;
+    
+    try {
+      const { data, error } = await supabase
+        .from('staged_furniture')
+        .select('*')
+        .eq('user_id', user.id)
+        .or('catalog_item_id.like.upload-%,catalog_item_id.like.generated-%,catalog_item_id.like.custom-%')
+        .order('created_at', { ascending: false })
+        .limit(50);
+      
+      if (error) throw error;
+      
+      const items: CatalogFurnitureItem[] = (data || []).map(item => ({
+        id: item.catalog_item_id,
+        name: item.item_name,
+        category: item.item_category,
+        price: item.item_price || 0,
+        imageUrl: item.item_image_url || '',
+        description: item.item_description || '',
+      }));
+      
+      setCustomLibraryItems(items);
+    } catch (error) {
+      console.error('Failed to fetch custom library items:', error);
+    }
+  }, [user, currentProjectId]);
+
+  useEffect(() => {
+    if (user && currentProjectId) {
+      fetchCustomLibraryItems();
+    }
+  }, [user, currentProjectId, fetchCustomLibraryItems]);
 
   // Toggle memory enabled
   const handleMemoryToggle = useCallback(async (enabled: boolean) => {
@@ -2133,13 +2172,19 @@ Ready to generate a render! Describe your vision.`;
     }
   }, [activeMarkerId]);
 
-  // Open catalog for marker product selection
+  // Open source modal for marker product selection
   const handleMarkerProductSelectStart = useCallback((markerId: string) => {
     setActiveMarkerId(markerId);
+    setShowMarkerSourceModal(true);
+  }, []);
+
+  // Open catalog from source modal
+  const handleMarkerOpenCatalog = useCallback(() => {
+    setShowMarkerSourceModal(false);
     setIsMarkerCatalogOpen(true);
   }, []);
 
-  // Assign product to marker (called from catalog modal)
+  // Assign product to marker (called from any source)
   const handleMarkerProductAssign = useCallback((product: CatalogFurnitureItem) => {
     if (!activeMarkerId) return;
     
@@ -2150,7 +2195,13 @@ Ready to generate a render! Describe your vision.`;
     ));
     setActiveMarkerId(null);
     setIsMarkerCatalogOpen(false);
-  }, [activeMarkerId]);
+    setShowMarkerSourceModal(false);
+    
+    // Refresh custom library if it was an uploaded/generated product
+    if (product.id.startsWith('upload-') || product.id.startsWith('generated-')) {
+      fetchCustomLibraryItems();
+    }
+  }, [activeMarkerId, fetchCustomLibraryItems]);
 
   // Clear all markers
   const handleMarkerClearAll = useCallback(() => {
@@ -3809,6 +3860,19 @@ ABSOLUTE REQUIREMENTS FOR CONSISTENCY:
           activeMarkerId={activeMarkerId}
         />
       )}
+
+      {/* Marker Product Source Modal - choose how to add product */}
+      <MarkerProductSourceModal
+        isOpen={showMarkerSourceModal}
+        onClose={() => {
+          setShowMarkerSourceModal(false);
+          setActiveMarkerId(null);
+        }}
+        onSelectFromCatalog={handleMarkerOpenCatalog}
+        onProductSelected={handleMarkerProductAssign}
+        markerId={activeMarkerId}
+        customLibraryItems={customLibraryItems}
+      />
 
       {/* Marker Catalog Modal - for selecting products for markers */}
       <FullScreenCatalogModal
