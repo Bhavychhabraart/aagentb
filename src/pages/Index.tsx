@@ -1510,12 +1510,18 @@ Ready to generate a render! Describe your vision.`;
     const exists = stagedItems.find(i => i.id === item.id);
     
     if (exists) {
-      // Remove from DB
-      await supabase
+      // Remove from DB - match by render_id as well if we have one
+      const deleteQuery = supabase
         .from('staged_furniture')
         .delete()
         .eq('project_id', currentProjectId)
         .eq('catalog_item_id', item.id);
+      
+      if (currentRenderId) {
+        deleteQuery.eq('render_id', currentRenderId);
+      }
+      
+      await deleteQuery;
       
       setStagedItems(prev => prev.filter(i => i.id !== item.id));
       toast({ 
@@ -1523,12 +1529,13 @@ Ready to generate a render! Describe your vision.`;
         description: `${item.name} unstaged` 
       });
     } else {
-      // Add to DB
+      // Add to DB with render_id
       await supabase
         .from('staged_furniture')
         .insert({
           project_id: currentProjectId,
           user_id: user.id,
+          render_id: currentRenderId, // Link to current render
           catalog_item_id: item.id,
           item_name: item.name,
           item_category: item.category,
@@ -1581,14 +1588,26 @@ Ready to generate a render! Describe your vision.`;
     setStagedItems([]);
   }, [currentProjectId]);
 
-  const loadStagedFurniture = async () => {
+  const loadStagedFurniture = useCallback(async (renderId?: string | null) => {
     if (!currentProjectId) return;
 
-    const { data, error } = await supabase
+    // Build query - filter by render_id if provided
+    let query = supabase
       .from('staged_furniture')
       .select('*')
       .eq('project_id', currentProjectId)
       .order('created_at', { ascending: true });
+    
+    // Filter by render_id - if renderId is provided, use it; otherwise use currentRenderId
+    const targetRenderId = renderId !== undefined ? renderId : currentRenderId;
+    if (targetRenderId) {
+      query = query.eq('render_id', targetRenderId);
+    } else {
+      // If no render yet, show items with null render_id (legacy or pre-render items)
+      query = query.is('render_id', null);
+    }
+
+    const { data, error } = await query;
 
     if (error) {
       console.error('Failed to load staged furniture:', error);
@@ -1605,7 +1624,14 @@ Ready to generate a render! Describe your vision.`;
     }));
 
     setStagedItems(items);
-  };
+  }, [currentProjectId, currentRenderId]);
+
+  // Reload staged items when render changes
+  useEffect(() => {
+    if (currentProjectId) {
+      loadStagedFurniture(currentRenderId);
+    }
+  }, [currentRenderId, currentProjectId, loadStagedFurniture]);
 
   // =========== SELECTION TOOL HANDLERS (Part 1 - no dependencies) ===========
 
@@ -3759,9 +3785,8 @@ ABSOLUTE REQUIREMENTS FOR CONSISTENCY:
                 onRoomPhotoUpload={() => setShowRoomPhotoModal(true)}
                 onStyleRefUpload={() => setShowStyleRefModal(true)}
                 onProductsPick={() => setShowProductsModal(true)}
-                placeholder={agentBEnabled ? "Describe your vision (Agent B will guide you)..." : "Describe your vision..."}
-                stagedItems={stagedItems}
                 onOpenCatalog={() => setShowCatalogModal(true)}
+                placeholder={agentBEnabled ? "Describe your vision (Agent B will guide you)..." : "Describe your vision..."}
                 uploadedProducts={uploadedProducts}
                 onClearProducts={handleClearProducts}
               />

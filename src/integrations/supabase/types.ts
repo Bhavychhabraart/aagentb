@@ -1182,6 +1182,7 @@ export type Database = {
           item_name: string
           item_price: number | null
           project_id: string
+          render_id: string | null
           room_id: string | null
           share_token: string | null
           shared_at: string | null
@@ -1202,6 +1203,7 @@ export type Database = {
           item_name: string
           item_price?: number | null
           project_id: string
+          render_id?: string | null
           room_id?: string | null
           share_token?: string | null
           shared_at?: string | null
@@ -1222,6 +1224,7 @@ export type Database = {
           item_name?: string
           item_price?: number | null
           project_id?: string
+          render_id?: string | null
           room_id?: string | null
           share_token?: string | null
           shared_at?: string | null
@@ -1236,6 +1239,13 @@ export type Database = {
             columns: ["project_id"]
             isOneToOne: false
             referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "staged_furniture_render_id_fkey"
+            columns: ["render_id"]
+            isOneToOne: false
+            referencedRelation: "renders"
             referencedColumns: ["id"]
           },
           {
