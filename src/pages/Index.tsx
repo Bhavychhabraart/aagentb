@@ -2159,9 +2159,9 @@ Ready to generate a render! Describe your vision.`;
       confirmed: false,
     };
     setStagingMarkers(prev => [...prev, newMarker]);
-    // Auto-open catalog for product selection
+    // Auto-open source modal for product selection
     setActiveMarkerId(newMarker.id);
-    setIsMarkerCatalogOpen(true);
+    setShowMarkerSourceModal(true);
   }, []);
 
   // Remove a marker
