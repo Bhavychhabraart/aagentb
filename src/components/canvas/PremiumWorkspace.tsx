@@ -26,7 +26,8 @@ import {
   RefreshCcw,
   Plus,
   X,
-  Trash2
+  Trash2,
+  Columns2
 } from 'lucide-react';
 import { RenderHistoryCarousel, RenderHistoryItem } from './RenderHistoryCarousel';
 import { CatalogFurnitureItem } from '@/services/catalogService';
@@ -90,6 +91,7 @@ interface PremiumWorkspaceProps {
   onStartZoneDrawing?: () => void;
   onStopZoneDrawing?: () => void;
   onGenerateZoneView?: (zone: Zone, viewType: ViewType) => void;
+  onCompareZone?: (zone: Zone) => void;
   onToggleZonesPanel?: () => void;
   // Zone generation state
   generatingZoneName?: string | null;
@@ -157,6 +159,7 @@ export function PremiumWorkspace({
   onStartZoneDrawing,
   onStopZoneDrawing,
   onGenerateZoneView,
+  onCompareZone,
   onToggleZonesPanel,
   generatingZoneName,
   generatingViewType,
@@ -778,6 +781,21 @@ export function PremiumWorkspace({
                           </p>
                         </div>
                         <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                          {/* Compare zone button */}
+                          {onCompareZone && renderUrl && (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-6 w-6 text-cyan-400 hover:text-cyan-300"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                onCompareZone(zone);
+                              }}
+                              title="Compare zone with generated render"
+                            >
+                              <Columns2 className="h-3 w-3" />
+                            </Button>
+                          )}
                           <Button
                             variant="ghost"
                             size="icon"

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Layers, Plus, Trash2, Camera, X } from 'lucide-react';
+import { Layers, Plus, Trash2, Camera, X, Columns2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
@@ -15,6 +15,7 @@ interface ZonesPanelProps {
   selectedZoneId: string | null;
   onEditZones: () => void;
   onGenerateZoneView: (zone: Zone) => void;
+  onCompareZone?: (zone: Zone) => void;
   isGenerating: boolean;
   onClose: () => void;
 }
@@ -27,6 +28,7 @@ export function ZonesPanel({
   selectedZoneId,
   onEditZones,
   onGenerateZoneView,
+  onCompareZone,
   isGenerating,
   onClose,
 }: ZonesPanelProps) {
@@ -180,6 +182,21 @@ export function ZonesPanel({
                 </div>
 
                 <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                  {/* Compare zone button - only if render exists */}
+                  {onCompareZone && renderUrl && (
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-6 w-6 text-cyan-400 hover:text-cyan-300"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onCompareZone(zone);
+                      }}
+                      title="Compare zone with generated render"
+                    >
+                      <Columns2 className="h-3 w-3" />
+                    </Button>
+                  )}
                   <Button
                     variant="ghost"
                     size="icon"

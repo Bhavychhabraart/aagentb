@@ -26,6 +26,7 @@ import { RenderHistoryItem } from '@/components/canvas/RenderHistoryCarousel';
 import { CameraView, ZoneRegion } from '@/components/canvas/MulticamPanel';
 import { LayoutUploadModal } from '@/components/creation/LayoutUploadModal';
 import { LayoutZoneModal } from '@/components/canvas/LayoutZoneModal';
+import { ZoneComparisonModal } from '@/components/canvas/ZoneComparisonModal';
 import { RoomPhotoModal } from '@/components/creation/RoomPhotoModal';
 import { StyleRefModal } from '@/components/creation/StyleRefModal';
 import { ProductPickerModal, ProductItem } from '@/components/creation/ProductPickerModal';
@@ -134,6 +135,9 @@ const Index = () => {
   const [isDrawingZone, setIsDrawingZone] = useState(false);
   const [selectedZoneId, setSelectedZoneId] = useState<string | null>(null);
   const [zones, setZones] = useState<Zone[]>([]);
+  
+  // Zone comparison state
+  const [comparisonZone, setComparisonZone] = useState<Zone | null>(null);
 
   // Agent B state
   const [agentBEnabled, setAgentBEnabled] = useState(false);
@@ -3376,6 +3380,7 @@ ABSOLUTE REQUIREMENTS FOR CONSISTENCY:
             onStartZoneDrawing={() => {}}
             onStopZoneDrawing={() => {}}
             onGenerateZoneView={handleGenerateZoneView}
+            onCompareZone={(zone) => setComparisonZone(zone)}
             onToggleZonesPanel={() => {
               if (layoutImageUrl) {
                 setShowLayoutZoneModal(true);
@@ -3610,6 +3615,7 @@ ABSOLUTE REQUIREMENTS FOR CONSISTENCY:
           onZoneCreate={handleZoneCreate}
           onZoneDelete={handleZoneDelete}
           onGenerateZoneView={handleGenerateZoneView}
+          onCompareZone={(zone) => setComparisonZone(zone)}
           isGenerating={isGenerating || isMulticamGenerating}
         />
       )}
@@ -3688,6 +3694,16 @@ ABSOLUTE REQUIREMENTS FOR CONSISTENCY:
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Zone Comparison Modal */}
+      {comparisonZone && layoutImageUrl && currentRenderUrl && (
+        <ZoneComparisonModal
+          zone={comparisonZone}
+          layoutImageUrl={layoutImageUrl}
+          generatedRenderUrl={currentRenderUrl}
+          onClose={() => setComparisonZone(null)}
+        />
+      )}
     </div>
   </SidebarProvider>
   </PageTransition>
