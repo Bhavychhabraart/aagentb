@@ -55,6 +55,7 @@ serve(async (req) => {
     console.log("Sending image to AI gateway:", logUrl);
 
     // Use Lovable AI to upscale the image
+    // Using gemini-3-pro-image-preview for better image editing/upscaling quality
     console.log("Calling AI gateway for upscaling...");
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
@@ -63,14 +64,14 @@ serve(async (req) => {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "google/gemini-2.5-flash-image-preview",
+        model: "google/gemini-3-pro-image-preview",
         messages: [
           {
             role: "user",
             content: [
               {
                 type: "text",
-                text: "Upscale this image to higher resolution. Enhance details, improve sharpness, and increase quality while maintaining the original composition and style. Make sure the output is a high-quality, detailed version of the input image."
+                text: "Upscale this image to higher resolution. Enhance details, improve sharpness, and increase quality while maintaining the original composition and style exactly. Make sure the output is a high-quality, detailed version of the input image with no changes to the content."
               },
               {
                 type: "image_url",
