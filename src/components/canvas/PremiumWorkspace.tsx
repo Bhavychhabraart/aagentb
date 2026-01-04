@@ -18,7 +18,6 @@ import {
   Clapperboard,
   ScanSearch,
   Package,
-  Target,
   ShoppingCart,
   Download,
   Maximize2,
@@ -98,8 +97,6 @@ interface PremiumWorkspaceProps {
   // New enhanced tools
   onToggleAIDetection?: () => void;
   isAIDetectionActive?: boolean;
-  onToggleMagicSelect?: () => void;
-  isMagicSelectActive?: boolean;
   onToggleAutoFurnish?: () => void;
   showAutoFurnish?: boolean;
   onToggleAssetsPanel?: () => void;
@@ -163,8 +160,6 @@ export function PremiumWorkspace({
   // New enhanced tools
   onToggleAIDetection,
   isAIDetectionActive,
-  onToggleMagicSelect,
-  isMagicSelectActive,
   onToggleAutoFurnish,
   showAutoFurnish,
   onToggleAssetsPanel,
@@ -210,16 +205,6 @@ export function PremiumWorkspace({
       disabled: !renderUrl || isGenerating,
       active: isSelectiveEditing,
       shortcut: 'S',
-      group: 'selection',
-    },
-    {
-      id: 'magicSelect',
-      icon: Target,
-      label: 'Magic',
-      onClick: onToggleMagicSelect,
-      disabled: !renderUrl || isGenerating,
-      active: isMagicSelectActive,
-      shortcut: 'G',
       group: 'selection',
     },
   ];

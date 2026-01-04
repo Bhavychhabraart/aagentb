@@ -35,7 +35,6 @@ import { AIDetectionOverlay, DetectedItem } from '@/components/canvas/AIDetectio
 import { FloatingAssetsPanel } from '@/components/canvas/FloatingAssetsPanel';
 import { AutoFurnishPanel } from '@/components/canvas/AutoFurnishPanel';
 import { FullScreenCatalogModal } from '@/components/canvas/FullScreenCatalogModal';
-import { MagicSelectOverlay, MagicSelection } from '@/components/canvas/MagicSelectOverlay';
 import { Button } from '@/components/ui/button';
 import { Move, Plus } from 'lucide-react';
 import { formatDownloadFilename } from '@/utils/formatDownloadFilename';
@@ -190,22 +189,6 @@ const Index = () => {
   // Start Over and Upscale state
   const [showStartOverDialog, setShowStartOverDialog] = useState(false);
   const [isUpscaling, setIsUpscaling] = useState(false);
-
-  // Magic Select state
-  const [isMagicSelectActive, setIsMagicSelectActive] = useState(false);
-  const [magicSelections, setMagicSelections] = useState<Array<{
-    id: string;
-    label: string;
-    maskImageUrl: string;
-    clickPosition: { x: number; y: number };
-    replacement?: {
-      type: 'catalog' | 'upload' | 'custom';
-      item: CatalogFurnitureItem | { name: string; imageUrl: string };
-    };
-  }>>([]);
-  const [isIdentifyingMagic, setIsIdentifyingMagic] = useState(false);
-  const [isApplyingMagic, setIsApplyingMagic] = useState(false);
-  const [customLibraryItems, setCustomLibraryItems] = useState<Array<{ id: string; name: string; imageUrl: string }>>([]);
 
   // Load memory settings on user login
   useEffect(() => {
@@ -3149,165 +3132,6 @@ ABSOLUTE REQUIREMENTS FOR CONSISTENCY:
     setUploadedProducts([]);
   }, []);
 
-  // =========== MAGIC SELECT HANDLERS ===========
-  
-  // Handle click on render to identify furniture with Magic Select
-  const handleMagicSelectClick = useCallback(async (clickX: number, clickY: number) => {
-    if (!currentRenderUrl && !roomPhotoUrl) return;
-    
-    setIsIdentifyingMagic(true);
-    
-    try {
-      const { data, error } = await supabase.functions.invoke('identify-and-mask', {
-        body: {
-          roomImageUrl: currentRenderUrl || roomPhotoUrl,
-          clickX,
-          clickY,
-        },
-      });
-      
-      if (error) throw error;
-      
-      if (!data.success) {
-        toast({
-          variant: 'destructive',
-          title: 'No furniture detected',
-          description: data.error || 'Try clicking directly on a furniture item',
-        });
-        return;
-      }
-      
-      // Add new selection
-      const newSelection: MagicSelection = {
-        id: `magic-${Date.now()}`,
-        label: data.label,
-        maskImageUrl: data.maskedImageUrl,
-        clickPosition: { x: clickX, y: clickY },
-      };
-      
-      setMagicSelections(prev => [...prev, newSelection]);
-      toast({
-        title: `${data.label} selected`,
-        description: 'Choose a replacement from catalog, upload, or custom library',
-      });
-    } catch (error) {
-      console.error('Magic select failed:', error);
-      toast({
-        variant: 'destructive',
-        title: 'Detection failed',
-        description: 'Please try again',
-      });
-    } finally {
-      setIsIdentifyingMagic(false);
-    }
-  }, [currentRenderUrl, roomPhotoUrl, toast]);
-  
-  // Handle Magic Select replacement update
-  const handleMagicSelectReplacement = useCallback((selectionId: string, replacement: MagicSelection['replacement']) => {
-    setMagicSelections(prev => prev.map(s => 
-      s.id === selectionId ? { ...s, replacement } : s
-    ));
-  }, []);
-  
-  // Handle applying Magic Select replacements
-  const handleApplyMagicSelections = useCallback(async () => {
-    if (!user || !currentProjectId) return;
-    
-    const selectionsWithReplacements = magicSelections.filter(s => s.replacement);
-    if (selectionsWithReplacements.length === 0) return;
-    
-    setIsApplyingMagic(true);
-    
-    try {
-      // Build a prompt that describes all the replacements
-      const replacementDescriptions = selectionsWithReplacements.map(s => 
-        `Replace the ${s.label} with ${s.replacement!.item.name}`
-      ).join('. ');
-      
-      const prompt = `Apply the following furniture replacements: ${replacementDescriptions}. Keep everything else in the room exactly the same.`;
-      
-      // Collect replacement images for reference
-      const referenceImages = selectionsWithReplacements.map(s => s.replacement!.item.imageUrl);
-      
-      // Create render record
-      const { data: renderRecord, error: renderError } = await supabase
-        .from('renders')
-        .insert({
-          project_id: currentProjectId,
-          user_id: user.id,
-          prompt,
-          status: 'generating',
-          parent_render_id: currentRenderId,
-        })
-        .select()
-        .single();
-      
-      if (renderError) throw renderError;
-      
-      await addMessage('user', prompt, { type: 'text' });
-      await addMessage('assistant', 'Applying furniture replacements...', {
-        type: 'render',
-        status: 'generating',
-      });
-      
-      setIsGenerating(true);
-      
-      // Call edit-render with the replacements
-      const { data: editData, error: editError } = await supabase.functions.invoke('edit-render', {
-        body: {
-          originalImageUrl: currentRenderUrl || roomPhotoUrl,
-          prompt,
-          referenceImageUrls: referenceImages,
-          projectId: currentProjectId,
-        },
-      });
-      
-      if (editError) throw editError;
-      
-      const newRenderUrl = editData?.imageUrl;
-      if (!newRenderUrl) throw new Error('No image returned from AI');
-      
-      // Update render record
-      await supabase.from('renders').update({
-        render_url: newRenderUrl,
-        status: 'complete',
-      }).eq('id', renderRecord.id);
-      
-      setCurrentRenderUrl(newRenderUrl);
-      setCurrentRenderId(renderRecord.id);
-      await loadAllRenders();
-      
-      // Clear magic select state
-      setMagicSelections([]);
-      setIsMagicSelectActive(false);
-      
-      toast({
-        title: 'Replacements applied!',
-        description: `${selectionsWithReplacements.length} item${selectionsWithReplacements.length > 1 ? 's' : ''} replaced`,
-      });
-    } catch (error) {
-      console.error('Magic select apply failed:', error);
-      toast({
-        variant: 'destructive',
-        title: 'Failed to apply replacements',
-        description: error instanceof Error ? error.message : 'Please try again',
-      });
-    } finally {
-      setIsApplyingMagic(false);
-      setIsGenerating(false);
-    }
-  }, [user, currentProjectId, currentRenderId, currentRenderUrl, roomPhotoUrl, magicSelections, addMessage, loadAllRenders, toast]);
-  
-  // Clear Magic Select state
-  const handleClearMagicSelections = useCallback(() => {
-    setMagicSelections([]);
-  }, []);
-  
-  // Remove a single Magic Selection
-  const handleRemoveMagicSelection = useCallback((selectionId: string) => {
-    setMagicSelections(prev => prev.filter(s => s.id !== selectionId));
-  }, []);
-
   // Check if undo is possible
   const canUndo = (() => {
     if (!currentRenderId || !allRenders.length) return false;
@@ -3580,23 +3404,9 @@ ABSOLUTE REQUIREMENTS FOR CONSISTENCY:
                 });
                 return;
               }
-              setIsMagicSelectActive(false);
               setIsAIDetectionActive(prev => !prev);
             }}
             isAIDetectionActive={isAIDetectionActive}
-            onToggleMagicSelect={() => {
-              if (!currentRenderUrl && !roomPhotoUrl) {
-                toast({
-                  variant: 'destructive',
-                  title: 'No image available',
-                  description: 'Upload a room photo or generate a render first'
-                });
-                return;
-              }
-              setIsAIDetectionActive(false);
-              setIsMagicSelectActive(prev => !prev);
-            }}
-            isMagicSelectActive={isMagicSelectActive}
             onToggleAutoFurnish={() => setShowAutoFurnish(prev => !prev)}
             showAutoFurnish={showAutoFurnish}
             onToggleAssetsPanel={() => setShowAssetsPanel(prev => !prev)}
@@ -3649,29 +3459,6 @@ ABSOLUTE REQUIREMENTS FOR CONSISTENCY:
               onApplyFurnish={handleApplyFurnish}
               onClearAll={handleClearDetectionState}
               isFindingSimilar={isFindingSimilar}
-            />
-          )}
-
-          {/* Magic Select Overlay */}
-          {isMagicSelectActive && (currentRenderUrl || roomPhotoUrl) && (
-            <MagicSelectOverlay
-              renderUrl={currentRenderUrl || roomPhotoUrl || ''}
-              isActive={isMagicSelectActive}
-              onClose={() => {
-                setIsMagicSelectActive(false);
-                setMagicSelections([]);
-              }}
-              selections={magicSelections}
-              onAddSelection={(selection) => setMagicSelections(prev => [...prev, selection])}
-              onRemoveSelection={handleRemoveMagicSelection}
-              onClearSelections={handleClearMagicSelections}
-              onUpdateReplacement={handleMagicSelectReplacement}
-              onApplyReplacements={handleApplyMagicSelections}
-              isIdentifying={isIdentifyingMagic}
-              isApplying={isApplyingMagic}
-              catalogItems={catalogItems}
-              customLibraryItems={customLibraryItems}
-              onIdentifyAtClick={handleMagicSelectClick}
             />
           )}
 
