@@ -9,7 +9,8 @@ import {
   ChevronUp, 
   ChevronDown,
   Trash2,
-  Maximize2
+  Maximize2,
+  Target
 } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -21,6 +22,7 @@ interface StagedItemsDockProps {
   onClearAll: () => void;
   onRemoveItem: (item: CatalogFurnitureItem) => void;
   onViewAll: () => void;
+  onPlaceMarkers?: () => void;
   canPosition: boolean;
   isGenerating?: boolean;
 }
@@ -32,6 +34,7 @@ export function StagedItemsDock({
   onClearAll,
   onRemoveItem,
   onViewAll,
+  onPlaceMarkers,
   canPosition,
   isGenerating,
 }: StagedItemsDockProps) {
@@ -161,6 +164,25 @@ export function StagedItemsDock({
 
                     {/* Action buttons */}
                     <div className="flex items-center gap-2 mt-3 pt-3 border-t border-border/30">
+                      {onPlaceMarkers && (
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="h-9 px-3 border-primary/50 hover:bg-primary/10"
+                              onClick={onPlaceMarkers}
+                              disabled={!canPosition || isGenerating}
+                            >
+                              <Target className="h-4 w-4" />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p className="font-medium">Place Markers</p>
+                            <p className="text-xs text-muted-foreground">Precise batch staging with Gemini 3</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      )}
                       <Button
                         variant="outline"
                         size="sm"
@@ -169,7 +191,7 @@ export function StagedItemsDock({
                         disabled={!canPosition}
                       >
                         <Move className="h-4 w-4 mr-2" />
-                        Position on Render
+                        Position
                       </Button>
                       <Button
                         size="sm"
@@ -178,7 +200,7 @@ export function StagedItemsDock({
                         disabled={isGenerating}
                       >
                         <Sparkles className="h-4 w-4 mr-2" />
-                        Generate with These
+                        Generate
                       </Button>
                     </div>
                   </div>

@@ -36,6 +36,7 @@ import { AIDetectionOverlay, DetectedItem } from '@/components/canvas/AIDetectio
 import { FloatingAssetsPanel } from '@/components/canvas/FloatingAssetsPanel';
 import { AutoFurnishPanel } from '@/components/canvas/AutoFurnishPanel';
 import { FullScreenCatalogModal } from '@/components/canvas/FullScreenCatalogModal';
+import { MarkerStagingPanel, StagingMarker } from '@/components/canvas/MarkerStagingPanel';
 import { Button } from '@/components/ui/button';
 import { Move, Plus } from 'lucide-react';
 import { formatDownloadFilename } from '@/utils/formatDownloadFilename';
@@ -191,6 +192,18 @@ const Index = () => {
   const [showStartOverDialog, setShowStartOverDialog] = useState(false);
   const [isUpscaling, setIsUpscaling] = useState(false);
   const [showStagedItemsModal, setShowStagedItemsModal] = useState(false);
+
+  // Marker staging state
+  const [showMarkerStaging, setShowMarkerStaging] = useState(false);
+  const [stagingMarkers, setStagingMarkers] = useState<Array<{
+    id: string;
+    position: { x: number; y: number };
+    product: CatalogFurnitureItem | null;
+    existingLabel?: string;
+    confirmed: boolean;
+  }>>([]);
+  const [activeMarkerId, setActiveMarkerId] = useState<string | null>(null);
+  const [isMarkerCatalogOpen, setIsMarkerCatalogOpen] = useState(false);
 
   // Load memory settings on user login
   useEffect(() => {
@@ -2096,6 +2109,164 @@ Ready to generate a render! Describe your vision.`;
     }
   }, [currentSelection, handleSelectiveEdit, stagedItems, handleCatalogItemSelect]);
 
+  // === MARKER STAGING HANDLERS ===
+  
+  // Add a new marker at position
+  const handleMarkerAdd = useCallback((position: { x: number; y: number }) => {
+    const newMarker: StagingMarker = {
+      id: `marker-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+      position,
+      product: null,
+      confirmed: false,
+    };
+    setStagingMarkers(prev => [...prev, newMarker]);
+    // Auto-open catalog for product selection
+    setActiveMarkerId(newMarker.id);
+    setIsMarkerCatalogOpen(true);
+  }, []);
+
+  // Remove a marker
+  const handleMarkerRemove = useCallback((markerId: string) => {
+    setStagingMarkers(prev => prev.filter(m => m.id !== markerId));
+    if (activeMarkerId === markerId) {
+      setActiveMarkerId(null);
+    }
+  }, [activeMarkerId]);
+
+  // Open catalog for marker product selection
+  const handleMarkerProductSelectStart = useCallback((markerId: string) => {
+    setActiveMarkerId(markerId);
+    setIsMarkerCatalogOpen(true);
+  }, []);
+
+  // Assign product to marker (called from catalog modal)
+  const handleMarkerProductAssign = useCallback((product: CatalogFurnitureItem) => {
+    if (!activeMarkerId) return;
+    
+    setStagingMarkers(prev => prev.map(m => 
+      m.id === activeMarkerId 
+        ? { ...m, product, confirmed: true }
+        : m
+    ));
+    setActiveMarkerId(null);
+    setIsMarkerCatalogOpen(false);
+  }, [activeMarkerId]);
+
+  // Clear all markers
+  const handleMarkerClearAll = useCallback(() => {
+    setStagingMarkers([]);
+    setActiveMarkerId(null);
+  }, []);
+
+  // Generate batch staging with all confirmed markers
+  const handleMarkerBatchGenerate = useCallback(async () => {
+    if (!user || !currentProjectId || !currentRenderUrl) {
+      toast({ variant: 'destructive', title: 'Error', description: 'Missing required data for generation' });
+      return;
+    }
+
+    const confirmedMarkers = stagingMarkers.filter(m => m.product !== null);
+    if (confirmedMarkers.length === 0) {
+      toast({ variant: 'destructive', title: 'No products', description: 'Add products to at least one marker' });
+      return;
+    }
+
+    setIsGenerating(true);
+    setShowMarkerStaging(false);
+
+    try {
+      // Create render record
+      const { data: renderRecord, error: renderError } = await supabase
+        .from('renders')
+        .insert({
+          project_id: currentProjectId,
+          user_id: user.id,
+          prompt: `Batch staging: ${confirmedMarkers.map(m => m.product?.name).join(', ')}`,
+          status: 'pending',
+          parent_render_id: currentRenderId,
+        })
+        .select()
+        .single();
+
+      if (renderError) throw renderError;
+
+      await addMessage('user', `🎯 Placing ${confirmedMarkers.length} item${confirmedMarkers.length > 1 ? 's' : ''} via marker staging`, { type: 'text' });
+
+      // Detect aspect ratio
+      const sourceAspectRatio = await getImageAspectRatio(currentRenderUrl);
+
+      // Build batch markers payload
+      const batchMarkers = confirmedMarkers.map(m => ({
+        position: m.position,
+        product: {
+          name: m.product!.name,
+          category: m.product!.category,
+          description: m.product!.description || '',
+          imageUrl: m.product!.imageUrl || '',
+        },
+      }));
+
+      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/edit-render`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+        },
+        body: JSON.stringify({
+          currentRenderUrl,
+          batchMarkers,
+          preserveAspectRatio: sourceAspectRatio,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || 'Batch staging failed');
+      }
+
+      const { imageUrl } = await response.json();
+
+      // Update render record
+      await supabase
+        .from('renders')
+        .update({ render_url: imageUrl, status: 'completed' })
+        .eq('id', renderRecord.id);
+
+      setCurrentRenderUrl(imageUrl);
+      setCurrentRenderId(renderRecord.id);
+
+      // Add all products to staged items
+      for (const marker of confirmedMarkers) {
+        if (marker.product && !stagedItems.find(i => i.id === marker.product!.id)) {
+          handleCatalogItemSelect(marker.product);
+        }
+      }
+
+      await addMessage('assistant', `Successfully placed ${confirmedMarkers.length} item${confirmedMarkers.length > 1 ? 's' : ''}!`, {
+        type: 'render',
+        imageUrl,
+        status: 'ready',
+      });
+
+      await loadAllRenders();
+
+      // Clear markers
+      setStagingMarkers([]);
+
+      toast({ 
+        title: 'Batch staging complete', 
+        description: `${confirmedMarkers.length} products placed with Gemini 3 Pro` 
+      });
+    } catch (error) {
+      console.error('Batch staging failed:', error);
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      await addMessage('assistant', `Batch staging failed: ${message}`, { type: 'text', status: 'failed' });
+      toast({ variant: 'destructive', title: 'Staging failed', description: message });
+    } finally {
+      setIsGenerating(false);
+    }
+  }, [user, currentProjectId, currentRenderUrl, currentRenderId, stagingMarkers, stagedItems, handleCatalogItemSelect, addMessage, toast, loadAllRenders]);
+
   // Handle render selection from history carousel
   const handleRenderHistorySelect = useCallback((render: RenderHistoryItem) => {
     setCurrentRenderUrl(render.render_url);
@@ -3512,6 +3683,7 @@ ABSOLUTE REQUIREMENTS FOR CONSISTENCY:
                 onClearAll={handleClearStagedItems}
                 onRemoveItem={handleCatalogItemSelect}
                 onViewAll={() => setShowStagedItemsModal(true)}
+                onPlaceMarkers={() => setShowMarkerStaging(true)}
                 canPosition={!!(currentRenderUrl || roomPhotoUrl)}
                 isGenerating={isGenerating}
               />
@@ -3615,6 +3787,46 @@ ABSOLUTE REQUIREMENTS FOR CONSISTENCY:
         onOpenInvoice={() => setShowExportModal(true)}
         onOpenPPT={() => setShowExportModal(true)}
         canPosition={!!(currentRenderUrl || roomPhotoUrl)}
+      />
+
+      {/* Marker Staging Panel */}
+      {(currentRenderUrl || roomPhotoUrl) && (
+        <MarkerStagingPanel
+          isOpen={showMarkerStaging}
+          onClose={() => {
+            setShowMarkerStaging(false);
+            setActiveMarkerId(null);
+          }}
+          renderUrl={currentRenderUrl || roomPhotoUrl!}
+          markers={stagingMarkers}
+          onMarkerAdd={handleMarkerAdd}
+          onMarkerRemove={handleMarkerRemove}
+          onMarkerProductSelect={handleMarkerProductSelectStart}
+          onClearAll={handleMarkerClearAll}
+          onGenerate={handleMarkerBatchGenerate}
+          isGenerating={isGenerating}
+          activeMarkerId={activeMarkerId}
+        />
+      )}
+
+      {/* Marker Catalog Modal - for selecting products for markers */}
+      <FullScreenCatalogModal
+        isOpen={isMarkerCatalogOpen}
+        onClose={() => {
+          setIsMarkerCatalogOpen(false);
+          setActiveMarkerId(null);
+        }}
+        catalogItems={catalogItems}
+        stagedItemIds={[]}
+        onToggleStage={(item) => {
+          handleMarkerProductAssign(item);
+        }}
+        onPreviewItem={(item) => {
+          handleMarkerProductAssign(item);
+        }}
+        title={activeMarkerId ? 'Select Product for Marker' : 'Select Product'}
+        subtitle="Click a product to assign it to the selected marker"
+        selectionMode={true}
       />
 
       {showPositioner && (currentRenderUrl || roomPhotoUrl) && (

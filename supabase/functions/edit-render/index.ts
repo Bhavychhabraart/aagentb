@@ -734,6 +734,178 @@ Output: The FULL edited image (same dimensions as input) with ONLY the masked/sp
       });
     }
 
+    // =============================================
+    // BATCH MARKER STAGING MODE - Gemini 3 Pro
+    // =============================================
+    // Handle batch marker staging - multiple products placed at specific coordinates in one call
+    const requestBody = await req.clone().json().catch(() => ({}));
+    const batchMarkers = requestBody.batchMarkers as Array<{
+      position: { x: number; y: number };
+      product: { name: string; category: string; description?: string; imageUrl: string };
+    }> | undefined;
+
+    if (batchMarkers && batchMarkers.length > 0) {
+      console.log('Using BATCH MARKER STAGING mode with Gemini 3 Pro');
+      console.log('Number of markers:', batchMarkers.length);
+
+      const content: Array<{ type: string; text?: string; image_url?: { url: string } }> = [];
+      let imageIndex = 1;
+
+      // IMAGE 1: Base render
+      content.push({ type: 'image_url', image_url: { url: currentRenderUrl } });
+      const baseImageIndex = imageIndex++;
+
+      // Add product reference images
+      const productImageRefs: Array<{ markerIdx: number; imageIdx: number; product: typeof batchMarkers[0]['product'] }> = [];
+      
+      for (let i = 0; i < batchMarkers.length; i++) {
+        const marker = batchMarkers[i];
+        if (marker.product.imageUrl) {
+          content.push({ type: 'image_url', image_url: { url: marker.product.imageUrl } });
+          productImageRefs.push({
+            markerIdx: i,
+            imageIdx: imageIndex++,
+            product: marker.product,
+          });
+        }
+      }
+
+      // Build the batch prompt
+      const replacementList = productImageRefs.map((ref, idx) => {
+        const marker = batchMarkers[ref.markerIdx];
+        const posDesc = getPositionDescription(marker.position.x, marker.position.y);
+        return `${idx + 1}. At coordinates (${Math.round(marker.position.x)}%, ${Math.round(marker.position.y)}%): Place "${ref.product.name}" (${ref.product.category}) → Reference: IMAGE ${ref.imageIdx}
+   - Position: ${posDesc}
+   - Description: ${ref.product.description || 'Premium furniture piece'}`;
+      }).join('\n\n');
+
+      const batchPrompt = `You are a MASTER STAGING ARCHITECT using Gemini 3 Pro for ULTRA-PRECISE furniture placement.
+
+═══════════════════════════════════════════════════════════════
+     ⚠️⚠️⚠️ ABSOLUTE CRITICAL - IMAGE PRESERVATION ⚠️⚠️⚠️
+═══════════════════════════════════════════════════════════════
+
+🚨 NON-NEGOTIABLE RULES - VIOLATION = COMPLETE FAILURE:
+1. OUTPUT IMAGE MUST HAVE **IDENTICAL DIMENSIONS** AS IMAGE ${baseImageIndex}
+2. DO NOT CROP, ZOOM, PAN, TILT, OR REFRAME THE IMAGE - ANY CROPPING IS WRONG
+3. The ENTIRE original room must be visible in output - same framing, same boundaries
+4. Keep the EXACT same camera angle and field of view
+5. Preserve ALL architectural elements (walls, windows, doors, floor) EXACTLY
+
+═══════════════════════════════════════════════════════════════
+     BATCH FURNITURE REPLACEMENT - ${batchMarkers.length} ITEMS
+═══════════════════════════════════════════════════════════════
+
+BASE IMAGE: The room to modify (IMAGE ${baseImageIndex})
+
+REPLACEMENT LIST:
+${replacementList}
+
+═══════════════════════════════════════════════════════════════
+     PLACEMENT PRECISION REQUIREMENTS
+═══════════════════════════════════════════════════════════════
+
+For EACH product placement:
+
+1. EXACT POSITION: Place the product CENTER at the specified (X%, Y%) coordinate
+   - X% is measured from LEFT edge (0% = far left, 100% = far right)
+   - Y% is measured from TOP edge (0% = top, 100% = bottom)
+
+2. PERFECT PRODUCT FIDELITY: Copy each product EXACTLY from its reference image
+   - Same shape, proportions, and silhouette
+   - Same colors, materials, and textures
+   - Same design details and features
+
+3. PERSPECTIVE MATCHING:
+   - Scale each product appropriately for its position in the room
+   - Apply correct perspective distortion based on camera angle
+   - Products in foreground should be larger, background smaller
+
+4. LIGHTING & SHADOWS:
+   - Match the room's existing lighting direction
+   - Apply realistic ray-traced shadows under each product
+   - Maintain consistent ambient occlusion
+
+5. REPLACE OR ADD:
+   - If existing furniture is at a marker location, REPLACE it
+   - If empty space, ADD the new product naturally
+   - Remove any overlapped/conflicting furniture
+
+═══════════════════════════════════════════════════════════════
+     ULTRA-PHOTOREALISTIC OUTPUT QUALITY
+═══════════════════════════════════════════════════════════════
+
+RENDERING STANDARD: RED Cinema Camera / Architectural Digest quality
+- 8K equivalent sharpness and detail
+- Physically-based materials with accurate reflections
+- Ray-traced global illumination
+- Professional photography color grading
+
+⛔ INSTANT REJECTION IF:
+- Output looks like CGI, illustration, or cartoon
+- Any cropping or dimension change from input
+- Products don't match their reference images
+- Inconsistent lighting or floating objects
+
+✅ SUCCESS CRITERIA:
+- Indistinguishable from professional architectural photography
+- All ${batchMarkers.length} products placed at their exact coordinates
+- Products look CUT from reference images and PASTED into scene
+- Seamless integration with room environment
+
+Output: The COMPLETE room image (same dimensions as input) with ALL ${batchMarkers.length} products placed.`;
+
+      content.push({ type: 'text', text: batchPrompt });
+
+      console.log('Batch staging prompt built. Total images:', content.filter(c => c.type === 'image_url').length);
+
+      const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${LOVABLE_API_KEY}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: 'google/gemini-3-pro-image-preview',
+          messages: [{ role: 'user', content }],
+          modalities: ['image', 'text'],
+          generationConfig: { aspectRatio: outputAspectRatio },
+        }),
+      });
+
+      if (!response.ok) {
+        if (response.status === 429) {
+          return new Response(JSON.stringify({ error: 'Rate limit exceeded. Please try again later.' }), {
+            status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+        if (response.status === 402) {
+          return new Response(JSON.stringify({ error: 'Usage limit reached. Please add credits.' }), {
+            status: 402, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+        const errorText = await response.text();
+        console.error('AI gateway error (batch staging):', response.status, errorText);
+        throw new Error(`AI gateway error: ${errorText}`);
+      }
+
+      const data = await response.json();
+      const imageUrl = data.choices?.[0]?.message?.images?.[0]?.image_url?.url;
+
+      if (!imageUrl) {
+        throw new Error('No image generated from batch marker staging request');
+      }
+
+      console.log('Batch marker staging completed successfully with', batchMarkers.length, 'items');
+      return new Response(JSON.stringify({ 
+        imageUrl, 
+        mode: 'batch-marker-staging',
+        itemCount: batchMarkers.length,
+      }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
     const analysis = layoutAnalysis as LayoutAnalysis | undefined;
 
     // Check if we have furniture items with position data for Master Staging
