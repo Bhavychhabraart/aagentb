@@ -74,7 +74,7 @@ ${enhancedPrompt}`
     }
 
     // Try with primary model first, then fallback
-    const models = ['google/gemini-2.5-flash-image-preview'];
+    const models = ['google/gemini-2.5-flash-image-preview', 'google/gemini-3-pro-image-preview'];
     let lastError: Error | null = null;
     let imageData: string | null = null;
     let responseMessage: string = '';

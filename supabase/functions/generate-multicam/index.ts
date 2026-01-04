@@ -161,7 +161,7 @@ Output: The room rendered from the specified camera angle.`;
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'google/gemini-2.5-flash-image-preview',
+        model: 'google/gemini-3-pro-image-preview',
         messages: [{ role: 'user', content }],
         modalities: ['image', 'text'],
         generationConfig: { aspectRatio: outputAspectRatio }
