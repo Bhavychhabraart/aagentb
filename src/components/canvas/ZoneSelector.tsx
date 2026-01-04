@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
-import { Pentagon, X, Check, Trash2, Undo2 } from 'lucide-react';
+import { Square, X, Check, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
@@ -49,11 +49,17 @@ export function ZoneSelector({
 }: ZoneSelectorProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const imgRef = useRef<HTMLImageElement>(null);
-  const [polygonPoints, setPolygonPoints] = useState<PolygonPoint[]>([]);
-  const [cursorPos, setCursorPos] = useState<{ x: number; y: number } | null>(null);
+  
+  // Rectangle drawing state
+  const [dragStart, setDragStart] = useState<PolygonPoint | null>(null);
+  const [dragEnd, setDragEnd] = useState<PolygonPoint | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
+  
+  // Zone naming
   const [newZoneName, setNewZoneName] = useState('');
   const [showNameInput, setShowNameInput] = useState(false);
-  const [pendingPolygon, setPendingPolygon] = useState<PolygonPoint[] | null>(null);
+  const [pendingRect, setPendingRect] = useState<{ start: PolygonPoint; end: PolygonPoint } | null>(null);
+  
   const [imageBounds, setImageBounds] = useState<ImageBounds | null>(null);
 
   // Calculate actual image bounds
@@ -86,11 +92,12 @@ export function ZoneSelector({
     return () => observer.disconnect();
   }, [calculateBounds]);
 
-  // Reset polygon when drawing mode ends
+  // Reset drawing state when drawing mode ends
   useEffect(() => {
     if (!isDrawing) {
-      setPolygonPoints([]);
-      setCursorPos(null);
+      setDragStart(null);
+      setDragEnd(null);
+      setIsDragging(false);
     }
   }, [isDrawing]);
 
@@ -106,106 +113,125 @@ export function ZoneSelector({
     return imagePercentageToPixel(point.x, point.y, imageBounds);
   }, [imageBounds]);
 
-  // Check if cursor is near the first point (to close polygon)
-  const isNearFirstPoint = useCallback((cursorX: number, cursorY: number): boolean => {
-    if (polygonPoints.length < 3 || !imageBounds) return false;
-    
-    const firstPixel = percentToPixel(polygonPoints[0]);
-    const distance = Math.sqrt(
-      Math.pow(cursorX - firstPixel.x, 2) + 
-      Math.pow(cursorY - firstPixel.y, 2)
-    );
-    return distance < 15; // 15px threshold
-  }, [polygonPoints, imageBounds, percentToPixel]);
-
-  const handleClick = useCallback((e: React.MouseEvent) => {
+  // Mouse down - start rectangle
+  const handleMouseDown = useCallback((e: React.MouseEvent) => {
     if (!isDrawing || !imageBounds) return;
     e.preventDefault();
-    e.stopPropagation();
     
     const coords = getPercentageCoords(e.clientX, e.clientY);
     if (!coords) return; // Click was in letterbox area
     
-    const rect = containerRef.current?.getBoundingClientRect();
-    if (!rect) return;
+    setDragStart(coords);
+    setDragEnd(coords);
+    setIsDragging(true);
+  }, [isDrawing, imageBounds, getPercentageCoords]);
+
+  // Mouse move - update rectangle end
+  const handleMouseMove = useCallback((e: React.MouseEvent) => {
+    if (!isDrawing || !imageBounds || !isDragging) return;
     
-    const pixelX = e.clientX - rect.left;
-    const pixelY = e.clientY - rect.top;
+    const coords = getPercentageCoords(e.clientX, e.clientY);
+    if (!coords) return;
     
-    // Check if clicking near first point to close polygon
-    if (isNearFirstPoint(pixelX, pixelY)) {
-      completePolygon();
-      return;
+    setDragEnd(coords);
+  }, [isDrawing, imageBounds, isDragging, getPercentageCoords]);
+
+  // Mouse up - complete rectangle
+  const handleMouseUp = useCallback((e: React.MouseEvent) => {
+    if (!isDrawing || !isDragging || !dragStart || !dragEnd) return;
+    
+    // Check if rectangle is large enough (at least 2% in both dimensions)
+    const width = Math.abs(dragEnd.x - dragStart.x);
+    const height = Math.abs(dragEnd.y - dragStart.y);
+    
+    if (width >= 2 && height >= 2) {
+      setPendingRect({ start: dragStart, end: dragEnd });
+      setShowNameInput(true);
+      setNewZoneName(`Zone ${zones.length + 1}`);
     }
     
-    setPolygonPoints(prev => [...prev, coords]);
-  }, [isDrawing, imageBounds, getPercentageCoords, isNearFirstPoint]);
-
-  const handleMouseMove = useCallback((e: React.MouseEvent) => {
-    if (!isDrawing || !imageBounds) return;
-    
-    const rect = containerRef.current?.getBoundingClientRect();
-    if (!rect) return;
-    
-    setCursorPos({
-      x: e.clientX - rect.left,
-      y: e.clientY - rect.top,
-    });
-  }, [isDrawing, imageBounds]);
-
-  const completePolygon = useCallback(() => {
-    if (polygonPoints.length < 3) return;
-    
-    setPendingPolygon(polygonPoints);
-    setShowNameInput(true);
-    setNewZoneName(`Zone ${zones.length + 1}`);
-    setPolygonPoints([]);
+    setDragStart(null);
+    setDragEnd(null);
+    setIsDragging(false);
     onDrawingChange(false);
-  }, [polygonPoints, zones.length, onDrawingChange]);
+  }, [isDrawing, isDragging, dragStart, dragEnd, zones.length, onDrawingChange]);
 
-  const handleUndo = useCallback(() => {
-    setPolygonPoints(prev => prev.slice(0, -1));
-  }, []);
+  // Mouse leave - cancel if dragging
+  const handleMouseLeave = useCallback(() => {
+    if (isDragging) {
+      setDragStart(null);
+      setDragEnd(null);
+      setIsDragging(false);
+    }
+  }, [isDragging]);
 
   const handleCancel = useCallback(() => {
-    setPolygonPoints([]);
+    setDragStart(null);
+    setDragEnd(null);
+    setIsDragging(false);
     onDrawingChange(false);
   }, [onDrawingChange]);
 
   const handleConfirmZone = () => {
-    if (pendingPolygon && pendingPolygon.length >= 3 && newZoneName.trim()) {
-      // Calculate bounding box
-      const x_start = Math.min(...pendingPolygon.map(p => p.x));
-      const y_start = Math.min(...pendingPolygon.map(p => p.y));
-      const x_end = Math.max(...pendingPolygon.map(p => p.x));
-      const y_end = Math.max(...pendingPolygon.map(p => p.y));
+    if (pendingRect && newZoneName.trim()) {
+      // Calculate normalized bounds (ensure start < end)
+      const x_start = Math.min(pendingRect.start.x, pendingRect.end.x);
+      const y_start = Math.min(pendingRect.start.y, pendingRect.end.y);
+      const x_end = Math.max(pendingRect.start.x, pendingRect.end.x);
+      const y_end = Math.max(pendingRect.start.y, pendingRect.end.y);
+      
+      // Store as 4 corner points for backwards compatibility
+      const polygon_points: PolygonPoint[] = [
+        { x: x_start, y: y_start },  // top-left
+        { x: x_end, y: y_start },    // top-right
+        { x: x_end, y: y_end },      // bottom-right
+        { x: x_start, y: y_end },    // bottom-left
+      ];
       
       onZoneCreate({
         name: newZoneName.trim(),
-        polygon_points: pendingPolygon,
+        polygon_points,
         x_start,
         y_start,
         x_end,
         y_end,
       });
-      setPendingPolygon(null);
+      setPendingRect(null);
       setShowNameInput(false);
       setNewZoneName('');
     }
   };
 
   const handleCancelZone = () => {
-    setPendingPolygon(null);
+    setPendingRect(null);
     setShowNameInput(false);
     setNewZoneName('');
   };
 
-  // Build SVG points string for a polygon
-  const getPolygonSvgPoints = useCallback((points: PolygonPoint[]): string => {
-    return points.map(p => {
-      const pixel = percentToPixel(p);
-      return `${pixel.x},${pixel.y}`;
-    }).join(' ');
+  // Get rectangle SVG props from two points
+  const getRectFromPoints = useCallback((start: PolygonPoint, end: PolygonPoint) => {
+    const startPixel = percentToPixel(start);
+    const endPixel = percentToPixel(end);
+    
+    const x = Math.min(startPixel.x, endPixel.x);
+    const y = Math.min(startPixel.y, endPixel.y);
+    const width = Math.abs(endPixel.x - startPixel.x);
+    const height = Math.abs(endPixel.y - startPixel.y);
+    
+    return { x, y, width, height };
+  }, [percentToPixel]);
+
+  // Get rectangle from zone bounds
+  const getRectFromZone = useCallback((zone: Zone) => {
+    const topLeft = percentToPixel({ x: zone.x_start, y: zone.y_start });
+    const bottomRight = percentToPixel({ x: zone.x_end, y: zone.y_end });
+    
+    return {
+      x: topLeft.x,
+      y: topLeft.y,
+      width: bottomRight.x - topLeft.x,
+      height: bottomRight.y - topLeft.y,
+    };
   }, [percentToPixel]);
 
   return (
@@ -213,17 +239,19 @@ export function ZoneSelector({
       <div
         ref={containerRef}
         className={cn(
-          "relative w-full h-full overflow-hidden rounded-lg",
+          "relative w-full h-full overflow-hidden rounded-lg select-none",
           isDrawing && "cursor-crosshair"
         )}
-        onClick={handleClick}
+        onMouseDown={handleMouseDown}
         onMouseMove={handleMouseMove}
+        onMouseUp={handleMouseUp}
+        onMouseLeave={handleMouseLeave}
       >
         <img
           ref={imgRef}
           src={imageUrl}
-          alt="Room render"
-          className="w-full h-full object-contain"
+          alt="Layout"
+          className="w-full h-full object-contain pointer-events-none"
           draggable={false}
           onLoad={calculateBounds}
         />
@@ -232,12 +260,15 @@ export function ZoneSelector({
         <svg className="absolute inset-0 pointer-events-none w-full h-full">
           {/* Existing zones */}
           {zones.map((zone) => {
-            if (!zone.polygon_points || zone.polygon_points.length < 3) return null;
+            const rect = getRectFromZone(zone);
             
             return (
-              <polygon
+              <rect
                 key={zone.id}
-                points={getPolygonSvgPoints(zone.polygon_points)}
+                x={rect.x}
+                y={rect.y}
+                width={rect.width}
+                height={rect.height}
                 className={cn(
                   "transition-all cursor-pointer pointer-events-auto",
                   selectedZoneId === zone.id
@@ -245,6 +276,7 @@ export function ZoneSelector({
                     : "fill-amber-500/10 stroke-amber-500/70 hover:fill-amber-500/20 hover:stroke-amber-400"
                 )}
                 strokeWidth="2"
+                rx="2"
                 onClick={(e) => {
                   e.stopPropagation();
                   onZoneSelect(zone);
@@ -253,80 +285,31 @@ export function ZoneSelector({
             );
           })}
 
-          {/* Pending polygon being named */}
-          {pendingPolygon && pendingPolygon.length >= 3 && (
-            <polygon
-              points={getPolygonSvgPoints(pendingPolygon)}
+          {/* Pending rectangle being named */}
+          {pendingRect && (
+            <rect
+              {...getRectFromPoints(pendingRect.start, pendingRect.end)}
               className="fill-green-500/20 stroke-green-500"
               strokeWidth="2"
               strokeDasharray="5,5"
+              rx="2"
             />
           )}
 
-          {/* Current drawing polygon */}
-          {isDrawing && polygonPoints.length > 0 && (
-            <>
-              {/* Lines connecting points */}
-              <polyline
-                points={[
-                  getPolygonSvgPoints(polygonPoints),
-                  cursorPos ? `${cursorPos.x},${cursorPos.y}` : ''
-                ].filter(Boolean).join(' ')}
-                className="fill-none stroke-primary"
-                strokeWidth="2"
-                strokeDasharray="5,5"
-              />
-              
-              {/* Fill preview when 3+ points */}
-              {polygonPoints.length >= 3 && (
-                <polygon
-                  points={getPolygonSvgPoints(polygonPoints)}
-                  className="fill-primary/10 stroke-none"
-                />
-              )}
-              
-              {/* Point handles */}
-              {polygonPoints.map((p, i) => {
-                const pixel = percentToPixel(p);
-                const isFirst = i === 0;
-                const canClose = isFirst && polygonPoints.length >= 3;
-                
-                return (
-                  <circle
-                    key={i}
-                    cx={pixel.x}
-                    cy={pixel.y}
-                    r={canClose ? 8 : 5}
-                    className={cn(
-                      "transition-all",
-                      isFirst 
-                        ? "fill-green-500 stroke-green-300" 
-                        : "fill-primary stroke-primary-foreground"
-                    )}
-                    strokeWidth="2"
-                  />
-                );
-              })}
-
-              {/* Cursor indicator for closing */}
-              {cursorPos && isNearFirstPoint(cursorPos.x, cursorPos.y) && (
-                <circle
-                  cx={percentToPixel(polygonPoints[0]).x}
-                  cy={percentToPixel(polygonPoints[0]).y}
-                  r={12}
-                  className="fill-none stroke-green-400 animate-pulse"
-                  strokeWidth="2"
-                />
-              )}
-            </>
+          {/* Current drawing rectangle */}
+          {isDrawing && isDragging && dragStart && dragEnd && (
+            <rect
+              {...getRectFromPoints(dragStart, dragEnd)}
+              className="fill-primary/10 stroke-primary"
+              strokeWidth="2"
+              strokeDasharray="5,5"
+              rx="2"
+            />
           )}
         </svg>
 
-        {/* Zone labels and delete buttons (positioned separately) */}
+        {/* Zone labels and delete buttons */}
         {zones.map((zone) => {
-          if (!zone.polygon_points || zone.polygon_points.length < 3) return null;
-          
-          // Position label at top-left of bounding box
           const labelPos = percentToPixel({ x: zone.x_start, y: zone.y_start });
           
           return (
@@ -392,39 +375,14 @@ export function ZoneSelector({
       {isDrawing && (
         <div className="absolute top-4 left-1/2 -translate-x-1/2 z-10">
           <div className="flex items-center gap-2 px-3 py-2 bg-black/80 backdrop-blur-md rounded-lg border border-border/50">
-            <Pentagon className="h-4 w-4 text-primary" />
+            <Square className="h-4 w-4 text-primary" />
             <span className="text-xs font-medium text-foreground">
-              {polygonPoints.length === 0 
-                ? "Click to add points" 
-                : polygonPoints.length < 3 
-                  ? `${3 - polygonPoints.length} more point${3 - polygonPoints.length > 1 ? 's' : ''} needed`
-                  : "Click first point or 'Close' to finish"}
+              {isDragging 
+                ? "Release to complete rectangle" 
+                : "Click and drag to select area"}
             </span>
             
             <div className="h-4 w-px bg-border mx-1" />
-            
-            {polygonPoints.length > 0 && (
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-6 text-xs px-2"
-                onClick={handleUndo}
-              >
-                <Undo2 className="h-3 w-3 mr-1" />
-                Undo
-              </Button>
-            )}
-            
-            {polygonPoints.length >= 3 && (
-              <Button
-                size="sm"
-                className="h-6 text-xs px-2"
-                onClick={completePolygon}
-              >
-                <Check className="h-3 w-3 mr-1" />
-                Close
-              </Button>
-            )}
             
             <Button
               variant="ghost"

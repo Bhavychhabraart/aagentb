@@ -162,7 +162,7 @@ export function LayoutZoneModal({
               </div>
               {isDrawing && (
                 <div className="text-xs text-primary bg-primary/10 px-3 py-2 rounded-lg">
-                  Click on the layout to draw polygon points. Click the first point or press "Close" to complete.
+                  Click and drag on the layout to select a rectangular area.
                 </div>
               )}
             </div>
@@ -220,10 +220,7 @@ export function LayoutZoneModal({
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-medium truncate">{zone.name}</p>
                         <p className="text-xs text-muted-foreground">
-                          {zone.polygon_points && zone.polygon_points.length >= 3 
-                            ? `${zone.polygon_points.length} points`
-                            : `${(zone.x_end - zone.x_start).toFixed(0)}% × ${(zone.y_end - zone.y_start).toFixed(0)}%`
-                          }
+                          {`${(zone.x_end - zone.x_start).toFixed(0)}% × ${(zone.y_end - zone.y_start).toFixed(0)}%`}
                         </p>
                       </div>
 
