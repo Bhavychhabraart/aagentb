@@ -763,6 +763,7 @@ export function SplitWorkspace({
                 <ZonesPanel
                   projectId={projectId}
                   renderUrl={birdEyeRenderUrl}
+                  layoutImageUrl={layoutImageUrl}
                   onZoneSelect={onZoneSelect}
                   selectedZoneId={selectedZoneId || null}
                   onEditZones={onToggleZonesPanel}
