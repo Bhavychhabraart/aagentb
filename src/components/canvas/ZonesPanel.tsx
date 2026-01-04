@@ -12,7 +12,7 @@ interface ZonesPanelProps {
   renderUrl: string | null;
   onZoneSelect: (zone: Zone | null) => void;
   selectedZoneId: string | null;
-  onStartDrawing: () => void;
+  onEditZones: () => void;
   onGenerateZoneView: (zone: Zone) => void;
   isGenerating: boolean;
   onClose: () => void;
@@ -23,7 +23,7 @@ export function ZonesPanel({
   renderUrl,
   onZoneSelect,
   selectedZoneId,
-  onStartDrawing,
+  onEditZones,
   onGenerateZoneView,
   isGenerating,
   onClose,
@@ -105,11 +105,10 @@ export function ZonesPanel({
             variant="ghost"
             size="sm"
             className="h-7 text-xs"
-            onClick={onStartDrawing}
-            disabled={!renderUrl}
+            onClick={onEditZones}
           >
             <Plus className="h-3 w-3 mr-1" />
-            Add Zone
+            Edit Zones
           </Button>
           <Button variant="ghost" size="icon" className="h-6 w-6" onClick={onClose}>
             <X className="h-3 w-3" />
@@ -127,7 +126,7 @@ export function ZonesPanel({
           <div className="text-center py-6 text-muted-foreground">
             <Layers className="h-8 w-8 mx-auto mb-2 opacity-50" />
             <p className="text-xs">No zones defined</p>
-            <p className="text-[10px] mt-1">Click "Add Zone" to draw a polygon zone on your render</p>
+            <p className="text-[10px] mt-1">Click "Edit Zones" to draw zones on your layout</p>
           </div>
         ) : (
           <div className="space-y-1">

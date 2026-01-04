@@ -25,6 +25,7 @@ import { generateSelectionMask } from '@/utils/generateSelectionMask';
 import { RenderHistoryItem } from '@/components/canvas/RenderHistoryCarousel';
 import { CameraView, ZoneRegion } from '@/components/canvas/MulticamPanel';
 import { LayoutUploadModal } from '@/components/creation/LayoutUploadModal';
+import { LayoutZoneModal } from '@/components/canvas/LayoutZoneModal';
 import { RoomPhotoModal } from '@/components/creation/RoomPhotoModal';
 import { StyleRefModal } from '@/components/creation/StyleRefModal';
 import { ProductPickerModal, ProductItem } from '@/components/creation/ProductPickerModal';
@@ -129,6 +130,7 @@ const Index = () => {
 
   // Zone selection state
   const [showZonesPanel, setShowZonesPanel] = useState(false);
+  const [showLayoutZoneModal, setShowLayoutZoneModal] = useState(false);
   const [isDrawingZone, setIsDrawingZone] = useState(false);
   const [selectedZoneId, setSelectedZoneId] = useState<string | null>(null);
   const [zones, setZones] = useState<Zone[]>([]);
@@ -2437,8 +2439,8 @@ ABSOLUTE REQUIREMENTS FOR CONSISTENCY:
     }
   }, [currentProjectId, loadZones]);
 
-  // Create a new zone
-  const handleZoneCreate = useCallback(async (zone: Omit<Zone, 'id'>) => {
+  // Create a new zone (now with layout reference)
+  const handleZoneCreate = useCallback(async (zone: Omit<Zone, 'id'>, layoutUrl?: string) => {
     if (!user || !currentProjectId) return;
 
     const { data, error } = await supabase
@@ -2452,6 +2454,7 @@ ABSOLUTE REQUIREMENTS FOR CONSISTENCY:
         y_start: zone.y_start,
         x_end: zone.x_end,
         y_end: zone.y_end,
+        layout_reference_url: layoutUrl || layoutImageUrl || null,
       }])
       .select()
       .single();
@@ -2475,7 +2478,7 @@ ABSOLUTE REQUIREMENTS FOR CONSISTENCY:
     setZones(prev => [...prev, newZone]);
     setSelectedZoneId(data.id);
     toast({ title: 'Zone created', description: `"${zone.name}" added` });
-  }, [user, currentProjectId, toast]);
+  }, [user, currentProjectId, layoutImageUrl, toast]);
 
   // Delete a zone
   const handleZoneDelete = useCallback(async (zoneId: string) => {
@@ -3357,15 +3360,25 @@ ABSOLUTE REQUIREMENTS FOR CONSISTENCY:
             projectId={currentProjectId || undefined}
             zones={zones}
             selectedZoneId={selectedZoneId}
-            isDrawingZone={isDrawingZone}
+            isDrawingZone={false}
             showZonesPanel={showZonesPanel}
             onZoneCreate={handleZoneCreate}
             onZoneDelete={handleZoneDelete}
             onZoneSelect={handleZoneSelect}
-            onStartZoneDrawing={() => setIsDrawingZone(true)}
-            onStopZoneDrawing={() => setIsDrawingZone(false)}
+            onStartZoneDrawing={() => {}}
+            onStopZoneDrawing={() => {}}
             onGenerateZoneView={handleGenerateZoneView}
-            onToggleZonesPanel={() => setShowZonesPanel(!showZonesPanel)}
+            onToggleZonesPanel={() => {
+              if (layoutImageUrl) {
+                setShowLayoutZoneModal(true);
+              } else {
+                toast({ 
+                  variant: 'destructive', 
+                  title: 'No layout available', 
+                  description: 'Upload a 2D layout first to define zones' 
+                });
+              }
+            }}
             generatingZoneName={generatingZoneName}
             generatingViewType={generatingViewType}
             // Enhanced tools props
@@ -3575,6 +3588,21 @@ ABSOLUTE REQUIREMENTS FOR CONSISTENCY:
           onConfirm={handleCompositeConfirm}
           onCancel={() => setShowPositioner(false)}
           isProcessing={isGenerating}
+        />
+      )}
+
+      {/* Layout Zone Modal - Full screen zone drawing on layout */}
+      {layoutImageUrl && currentProjectId && (
+        <LayoutZoneModal
+          isOpen={showLayoutZoneModal}
+          onClose={() => setShowLayoutZoneModal(false)}
+          projectId={currentProjectId}
+          layoutImageUrl={layoutImageUrl}
+          renderUrl={currentRenderUrl}
+          onZoneCreate={handleZoneCreate}
+          onZoneDelete={handleZoneDelete}
+          onGenerateZoneView={handleGenerateZoneView}
+          isGenerating={isGenerating || isMulticamGenerating}
         />
       )}
 
