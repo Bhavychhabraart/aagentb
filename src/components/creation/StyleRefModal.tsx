@@ -4,6 +4,7 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogDescription,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Upload, Palette, X, Plus } from "lucide-react";
@@ -77,6 +78,9 @@ export function StyleRefModal({
             <Palette className="w-5 h-5 text-primary" />
             Add Style References
           </DialogTitle>
+          <DialogDescription className="sr-only">
+            Upload mood board images to define your style direction
+          </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4">
