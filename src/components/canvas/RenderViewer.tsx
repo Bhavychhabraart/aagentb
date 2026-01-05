@@ -540,9 +540,9 @@ export function RenderViewer({
                   )}
                   
                   {/* Selection overlay */}
-                  {selectionMode && imageUrl && (
+                  {selectionMode && displayUrl && (
                     <SelectionOverlay
-                      imageUrl={imageUrl}
+                      imageUrl={displayUrl}
                       isActive={selectionMode && !currentSelection}
                       onSelectionComplete={handleSelectionComplete}
                     />
