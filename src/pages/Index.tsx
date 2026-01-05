@@ -198,6 +198,14 @@ const Index = () => {
   // Start Over and Upscale state
   const [showStartOverDialog, setShowStartOverDialog] = useState(false);
   const [isUpscaling, setIsUpscaling] = useState(false);
+  
+  // Pending regeneration state for Start Over - triggers generation after state resets
+  const [pendingRegeneration, setPendingRegeneration] = useState<{
+    layoutUrl: string | null;
+    roomPhotoUrl: string | null;
+    styleRefUrls: string[];
+    products: Array<{ id: string; name: string; imageUrl: string }>;
+  } | null>(null);
   const [showStagedItemsModal, setShowStagedItemsModal] = useState(false);
   const [isApplyingStyle, setIsApplyingStyle] = useState(false);
   
@@ -3342,19 +3350,19 @@ ABSOLUTE REQUIREMENTS FOR CONSISTENCY:
     }
   }, [user, currentProjectId, addMessage, toast]);
 
-  // Handle style references from chat
-  const handleStyleRefsFromChat = useCallback(async (items: Array<{ file?: File; preview: string; name: string }>) => {
+  // Handle style references from chat - returns uploaded URLs for chaining
+  const handleStyleRefsFromChat = useCallback(async (items: Array<{ file?: File; preview: string; name: string }>): Promise<string[]> => {
     if (!user) {
       toast({ variant: 'destructive', title: 'Error', description: 'You must be logged in to upload' });
-      return;
+      return [];
     }
     if (!currentProjectId) {
       toast({ variant: 'destructive', title: 'Error', description: 'No project selected' });
-      return;
+      return [];
     }
     if (!items.length || items.every(i => !i.file)) {
       toast({ variant: 'destructive', title: 'Error', description: 'No files selected' });
-      return;
+      return [];
     }
     
     try {
@@ -3389,9 +3397,11 @@ ABSOLUTE REQUIREMENTS FOR CONSISTENCY:
       await addMessage('user', `Added ${uploadedUrls.length} style reference${uploadedUrls.length > 1 ? 's' : ''}`, { type: 'upload' });
       toast({ title: 'Style references added' });
       setShowStyleRefModal(false);
+      return uploadedUrls;
     } catch (error) {
       console.error('Style refs upload failed:', error);
       toast({ variant: 'destructive', title: 'Upload failed', description: 'Please try again' });
+      return [];
     }
   }, [user, currentProjectId, addMessage, toast]);
 
@@ -3479,11 +3489,13 @@ ABSOLUTE REQUIREMENTS FOR CONSISTENCY:
     if (!user || !currentProjectId) return;
     
     try {
-      // Store current assets (already in state)
-      const currentLayoutUrl = layoutImageUrl;
-      const currentRoomPhotoUrl = roomPhotoUrl;
-      const currentStyleRefUrls = [...styleRefUrls];
-      const currentUploadedProducts = [...uploadedProducts];
+      // Store current assets BEFORE resetting state
+      const regenerationData = {
+        layoutUrl: layoutImageUrl,
+        roomPhotoUrl: roomPhotoUrl,
+        styleRefUrls: [...styleRefUrls],
+        products: [...uploadedProducts],
+      };
       
       // Delete existing renders from database for this project (cleanup)
       await supabase
@@ -3491,11 +3503,15 @@ ABSOLUTE REQUIREMENTS FOR CONSISTENCY:
         .delete()
         .eq('project_id', currentProjectId);
       
-      // Delete staged furniture from database
-      await supabase
-        .from('staged_furniture')
-        .delete()
-        .eq('project_id', currentProjectId);
+      // Delete staged furniture from database (with error handling)
+      try {
+        await supabase
+          .from('staged_furniture')
+          .delete()
+          .eq('project_id', currentProjectId);
+      } catch (e) {
+        console.warn('Could not clear staged furniture:', e);
+      }
       
       // Reset ONLY render-related state - keep assets and project
       setMessages([]);
@@ -3519,27 +3535,40 @@ ABSOLUTE REQUIREMENTS FOR CONSISTENCY:
       toast({ title: 'Regenerating render...', description: 'Starting fresh with your original inputs' });
       setShowStartOverDialog(false);
       
-      // Automatically trigger render with all original inputs
-      setTimeout(() => {
-        const hasAssets = currentLayoutUrl || currentRoomPhotoUrl || currentStyleRefUrls.length > 0;
-        if (hasAssets) {
-          let prompt = 'Generate a fresh interior design render';
-          if (currentLayoutUrl) prompt += ' based on the floor plan layout';
-          if (currentRoomPhotoUrl) prompt += ' for the uploaded room photo';
-          if (currentStyleRefUrls.length > 0) prompt += ' with the selected style references';
-          if (currentUploadedProducts.length > 0) {
-            const productNames = currentUploadedProducts.slice(0, 3).map(p => p.name).join(', ');
-            prompt += ` featuring ${productNames}`;
-          }
-          
-          handleSendMessageWithAgentB(prompt);
-        }
-      }, 500);
+      // Set pending regeneration - useEffect will trigger after state resets complete
+      setPendingRegeneration(regenerationData);
+      
     } catch (error) {
       console.error('Failed to start over:', error);
       toast({ variant: 'destructive', title: 'Error', description: 'Failed to regenerate' });
     }
-  }, [user, toast, layoutImageUrl, roomPhotoUrl, styleRefUrls, uploadedProducts, currentProjectId, handleSendMessageWithAgentB]);
+  }, [user, toast, layoutImageUrl, roomPhotoUrl, styleRefUrls, uploadedProducts, currentProjectId]);
+
+  // Effect to trigger regeneration after state resets complete (for Start Over)
+  useEffect(() => {
+    if (pendingRegeneration && !currentRenderUrl && user && currentProjectId) {
+      const { layoutUrl, roomPhotoUrl: pendingRoomPhoto, styleRefUrls: pendingStyles, products } = pendingRegeneration;
+      
+      const hasAssets = layoutUrl || pendingRoomPhoto || pendingStyles.length > 0 || products.length > 0;
+      if (hasAssets) {
+        let prompt = 'Generate a fresh interior design render';
+        if (layoutUrl) prompt += ' based on the floor plan layout';
+        if (pendingRoomPhoto) prompt += ' for the uploaded room photo';
+        if (pendingStyles.length > 0) prompt += ' with the selected style references';
+        if (products.length > 0) {
+          const productNames = products.slice(0, 3).map(p => p.name).join(', ');
+          prompt += ` featuring ${productNames}`;
+        }
+        
+        // Use triggerGeneration directly instead of handleSendMessageWithAgentB
+        // to avoid Agent B flow interference
+        triggerGeneration(prompt, []);
+      }
+      
+      // Clear pending state
+      setPendingRegeneration(null);
+    }
+  }, [pendingRegeneration, currentRenderUrl, user, currentProjectId, triggerGeneration]);
 
   // Handle Upscale Render
   const handleUpscaleRender = useCallback(async () => {
@@ -3645,7 +3674,80 @@ ABSOLUTE REQUIREMENTS FOR CONSISTENCY:
     }
   }, [currentRenderUrl, styleRefUrls, user, currentProjectId, currentRoomId, currentRenderId, toast]);
 
-  // Handle Save Multicam Grid to History
+  // Handle Apply Style with Upload - combines upload + apply in atomic operation
+  const handleApplyStyleWithUpload = useCallback(async (items: Array<{ file?: File; preview: string; name: string }>) => {
+    if (!currentRenderUrl) {
+      toast({ variant: 'destructive', title: 'No render available', description: 'Generate a render first' });
+      return;
+    }
+    
+    setIsApplyingStyle(true);
+    
+    try {
+      // First upload the new style refs and wait for completion
+      const newUrls = await handleStyleRefsFromChat(items);
+      
+      // Combine with existing style refs
+      const allStyleUrls = [...styleRefUrls, ...newUrls];
+      
+      if (allStyleUrls.length === 0) {
+        toast({ variant: 'destructive', title: 'No style references', description: 'Add style reference images first' });
+        return;
+      }
+      
+      // Apply style with all URLs
+      const response = await supabase.functions.invoke('edit-render', {
+        body: {
+          currentRenderUrl,
+          styleRefUrls: allStyleUrls,
+          userPrompt: 'Apply the color palette, mood, lighting, and aesthetic from the style reference images. CRITICAL: Do NOT change, move, add, or remove ANY furniture items. Keep all furniture exactly as they are. Only modify: wall colors, lighting atmosphere, color temperature, material finishes, and overall mood to match the style references.',
+          textOnlyEdit: true,
+        }
+      });
+      
+      if (response.error) throw response.error;
+      
+      const newRenderUrl = response.data?.imageUrl;
+      if (!newRenderUrl) throw new Error('No image returned');
+      
+      // Save to database
+      if (user && currentProjectId) {
+        const { data: renderData } = await supabase
+          .from('renders')
+          .insert({
+            project_id: currentProjectId,
+            room_id: currentRoomId,
+            user_id: user.id,
+            prompt: 'Style applied from references',
+            render_url: newRenderUrl,
+            status: 'completed',
+            parent_render_id: currentRenderId,
+          })
+          .select()
+          .single();
+        
+        if (renderData) {
+          setCurrentRenderId(renderData.id);
+          setAllRenders(prev => [...prev, {
+            id: renderData.id,
+            render_url: newRenderUrl,
+            prompt: 'Style applied',
+            parent_render_id: currentRenderId,
+            created_at: new Date().toISOString(),
+          }]);
+        }
+      }
+      
+      setCurrentRenderUrl(newRenderUrl);
+      setAllRenderUrls(prev => [...prev, newRenderUrl]);
+      toast({ title: 'Style applied!', description: 'Color palette and mood updated' });
+    } catch (error) {
+      console.error('Apply style with upload failed:', error);
+      toast({ variant: 'destructive', title: 'Apply style failed', description: 'Please try again' });
+    } finally {
+      setIsApplyingStyle(false);
+    }
+  }, [currentRenderUrl, styleRefUrls, user, currentProjectId, currentRoomId, currentRenderId, toast, handleStyleRefsFromChat]);
   const handleSaveMulticamToHistory = useCallback(async (imageUrl: string, prompt: string, viewType: string) => {
     if (!user || !currentProjectId) return;
     
@@ -4082,6 +4184,7 @@ ABSOLUTE REQUIREMENTS FOR CONSISTENCY:
         onOpenChange={setShowStyleRefModal}
         onUpload={handleStyleRefsFromChat}
         currentUploads={[]}
+        onApplyStyleWithUpload={handleApplyStyleWithUpload}
         onApplyStyle={handleApplyStyle}
         isApplyingStyle={isApplyingStyle}
         hasRender={!!currentRenderUrl}
