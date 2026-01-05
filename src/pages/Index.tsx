@@ -3568,7 +3568,7 @@ ABSOLUTE REQUIREMENTS FOR CONSISTENCY:
       link.click();
       document.body.removeChild(link);
       
-      toast({ title: 'Upscaled!', description: 'HD image downloaded' });
+      toast({ title: 'Upscaled to 2K!', description: 'High-resolution image downloaded' });
     } catch (error) {
       console.error('Upscale failed:', error);
       toast({ variant: 'destructive', title: 'Upscale failed', description: 'Please try again' });
@@ -3644,6 +3644,42 @@ ABSOLUTE REQUIREMENTS FOR CONSISTENCY:
       setIsApplyingStyle(false);
     }
   }, [currentRenderUrl, styleRefUrls, user, currentProjectId, currentRoomId, currentRenderId, toast]);
+
+  // Handle Save Multicam Grid to History
+  const handleSaveMulticamToHistory = useCallback(async (imageUrl: string, prompt: string, viewType: string) => {
+    if (!user || !currentProjectId) return;
+    
+    try {
+      const { data: renderData } = await supabase
+        .from('renders')
+        .insert({
+          project_id: currentProjectId,
+          room_id: currentRoomId,
+          user_id: user.id,
+          prompt: prompt,
+          render_url: imageUrl,
+          status: 'completed',
+          parent_render_id: currentRenderId,
+          view_type: viewType,
+        })
+        .select()
+        .single();
+      
+      if (renderData) {
+        setAllRenders(prev => [...prev, {
+          id: renderData.id,
+          render_url: imageUrl,
+          prompt: prompt,
+          parent_render_id: currentRenderId,
+          created_at: new Date().toISOString(),
+          view_type: viewType,
+        }]);
+        setAllRenderUrls(prev => [...prev, imageUrl]);
+      }
+    } catch (error) {
+      console.error('Failed to save multicam to history:', error);
+    }
+  }, [user, currentProjectId, currentRoomId, currentRenderId]);
 
   // Loading state - early returns AFTER all hooks
   if (authLoading) {
@@ -3767,6 +3803,9 @@ ABSOLUTE REQUIREMENTS FOR CONSISTENCY:
             styleRefCount={styleRefUrls.length}
             onApplyStyle={handleApplyStyle}
             isApplyingStyle={isApplyingStyle}
+            // Multicam history save props
+            onSaveMulticamToHistory={handleSaveMulticamToHistory}
+            userId={user.id}
           />
 
           {/* Selection is now handled inside PremiumWorkspace */}

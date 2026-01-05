@@ -54,9 +54,9 @@ serve(async (req) => {
     const logUrl = imageUrl.length > 200 ? `${imageUrl.substring(0, 200)}...` : imageUrl;
     console.log("Sending image to AI gateway:", logUrl);
 
-    // Use Lovable AI to upscale the image
+    // Use Lovable AI to upscale the image to 2K resolution
     // Using gemini-3-pro-image-preview for better image editing/upscaling quality
-    console.log("Calling AI gateway for upscaling...");
+    console.log("Calling AI gateway for 2K upscaling...");
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
       headers: {
@@ -71,7 +71,19 @@ serve(async (req) => {
             content: [
               {
                 type: "text",
-                text: "Upscale this image to higher resolution. Enhance details, improve sharpness, and increase quality while maintaining the original composition and style exactly. Make sure the output is a high-quality, detailed version of the input image with no changes to the content."
+                text: `UPSCALE this image to 2K resolution (2560x1440 or higher).
+
+CRITICAL REQUIREMENTS:
+- Output resolution: Minimum 2560x1440 pixels (2K/WQHD)
+- Enhance fine details: textures, materials, edges, fabric weaves
+- Improve sharpness and clarity significantly
+- Preserve EXACT composition, colors, lighting, and style
+- NO changes to content, design, or artistic elements
+- Professional print-ready quality with high DPI
+- Maintain aspect ratio of original image
+
+This is a HIGH-RESOLUTION UPSCALE. The output MUST be dramatically larger and more detailed than the input.
+Focus on: sharp edges, crisp textures, enhanced material details, and photorealistic quality.`
               },
               {
                 type: "image_url",
@@ -82,7 +94,10 @@ serve(async (req) => {
             ]
           }
         ],
-        modalities: ["image", "text"]
+        modalities: ["image", "text"],
+        generationConfig: { 
+          aspectRatio: "16:9"
+        }
       }),
     });
 
@@ -179,7 +194,8 @@ serve(async (req) => {
     return new Response(
       JSON.stringify({ 
         success: true, 
-        upscaledUrl: publicUrl.publicUrl 
+        upscaledUrl: publicUrl.publicUrl,
+        resolution: '2K (2560x1440+)'
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );

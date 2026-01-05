@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Camera, Loader2, X, Download, Presentation, Grid2X2, RefreshCw, Layers, Plus } from 'lucide-react';
+import { Camera, Loader2, X, Download, Presentation, Grid2X2, RefreshCw, Layers, Plus, Building, Newspaper, Focus, Sparkles, Layout, Users, Film, ChevronRight, ChevronLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
@@ -16,6 +16,25 @@ export interface ZoneRegion {
   y_end: number;
 }
 
+interface GridPreset {
+  id: string;
+  name: string;
+  views: string[];
+  description: string;
+}
+
+const GRID_PRESETS: GridPreset[] = [
+  { id: 'standard', name: 'Standard Views', views: ['eye-level', 'overhead', 'wide', 'macro'], description: 'Eye Level • Overhead • Wide • Detail' },
+  { id: 'cinematic', name: 'Cinematic Pack', views: ['dramatic', 'low', 'photographer', 'fisheye'], description: 'Dramatic • Low • Editorial • Fish-Eye' },
+  { id: 'architectural', name: 'Architectural', views: ['straight-on', 'corner', 'top-down', 'isometric'], description: 'Symmetrical • Corner • Top-Down • Isometric' },
+  { id: 'magazine', name: 'Magazine Style', views: ['photographer', 'eye-level', 'wide', 'macro'], description: 'Editorial • Eye Level • Wide • Close-Up' },
+  { id: 'presentation', name: 'Presentation', views: ['eye-level', 'corner', 'top-down', 'wide'], description: 'Eye Level • Corner • Plan View • Wide' },
+  { id: 'detail', name: 'Detail Focus', views: ['macro', 'low', 'eye-level', 'photographer'], description: 'Close-Up • Hero • Eye Level • Editorial' },
+  { id: 'dramatic', name: 'Dramatic Angles', views: ['fisheye', 'low', 'dramatic', 'corner'], description: 'Fish-Eye • Hero • Moody • Corner' },
+  { id: 'overview', name: 'Full Overview', views: ['overhead', 'top-down', 'isometric', 'wide'], description: 'Overhead • Plan • Isometric • Wide' },
+  { id: 'client', name: 'Client Ready', views: ['eye-level', 'corner', 'photographer', 'wide'], description: 'Eye Level • Corner • Editorial • Wide' },
+];
+
 interface MulticamPanelProps {
   onGenerateView: (view: CameraView, customPrompt?: string, zone?: ZoneRegion) => void;
   isGenerating: boolean;
@@ -27,6 +46,8 @@ interface MulticamPanelProps {
   onStartZoneDrawing?: () => void;
   currentRenderUrl?: string;
   styleRefUrls?: string[];
+  onSaveToHistory?: (imageUrl: string, prompt: string, viewType: string) => void;
+  userId?: string;
 }
 
 export function MulticamPanel({ 
@@ -40,6 +61,8 @@ export function MulticamPanel({
   onStartZoneDrawing,
   currentRenderUrl,
   styleRefUrls,
+  onSaveToHistory,
+  userId,
 }: MulticamPanelProps) {
   const { toast } = useToast();
   const [isExporting, setIsExporting] = useState(false);
@@ -47,6 +70,9 @@ export function MulticamPanel({
   const [selectedZone, setSelectedZone] = useState<Zone | null>(null);
   const [isGeneratingGrid, setIsGeneratingGrid] = useState(false);
   const [compositeGridUrl, setCompositeGridUrl] = useState<string | null>(null);
+  const [selectedPresetIndex, setSelectedPresetIndex] = useState(0);
+
+  const selectedPreset = GRID_PRESETS[selectedPresetIndex];
 
   // Load zones when projectId changes
   useEffect(() => {
@@ -104,7 +130,7 @@ export function MulticamPanel({
         body: JSON.stringify({
           currentRenderUrl,
           mode: 'grid',
-          views: ['eye-level', 'overhead', 'wide', 'macro'],
+          views: selectedPreset.views,
           styleRefUrls,
           zone,
         }),
@@ -127,8 +153,13 @@ export function MulticamPanel({
         setCompositeGridUrl(data.imageUrl);
         toast({ 
           title: '2x2 Grid Generated!', 
-          description: 'All 4 camera angles in one image.' 
+          description: `${selectedPreset.name} - All 4 camera angles in one image.` 
         });
+
+        // Save to render history
+        if (onSaveToHistory) {
+          onSaveToHistory(data.imageUrl, `Multicam Grid: ${selectedPreset.name}`, 'multicam_grid');
+        }
       }
     } catch (error) {
       console.error('Generate grid error:', error);
@@ -152,7 +183,7 @@ export function MulticamPanel({
       const blobUrl = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = blobUrl;
-      a.download = formatDownloadFilename('multicam', 'grid', 'png');
+      a.download = formatDownloadFilename('multicam', selectedPreset.id, 'png');
       a.click();
       URL.revokeObjectURL(blobUrl);
       toast({ title: 'Grid downloaded!' });
@@ -171,13 +202,13 @@ export function MulticamPanel({
     try {
       const pptx = new pptxgen();
       pptx.author = 'Design Studio';
-      pptx.title = 'Camera Views Grid';
+      pptx.title = `Camera Views - ${selectedPreset.name}`;
       pptx.subject = 'Room Design - 4 Camera Angles';
 
       const slide = pptx.addSlide();
       
       // Add title
-      slide.addText('Camera Views - 2x2 Grid', {
+      slide.addText(`Camera Views - ${selectedPreset.name}`, {
         x: 0.5,
         y: 0.3,
         w: '90%',
@@ -188,7 +219,7 @@ export function MulticamPanel({
       });
 
       // Add subtitle with view labels
-      slide.addText('Eye Level | Overhead | Wide Angle | Detail Shot', {
+      slide.addText(selectedPreset.description, {
         x: 0.5,
         y: 0.8,
         w: '90%',
@@ -208,7 +239,7 @@ export function MulticamPanel({
       });
 
       const { formatDownloadFilename } = await import('@/utils/formatDownloadFilename');
-      await pptx.writeFile({ fileName: formatDownloadFilename('ppt', 'camera-views', 'pptx') });
+      await pptx.writeFile({ fileName: formatDownloadFilename('ppt', `camera-views-${selectedPreset.id}`, 'pptx') });
       toast({ title: 'PowerPoint exported!' });
     } catch (error) {
       console.error('PPT export failed:', error);
@@ -223,6 +254,16 @@ export function MulticamPanel({
       onSetAsMain(compositeGridUrl);
       toast({ title: 'Grid set as main render' });
     }
+  };
+
+  const handlePrevPreset = () => {
+    setSelectedPresetIndex((prev) => (prev === 0 ? GRID_PRESETS.length - 1 : prev - 1));
+    setCompositeGridUrl(null);
+  };
+
+  const handleNextPreset = () => {
+    setSelectedPresetIndex((prev) => (prev === GRID_PRESETS.length - 1 ? 0 : prev + 1));
+    setCompositeGridUrl(null);
   };
 
   return (
@@ -241,6 +282,36 @@ export function MulticamPanel({
         <Button variant="ghost" size="icon" className="h-6 w-6" onClick={onClose}>
           <X className="h-3 w-3" />
         </Button>
+      </div>
+
+      {/* Grid Preset Selector */}
+      <div className="px-3 py-2 border-b border-border/30">
+        <div className="flex items-center justify-between mb-1">
+          <span className="text-[10px] text-muted-foreground uppercase tracking-wider">Grid Style</span>
+          <span className="text-[10px] text-muted-foreground">{selectedPresetIndex + 1} / {GRID_PRESETS.length}</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-7 w-7 shrink-0"
+            onClick={handlePrevPreset}
+          >
+            <ChevronLeft className="h-4 w-4" />
+          </Button>
+          <div className="flex-1 text-center">
+            <p className="text-sm font-medium text-foreground">{selectedPreset.name}</p>
+            <p className="text-[10px] text-muted-foreground">{selectedPreset.description}</p>
+          </div>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-7 w-7 shrink-0"
+            onClick={handleNextPreset}
+          >
+            <ChevronRight className="h-4 w-4" />
+          </Button>
+        </div>
       </div>
 
       {/* Zone selector */}
@@ -307,10 +378,11 @@ export function MulticamPanel({
               Generate a single image with 4 different camera angles of your room
             </p>
             <div className="mt-3 grid grid-cols-2 gap-1 text-[9px] text-muted-foreground/70">
-              <span className="px-2 py-1 bg-muted/10 rounded">Eye Level</span>
-              <span className="px-2 py-1 bg-muted/10 rounded">Overhead</span>
-              <span className="px-2 py-1 bg-muted/10 rounded">Wide Angle</span>
-              <span className="px-2 py-1 bg-muted/10 rounded">Detail Shot</span>
+              {selectedPreset.views.map((view, idx) => (
+                <span key={idx} className="px-2 py-1 bg-muted/10 rounded capitalize">
+                  {view.replace('-', ' ')}
+                </span>
+              ))}
             </div>
           </div>
         )}
