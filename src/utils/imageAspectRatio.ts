@@ -35,11 +35,8 @@ export async function getImageAspectRatio(imageUrl: string): Promise<string> {
 }
 
 export function getClosestSupportedRatio(ratio: number): string {
-  // Bias toward 16:9 for widescreen renders (ratio >= 1.5)
-  if (ratio >= 1.5) return '16:9';
-  
-  // Standard landscape (between square and widescreen)
-  if (ratio >= 1.15 && ratio < 1.5) return '4:3';
+  // Any landscape image uses 16:9 to prevent unwanted cropping/zooming
+  if (ratio >= 1.15) return '16:9';
   
   // Square-ish
   if (ratio >= 0.85 && ratio < 1.15) return '1:1';
