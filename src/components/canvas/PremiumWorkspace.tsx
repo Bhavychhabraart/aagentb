@@ -25,7 +25,9 @@ import {
   Trash2,
   Columns2,
   Target,
-  SplitSquareHorizontal
+  SplitSquareHorizontal,
+  Palette,
+  Paintbrush
 } from 'lucide-react';
 import { RenderHistoryCarousel, RenderHistoryItem } from './RenderHistoryCarousel';
 import { CatalogFurnitureItem } from '@/services/catalogService';
@@ -115,6 +117,12 @@ interface PremiumWorkspaceProps {
   // Comparison props
   onToggleComparison?: () => void;
   showComparison?: boolean;
+  // Style reference props
+  onToggleStyleRef?: () => void;
+  showStyleRef?: boolean;
+  styleRefCount?: number;
+  onApplyStyle?: () => void;
+  isApplyingStyle?: boolean;
 }
 
 interface ToolbarItem {
@@ -185,6 +193,12 @@ export function PremiumWorkspace({
   // Comparison props
   onToggleComparison,
   showComparison,
+  // Style reference props
+  onToggleStyleRef,
+  showStyleRef,
+  styleRefCount = 0,
+  onApplyStyle,
+  isApplyingStyle,
 }: PremiumWorkspaceProps) {
   const [showDirectorInput, setShowDirectorInput] = useState(false);
   const [directorPrompt, setDirectorPrompt] = useState('');
@@ -302,6 +316,27 @@ export function PremiumWorkspace({
       active: showMarkerStaging,
       shortcut: 'M',
       group: 'placement',
+    },
+  ];
+
+  const styleTools: ToolbarItem[] = [
+    {
+      id: 'styleref',
+      icon: Palette,
+      label: styleRefCount > 0 ? `Styles (${styleRefCount})` : 'Styles',
+      onClick: onToggleStyleRef,
+      active: showStyleRef || styleRefCount > 0,
+      shortcut: 'Y',
+      group: 'style',
+    },
+    {
+      id: 'applystyle',
+      icon: isApplyingStyle ? Loader2 : Paintbrush,
+      label: isApplyingStyle ? 'Applying...' : 'Apply Style',
+      onClick: onApplyStyle,
+      disabled: !renderUrl || isGenerating || styleRefCount === 0 || isApplyingStyle,
+      shortcut: 'T',
+      group: 'style',
     },
   ];
 
@@ -439,6 +474,11 @@ export function PremiumWorkspace({
             
             {/* Panel Tools */}
             {renderToolGroup(panelTools)}
+            
+            <Separator orientation="vertical" className="h-6 mx-1 bg-border/30" />
+            
+            {/* Style Tools */}
+            {renderToolGroup(styleTools)}
             
             <Separator orientation="vertical" className="h-6 mx-1 bg-border/30" />
             

@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { cn } from '@/lib/utils';
-import { Send, Plus, Brain, Loader2, Image, Layout, Palette, Package, Sparkles, X, Wand2 } from 'lucide-react';
+import { Send, Plus, Brain, Loader2, Image, Package, X, Wand2 } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import {
   DropdownMenu,
@@ -20,11 +20,7 @@ interface SleekChatInputProps {
   isLoading?: boolean;
   agentBEnabled?: boolean;
   onAgentBToggle?: (enabled: boolean) => void;
-  onLayoutUpload?: () => void;
   onRoomPhotoUpload?: () => void;
-  onStyleRefUpload?: () => void;
-  onProductsPick?: () => void;
-  onOpenCatalog?: () => void;
   placeholder?: string;
   uploadedProducts?: UploadedProduct[];
   onClearProducts?: () => void;
@@ -35,11 +31,7 @@ export function SleekChatInput({
   isLoading,
   agentBEnabled,
   onAgentBToggle,
-  onLayoutUpload,
   onRoomPhotoUpload,
-  onStyleRefUpload,
-  onProductsPick,
-  onOpenCatalog,
   placeholder = 'Describe your vision...',
   uploadedProducts = [],
   onClearProducts,
@@ -143,35 +135,11 @@ export function SleekChatInput({
                 <Plus className="h-4 w-4" />
               </button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="start" className="w-48 glass-premium">
-              {onLayoutUpload && (
-                <DropdownMenuItem onClick={onLayoutUpload} className="gap-2">
-                  <Layout className="h-4 w-4" />
-                  Add 2D Layout
-                </DropdownMenuItem>
-              )}
+          <DropdownMenuContent align="start" className="w-48 glass-premium">
               {onRoomPhotoUpload && (
                 <DropdownMenuItem onClick={onRoomPhotoUpload} className="gap-2">
                   <Image className="h-4 w-4" />
                   Add Room Photo
-                </DropdownMenuItem>
-              )}
-              {onStyleRefUpload && (
-                <DropdownMenuItem onClick={onStyleRefUpload} className="gap-2">
-                  <Palette className="h-4 w-4" />
-                  Add Style Reference
-                </DropdownMenuItem>
-              )}
-              {onOpenCatalog && (
-                <DropdownMenuItem onClick={onOpenCatalog} className="gap-2">
-                  <Package className="h-4 w-4" />
-                  Browse Catalog
-                </DropdownMenuItem>
-              )}
-              {onProductsPick && (
-                <DropdownMenuItem onClick={onProductsPick} className="gap-2">
-                  <Sparkles className="h-4 w-4" />
-                  Add Products
                 </DropdownMenuItem>
               )}
             </DropdownMenuContent>
