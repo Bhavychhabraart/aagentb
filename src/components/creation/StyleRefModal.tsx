@@ -7,7 +7,7 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Upload, Palette, X, Plus, Paintbrush } from "lucide-react";
+import { Upload, Palette, X, Plus, Paintbrush, Loader2 } from "lucide-react";
 
 interface UploadedItem {
   file?: File;
@@ -18,8 +18,9 @@ interface UploadedItem {
 interface StyleRefModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onUpload: (items: UploadedItem[]) => void;
+  onUpload: (items: UploadedItem[]) => Promise<string[]> | void;
   currentUploads: UploadedItem[];
+  onApplyStyleWithUpload?: (items: UploadedItem[]) => Promise<void>;
   onApplyStyle?: () => void;
   isApplyingStyle?: boolean;
   hasRender?: boolean;
@@ -30,12 +31,14 @@ export function StyleRefModal({
   onOpenChange,
   onUpload,
   currentUploads,
+  onApplyStyleWithUpload,
   onApplyStyle,
   isApplyingStyle,
   hasRender,
 }: StyleRefModalProps) {
   const [previews, setPreviews] = useState<UploadedItem[]>(currentUploads);
   const [isDragging, setIsDragging] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
 
   const handleFileSelect = useCallback((files: FileList) => {
     const newPreviews: UploadedItem[] = [];
@@ -75,6 +78,27 @@ export function StyleRefModal({
   const handleConfirm = () => {
     onUpload(previews);
   };
+
+  // Handle Apply Style - waits for upload then applies
+  const handleApplyStyleClick = async () => {
+    if (previews.length === 0) return;
+    
+    setIsUploading(true);
+    try {
+      if (onApplyStyleWithUpload) {
+        // Use the combined function that uploads and applies atomically
+        await onApplyStyleWithUpload(previews);
+      } else {
+        // Fallback: upload first, then apply
+        await onUpload(previews);
+        onApplyStyle?.();
+      }
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  const isProcessing = isApplyingStyle || isUploading;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -162,16 +186,25 @@ export function StyleRefModal({
             <Button variant="outline" onClick={() => onOpenChange(false)}>
               Cancel
             </Button>
-            <Button onClick={handleConfirm} variant="secondary">
+            <Button onClick={handleConfirm} variant="secondary" disabled={isProcessing}>
               {previews.length > 0 ? `Add ${previews.length} Reference${previews.length > 1 ? "s" : ""}` : "Add References"}
             </Button>
             {previews.length > 0 && hasRender && (
               <Button 
-                onClick={() => { handleConfirm(); onApplyStyle?.(); }}
-                disabled={isApplyingStyle}
+                onClick={handleApplyStyleClick}
+                disabled={isProcessing}
               >
-                <Paintbrush className="w-4 h-4 mr-2" />
-                {isApplyingStyle ? 'Applying...' : 'Apply Style'}
+                {isProcessing ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    {isUploading ? 'Uploading...' : 'Applying...'}
+                  </>
+                ) : (
+                  <>
+                    <Paintbrush className="w-4 h-4 mr-2" />
+                    Apply Style
+                  </>
+                )}
               </Button>
             )}
           </div>
