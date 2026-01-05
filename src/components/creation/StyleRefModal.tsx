@@ -193,12 +193,13 @@ export function StyleRefModal({
               <Button 
                 onClick={handleApplyStyleClick}
                 disabled={isProcessing}
+                className={isProcessing ? "animate-glow-pulse" : ""}
               >
                 {isProcessing ? (
-                  <>
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                    {isUploading ? 'Uploading...' : 'Applying...'}
-                  </>
+                  <div className="flex items-center gap-2">
+                    <div className="h-2 w-2 rounded-full bg-primary-foreground animate-pulse" />
+                    <span>{isUploading ? 'Uploading...' : 'Applying...'}</span>
+                  </div>
                 ) : (
                   <>
                     <Paintbrush className="w-4 h-4 mr-2" />
