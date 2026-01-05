@@ -199,6 +199,7 @@ const Index = () => {
   const [showStartOverDialog, setShowStartOverDialog] = useState(false);
   const [isUpscaling, setIsUpscaling] = useState(false);
   const [showStagedItemsModal, setShowStagedItemsModal] = useState(false);
+  const [isApplyingStyle, setIsApplyingStyle] = useState(false);
   
   // Similar Products and Custom Product modal state
   const [showSimilarProductsModal, setShowSimilarProductsModal] = useState(false);
@@ -3641,6 +3642,74 @@ ABSOLUTE REQUIREMENTS FOR CONSISTENCY:
     }
   }, [currentRenderUrl, projectName, toast]);
 
+  // Handle Apply Style - applies style references to current render without changing furniture
+  const handleApplyStyle = useCallback(async () => {
+    if (!currentRenderUrl) {
+      toast({ variant: 'destructive', title: 'No render available', description: 'Generate a render first' });
+      return;
+    }
+    
+    if (styleRefUrls.length === 0) {
+      toast({ variant: 'destructive', title: 'No style references', description: 'Add style reference images first' });
+      return;
+    }
+    
+    setIsApplyingStyle(true);
+    
+    try {
+      const response = await supabase.functions.invoke('edit-render', {
+        body: {
+          currentRenderUrl,
+          styleRefUrls,
+          userPrompt: 'Apply the color palette, mood, lighting, and aesthetic from the style reference images. CRITICAL: Do NOT change, move, add, or remove ANY furniture items. Keep all furniture exactly as they are. Only modify: wall colors, lighting atmosphere, color temperature, material finishes, and overall mood to match the style references.',
+          textOnlyEdit: true,
+        }
+      });
+      
+      if (response.error) throw response.error;
+      
+      const newRenderUrl = response.data?.imageUrl;
+      if (!newRenderUrl) throw new Error('No image returned');
+      
+      // Save to database
+      if (user && currentProjectId) {
+        const { data: renderData } = await supabase
+          .from('renders')
+          .insert({
+            project_id: currentProjectId,
+            room_id: currentRoomId,
+            user_id: user.id,
+            prompt: 'Style applied from references',
+            render_url: newRenderUrl,
+            status: 'completed',
+            parent_render_id: currentRenderId,
+          })
+          .select()
+          .single();
+        
+        if (renderData) {
+          setCurrentRenderId(renderData.id);
+          setAllRenders(prev => [...prev, {
+            id: renderData.id,
+            render_url: newRenderUrl,
+            prompt: 'Style applied',
+            parent_render_id: currentRenderId,
+            created_at: new Date().toISOString(),
+          }]);
+        }
+      }
+      
+      setCurrentRenderUrl(newRenderUrl);
+      setAllRenderUrls(prev => [...prev, newRenderUrl]);
+      toast({ title: 'Style applied!', description: 'Color palette and mood updated' });
+    } catch (error) {
+      console.error('Apply style failed:', error);
+      toast({ variant: 'destructive', title: 'Apply style failed', description: 'Please try again' });
+    } finally {
+      setIsApplyingStyle(false);
+    }
+  }, [currentRenderUrl, styleRefUrls, user, currentProjectId, currentRoomId, currentRenderId, toast]);
+
   // Loading state - early returns AFTER all hooks
   if (authLoading) {
     return (
@@ -3757,6 +3826,12 @@ ABSOLUTE REQUIREMENTS FOR CONSISTENCY:
             // Comparison props
             onToggleComparison={() => setShowComparisonModal(prev => !prev)}
             showComparison={showComparisonModal}
+            // Style reference props
+            onToggleStyleRef={() => setShowStyleRefModal(true)}
+            showStyleRef={showStyleRefModal}
+            styleRefCount={styleRefUrls.length}
+            onApplyStyle={handleApplyStyle}
+            isApplyingStyle={isApplyingStyle}
           />
 
           {/* Selection is now handled inside PremiumWorkspace */}
@@ -3848,11 +3923,7 @@ ABSOLUTE REQUIREMENTS FOR CONSISTENCY:
                 isLoading={isProcessing || isGenerating || isSelectiveEditing || agentBState === 'generating'}
                 agentBEnabled={agentBEnabled}
                 onAgentBToggle={setAgentBEnabled}
-                onLayoutUpload={() => setShowLayoutModal(true)}
                 onRoomPhotoUpload={() => setShowRoomPhotoModal(true)}
-                onStyleRefUpload={() => setShowStyleRefModal(true)}
-                onProductsPick={() => setShowProductsModal(true)}
-                onOpenCatalog={() => setShowCatalogModal(true)}
                 placeholder={agentBEnabled ? "Describe your vision (Agent B will guide you)..." : "Describe your vision..."}
                 uploadedProducts={uploadedProducts}
                 onClearProducts={handleClearProducts}
