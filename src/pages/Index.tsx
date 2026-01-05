@@ -3474,83 +3474,30 @@ ABSOLUTE REQUIREMENTS FOR CONSISTENCY:
     return !!currentRender?.parent_render_id;
   })();
 
-  // Handle Start Over - creates a new project but KEEPS uploaded assets
+  // Handle Start Over - regenerates render in the SAME project with all original inputs
   const handleStartOver = useCallback(async () => {
-    if (!user) return;
+    if (!user || !currentProjectId) return;
     
     try {
-      // Store current assets to copy to new project
+      // Store current assets (already in state)
       const currentLayoutUrl = layoutImageUrl;
       const currentRoomPhotoUrl = roomPhotoUrl;
       const currentStyleRefUrls = [...styleRefUrls];
       const currentUploadedProducts = [...uploadedProducts];
-      const oldProjectId = currentProjectId;
       
-      // Create a new project
-      const { data: newProject, error } = await supabase
-        .from('projects')
-        .insert({ user_id: user.id, name: 'New Project' })
-        .select('id')
-        .single();
+      // Delete existing renders from database for this project (cleanup)
+      await supabase
+        .from('renders')
+        .delete()
+        .eq('project_id', currentProjectId);
       
-      if (error) throw error;
+      // Delete staged furniture from database
+      await supabase
+        .from('staged_furniture')
+        .delete()
+        .eq('project_id', currentProjectId);
       
-      // Copy room uploads (layout and room photo) to new project
-      if (oldProjectId) {
-        const { data: oldUploads } = await supabase
-          .from('room_uploads')
-          .select('*')
-          .eq('project_id', oldProjectId)
-          .in('upload_type', ['layout', 'room_photo']);
-        
-        if (oldUploads && oldUploads.length > 0) {
-          const newUploads = oldUploads.map(upload => ({
-            project_id: newProject.id,
-            user_id: user.id,
-            file_name: upload.file_name,
-            file_url: upload.file_url,
-            upload_type: upload.upload_type,
-            analysis_status: upload.analysis_status,
-            analysis_result: upload.analysis_result,
-          }));
-          await supabase.from('room_uploads').insert(newUploads);
-        }
-        
-        // Copy style uploads to new project
-        const { data: oldStyleUploads } = await supabase
-          .from('style_uploads')
-          .select('*')
-          .eq('project_id', oldProjectId);
-        
-        if (oldStyleUploads && oldStyleUploads.length > 0) {
-          const newStyleUploads = oldStyleUploads.map(upload => ({
-            project_id: newProject.id,
-            user_id: user.id,
-            file_name: upload.file_name,
-            file_url: upload.file_url,
-          }));
-          await supabase.from('style_uploads').insert(newStyleUploads);
-        }
-        
-        // Copy product items to new project
-        const { data: oldProducts } = await supabase
-          .from('product_items')
-          .select('*')
-          .eq('project_id', oldProjectId);
-        
-        if (oldProducts && oldProducts.length > 0) {
-          const newProducts = oldProducts.map(product => ({
-            project_id: newProject.id,
-            user_id: user.id,
-            name: product.name,
-            image_url: product.image_url,
-            product_url: product.product_url,
-          }));
-          await supabase.from('product_items').insert(newProducts);
-        }
-      }
-      
-      // Reset render-related state but KEEP assets
+      // Reset ONLY render-related state - keep assets and project
       setMessages([]);
       setCurrentRenderUrl(null);
       setCurrentRenderId(null);
@@ -3569,25 +3516,13 @@ ABSOLUTE REQUIREMENTS FOR CONSISTENCY:
       setDetectionReplacements(new Map());
       setLockedDetections(new Set());
       
-      // KEEP the assets - restore them after project switch
-      setLayoutImageUrl(currentLayoutUrl);
-      setRoomPhotoUrl(currentRoomPhotoUrl);
-      setStyleRefUrls(currentStyleRefUrls);
-      setUploadedProducts(currentUploadedProducts);
-      
-      // Navigate to new project
-      setCurrentProjectId(newProject.id);
-      setSearchParams({ project: newProject.id }, { replace: true });
-      setProjectName('New Project');
-      
-      toast({ title: 'Starting fresh render...', description: 'Generating new render with your assets' });
+      toast({ title: 'Regenerating render...', description: 'Starting fresh with your original inputs' });
       setShowStartOverDialog(false);
       
-      // Automatically trigger a new render generation with the kept assets
+      // Automatically trigger render with all original inputs
       setTimeout(() => {
         const hasAssets = currentLayoutUrl || currentRoomPhotoUrl || currentStyleRefUrls.length > 0;
         if (hasAssets) {
-          // Build a prompt based on available assets
           let prompt = 'Generate a fresh interior design render';
           if (currentLayoutUrl) prompt += ' based on the floor plan layout';
           if (currentRoomPhotoUrl) prompt += ' for the uploaded room photo';
@@ -3597,15 +3532,14 @@ ABSOLUTE REQUIREMENTS FOR CONSISTENCY:
             prompt += ` featuring ${productNames}`;
           }
           
-          // Trigger the generation
           handleSendMessageWithAgentB(prompt);
         }
       }, 500);
     } catch (error) {
       console.error('Failed to start over:', error);
-      toast({ variant: 'destructive', title: 'Error', description: 'Failed to create new project' });
+      toast({ variant: 'destructive', title: 'Error', description: 'Failed to regenerate' });
     }
-  }, [user, toast, setSearchParams, layoutImageUrl, roomPhotoUrl, styleRefUrls, uploadedProducts, currentProjectId, handleSendMessageWithAgentB]);
+  }, [user, toast, layoutImageUrl, roomPhotoUrl, styleRefUrls, uploadedProducts, currentProjectId, handleSendMessageWithAgentB]);
 
   // Handle Upscale Render
   const handleUpscaleRender = useCallback(async () => {
@@ -4109,6 +4043,9 @@ ABSOLUTE REQUIREMENTS FOR CONSISTENCY:
         onOpenChange={setShowStyleRefModal}
         onUpload={handleStyleRefsFromChat}
         currentUploads={[]}
+        onApplyStyle={handleApplyStyle}
+        isApplyingStyle={isApplyingStyle}
+        hasRender={!!currentRenderUrl}
       />
       
       <ProductPickerModal
