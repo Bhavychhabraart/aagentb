@@ -3337,13 +3337,23 @@ ABSOLUTE REQUIREMENTS FOR CONSISTENCY:
       }).select().single();
       
       setRoomPhotoUrl(publicUrl);
+      
+      // Set currentUpload to display the photo directly in the workspace
+      if (uploadRecord) {
+        setCurrentUpload({
+          id: uploadRecord.id,
+          file_url: publicUrl,
+          upload_type: 'room_photo',
+          analysis_status: 'pending',
+          analysis_result: null,
+        });
+      }
+      
       await addMessage('user', `Added room photo: ${item.name}`, { type: 'upload', imageUrl: publicUrl });
-      toast({ title: 'Room photo added', description: 'Analyzing room...' });
+      toast({ title: 'Room photo added', description: 'Ready for styling' });
       setShowRoomPhotoModal(false);
       
-      if (uploadRecord) {
-        analyzeRoom(uploadRecord.id, publicUrl);
-      }
+      // Removed analyzeRoom() call - photo goes directly to workspace
     } catch (error) {
       console.error('Room photo upload failed:', error);
       toast({ variant: 'destructive', title: 'Upload failed', description: 'Please try again' });
