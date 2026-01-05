@@ -199,13 +199,6 @@ const Index = () => {
   const [showStartOverDialog, setShowStartOverDialog] = useState(false);
   const [isUpscaling, setIsUpscaling] = useState(false);
   
-  // Pending regeneration state for Start Over - triggers generation after state resets
-  const [pendingRegeneration, setPendingRegeneration] = useState<{
-    layoutUrl: string | null;
-    roomPhotoUrl: string | null;
-    styleRefUrls: string[];
-    products: Array<{ id: string; name: string; imageUrl: string }>;
-  } | null>(null);
   const [showStagedItemsModal, setShowStagedItemsModal] = useState(false);
   const [isApplyingStyle, setIsApplyingStyle] = useState(false);
   
@@ -3500,13 +3493,11 @@ ABSOLUTE REQUIREMENTS FOR CONSISTENCY:
     if (!user || !currentProjectId) return;
     
     try {
-      // Store current assets BEFORE resetting state
-      const regenerationData = {
-        layoutUrl: layoutImageUrl,
-        roomPhotoUrl: roomPhotoUrl,
-        styleRefUrls: [...styleRefUrls],
-        products: [...uploadedProducts],
-      };
+      // Save current assets for the generation call
+      const savedLayoutUrl = layoutImageUrl;
+      const savedRoomPhotoUrl = roomPhotoUrl;
+      const savedStyleRefUrls = [...styleRefUrls];
+      const savedProducts = [...uploadedProducts];
       
       // Delete existing renders from database for this project (cleanup)
       await supabase
@@ -3543,43 +3534,37 @@ ABSOLUTE REQUIREMENTS FOR CONSISTENCY:
       setDetectionReplacements(new Map());
       setLockedDetections(new Set());
       
-      toast({ title: 'Regenerating render...', description: 'Starting fresh with your original inputs' });
       setShowStartOverDialog(false);
       
-      // Set pending regeneration - useEffect will trigger after state resets complete
-      setPendingRegeneration(regenerationData);
+      // Check if we have any assets to regenerate from
+      const hasAssets = savedLayoutUrl || savedRoomPhotoUrl || savedStyleRefUrls.length > 0 || savedProducts.length > 0;
+      
+      if (hasAssets) {
+        toast({ title: 'Regenerating render...', description: 'Starting fresh with your original inputs' });
+        
+        // Build prompt
+        let prompt = 'Generate a fresh interior design render';
+        if (savedLayoutUrl) prompt += ' based on the floor plan layout';
+        if (savedRoomPhotoUrl) prompt += ' for the uploaded room photo';
+        if (savedStyleRefUrls.length > 0) prompt += ' with the selected style references';
+        if (savedProducts.length > 0) {
+          const productNames = savedProducts.slice(0, 3).map(p => p.name).join(', ');
+          prompt += ` featuring ${productNames}`;
+        }
+        
+        // Trigger generation directly after a small delay to ensure state is cleared
+        setTimeout(() => {
+          triggerGeneration(prompt, []);
+        }, 100);
+      } else {
+        toast({ title: 'Workspace cleared', description: 'Upload new assets to start designing' });
+      }
       
     } catch (error) {
       console.error('Failed to start over:', error);
       toast({ variant: 'destructive', title: 'Error', description: 'Failed to regenerate' });
     }
-  }, [user, toast, layoutImageUrl, roomPhotoUrl, styleRefUrls, uploadedProducts, currentProjectId]);
-
-  // Effect to trigger regeneration after state resets complete (for Start Over)
-  useEffect(() => {
-    if (pendingRegeneration && !currentRenderUrl && user && currentProjectId) {
-      const { layoutUrl, roomPhotoUrl: pendingRoomPhoto, styleRefUrls: pendingStyles, products } = pendingRegeneration;
-      
-      const hasAssets = layoutUrl || pendingRoomPhoto || pendingStyles.length > 0 || products.length > 0;
-      if (hasAssets) {
-        let prompt = 'Generate a fresh interior design render';
-        if (layoutUrl) prompt += ' based on the floor plan layout';
-        if (pendingRoomPhoto) prompt += ' for the uploaded room photo';
-        if (pendingStyles.length > 0) prompt += ' with the selected style references';
-        if (products.length > 0) {
-          const productNames = products.slice(0, 3).map(p => p.name).join(', ');
-          prompt += ` featuring ${productNames}`;
-        }
-        
-        // Use triggerGeneration directly instead of handleSendMessageWithAgentB
-        // to avoid Agent B flow interference
-        triggerGeneration(prompt, []);
-      }
-      
-      // Clear pending state
-      setPendingRegeneration(null);
-    }
-  }, [pendingRegeneration, currentRenderUrl, user, currentProjectId, triggerGeneration]);
+  }, [user, toast, layoutImageUrl, roomPhotoUrl, styleRefUrls, uploadedProducts, currentProjectId, triggerGeneration]);
 
   // Handle Upscale Render
   const handleUpscaleRender = useCallback(async () => {
@@ -4200,7 +4185,7 @@ ABSOLUTE REQUIREMENTS FOR CONSISTENCY:
         onApplyStyleWithUpload={handleApplyStyleWithUpload}
         onApplyStyle={handleApplyStyle}
         isApplyingStyle={isApplyingStyle}
-        hasRender={!!currentRenderUrl}
+        hasRender={!!currentRenderUrl || !!roomPhotoUrl}
       />
       
       <ProductPickerModal
