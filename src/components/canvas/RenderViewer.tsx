@@ -146,9 +146,10 @@ export function RenderViewer({
   };
 
   const hasLayoutToCompare = !!layoutImageUrl && !!imageUrl;
-  const canSelectArea = !!imageUrl && !isGenerating && !showComparison && onSelectiveEdit;
-  const canUseDirector = !!imageUrl && !isGenerating && !selectionMode && onAIDirectorChange;
-  const canUseMulticam = !!imageUrl && !isGenerating && !selectionMode && onMulticamGenerate;
+  const hasUsableImage = !!imageUrl || !!roomPhotoUrl;
+  const canSelectArea = hasUsableImage && !isGenerating && !showComparison && onSelectiveEdit;
+  const canUseDirector = hasUsableImage && !isGenerating && !selectionMode && onAIDirectorChange;
+  const canUseMulticam = hasUsableImage && !isGenerating && !selectionMode && onMulticamGenerate;
 
   const handleMulticamSelect = (view: CameraView, viewImageUrl: string) => {
     // When user clicks on a generated view, show it in the main viewer
@@ -190,7 +191,7 @@ export function RenderViewer({
                     </Button>
                   </TooltipTrigger>
                   <TooltipContent>
-                    <p>{!imageUrl ? 'Generate a render first to use selection tool' : selectionMode ? 'Exit selection mode' : 'Select area to edit'}</p>
+                    <p>{!hasUsableImage ? 'Upload a room photo or generate a render first' : selectionMode ? 'Exit selection mode' : 'Select area to edit'}</p>
                   </TooltipContent>
                 </Tooltip>
                 <div className="w-px h-4 bg-border/50 mx-1" />
@@ -366,7 +367,7 @@ export function RenderViewer({
                     </Button>
                   </TooltipTrigger>
                   <TooltipContent>
-                    <p>{!imageUrl ? 'Generate a render first to use AI Director' : showAIDirector ? 'Close AI Director' : 'AI Director - Quick global changes'}</p>
+                    <p>{!hasUsableImage ? 'Upload a room photo or generate a render first' : showAIDirector ? 'Close AI Director' : 'AI Director - Quick global changes'}</p>
                   </TooltipContent>
                 </Tooltip>
               </>
@@ -390,7 +391,7 @@ export function RenderViewer({
                     </Button>
                   </TooltipTrigger>
                   <TooltipContent>
-                    <p>{!imageUrl ? 'Generate a render first to use Multicam' : showMulticam ? 'Close Multicam' : 'Multicam - Generate different views'}</p>
+                    <p>{!hasUsableImage ? 'Upload a room photo or generate a render first' : showMulticam ? 'Close Multicam' : 'Multicam - Generate different views'}</p>
                   </TooltipContent>
                 </Tooltip>
               </>
