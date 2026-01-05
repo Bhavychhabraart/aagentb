@@ -9,9 +9,18 @@ import {
   ChevronUp, 
   ChevronDown,
   Trash2,
-  Maximize2
+  Maximize2,
+  Search,
+  Package,
+  MoreVertical
 } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { 
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { motion, AnimatePresence } from 'framer-motion';
 
 interface StagedItemsDockProps {
@@ -21,6 +30,8 @@ interface StagedItemsDockProps {
   onClearAll: () => void;
   onRemoveItem: (item: CatalogFurnitureItem) => void;
   onViewAll: () => void;
+  onFindSimilar?: (item: CatalogFurnitureItem) => void;
+  onCreateCustom?: (item: CatalogFurnitureItem) => void;
   canPosition: boolean;
   isGenerating?: boolean;
 }
@@ -32,6 +43,8 @@ export function StagedItemsDock({
   onClearAll,
   onRemoveItem,
   onViewAll,
+  onFindSimilar,
+  onCreateCustom,
   canPosition,
   isGenerating,
 }: StagedItemsDockProps) {
@@ -123,9 +136,9 @@ export function StagedItemsDock({
                           key={item.id} 
                           className="relative group flex-shrink-0"
                         >
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <div className="w-14 h-14 rounded-lg overflow-hidden border border-border/50 bg-muted/30 hover:border-primary/50 transition-colors">
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <button className="w-14 h-14 rounded-lg overflow-hidden border border-border/50 bg-muted/30 hover:border-primary/50 transition-colors focus:outline-none focus:ring-2 focus:ring-primary/30">
                                 {item.imageUrl ? (
                                   <img 
                                     src={item.imageUrl} 
@@ -137,18 +150,37 @@ export function StagedItemsDock({
                                     No img
                                   </div>
                                 )}
-                              </div>
-                            </TooltipTrigger>
-                            <TooltipContent>
-                              <div>
-                                <p className="font-medium">{item.name}</p>
+                              </button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="start" className="w-48">
+                              <div className="px-2 py-1.5 border-b border-border/50 mb-1">
+                                <p className="font-medium text-sm truncate">{item.name}</p>
                                 {item.price && (
-                                  <p className="text-xs text-muted-foreground">${item.price.toLocaleString()}</p>
+                                  <p className="text-xs text-muted-foreground">₹{item.price.toLocaleString()}</p>
                                 )}
                               </div>
-                            </TooltipContent>
-                          </Tooltip>
-                          {/* Remove button */}
+                              {onFindSimilar && (
+                                <DropdownMenuItem onClick={() => onFindSimilar(item)}>
+                                  <Search className="h-4 w-4 mr-2" />
+                                  Find Similar
+                                </DropdownMenuItem>
+                              )}
+                              {onCreateCustom && (
+                                <DropdownMenuItem onClick={() => onCreateCustom(item)}>
+                                  <Package className="h-4 w-4 mr-2" />
+                                  Create Custom
+                                </DropdownMenuItem>
+                              )}
+                              <DropdownMenuItem 
+                                onClick={() => onRemoveItem(item)}
+                                className="text-destructive focus:text-destructive"
+                              >
+                                <Trash2 className="h-4 w-4 mr-2" />
+                                Remove
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                          {/* Quick remove button */}
                           <button
                             className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-destructive text-destructive-foreground flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity shadow-sm"
                             onClick={() => onRemoveItem(item)}

@@ -329,6 +329,75 @@ export type Database = {
         }
         Relationships: []
       }
+      custom_products: {
+        Row: {
+          category: string | null
+          created_at: string | null
+          description: string | null
+          dimensions: Json | null
+          id: string
+          manufacturing: Json | null
+          materials: Json | null
+          name: string
+          position_x: number | null
+          position_y: number | null
+          pricing: Json | null
+          project_id: string | null
+          render_id: string | null
+          source_image_url: string | null
+          user_id: string
+        }
+        Insert: {
+          category?: string | null
+          created_at?: string | null
+          description?: string | null
+          dimensions?: Json | null
+          id?: string
+          manufacturing?: Json | null
+          materials?: Json | null
+          name: string
+          position_x?: number | null
+          position_y?: number | null
+          pricing?: Json | null
+          project_id?: string | null
+          render_id?: string | null
+          source_image_url?: string | null
+          user_id: string
+        }
+        Update: {
+          category?: string | null
+          created_at?: string | null
+          description?: string | null
+          dimensions?: Json | null
+          id?: string
+          manufacturing?: Json | null
+          materials?: Json | null
+          name?: string
+          position_x?: number | null
+          position_y?: number | null
+          pricing?: Json | null
+          project_id?: string | null
+          render_id?: string | null
+          source_image_url?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "custom_products_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "custom_products_render_id_fkey"
+            columns: ["render_id"]
+            isOneToOne: false
+            referencedRelation: "renders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       design_memory_settings: {
         Row: {
           auto_learn: boolean | null

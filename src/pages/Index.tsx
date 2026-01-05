@@ -29,6 +29,8 @@ import { LayoutUploadModal } from '@/components/creation/LayoutUploadModal';
 import { LayoutZoneModal } from '@/components/canvas/LayoutZoneModal';
 import { ZoneComparisonModal } from '@/components/canvas/ZoneComparisonModal';
 import { RenderComparisonModal } from '@/components/canvas/RenderComparisonModal';
+import { SimilarProductsModal } from '@/components/canvas/SimilarProductsModal';
+import { CustomProductModal, CustomProductSpec } from '@/components/canvas/CustomProductModal';
 import { RoomPhotoModal } from '@/components/creation/RoomPhotoModal';
 import { StyleRefModal } from '@/components/creation/StyleRefModal';
 import { ProductPickerModal, ProductItem } from '@/components/creation/ProductPickerModal';
@@ -197,6 +199,11 @@ const Index = () => {
   const [showStartOverDialog, setShowStartOverDialog] = useState(false);
   const [isUpscaling, setIsUpscaling] = useState(false);
   const [showStagedItemsModal, setShowStagedItemsModal] = useState(false);
+  
+  // Similar Products and Custom Product modal state
+  const [showSimilarProductsModal, setShowSimilarProductsModal] = useState(false);
+  const [showCustomProductModal, setShowCustomProductModal] = useState(false);
+  const [selectedItemForAction, setSelectedItemForAction] = useState<CatalogFurnitureItem | null>(null);
 
   // Marker staging state
   const [showMarkerStaging, setShowMarkerStaging] = useState(false);
@@ -1587,6 +1594,64 @@ Ready to generate a render! Describe your vision.`;
     
     setStagedItems([]);
   }, [currentProjectId]);
+
+  // Handle Find Similar - opens modal to find catalog matches
+  const handleFindSimilar = useCallback((item: CatalogFurnitureItem) => {
+    setSelectedItemForAction(item);
+    setShowSimilarProductsModal(true);
+  }, []);
+
+  // Handle Create Custom - opens modal to generate custom product spec
+  const handleCreateCustom = useCallback((item: CatalogFurnitureItem) => {
+    setSelectedItemForAction(item);
+    setShowCustomProductModal(true);
+  }, []);
+
+  // Handle selecting a similar product from catalog
+  const handleSimilarProductSelect = useCallback(async (catalogItem: CatalogFurnitureItem) => {
+    if (!selectedItemForAction || !currentProjectId || !user) return;
+
+    // Replace the staged item with the catalog item
+    setStagedItems(prev =>
+      prev.map(item =>
+        item.id === selectedItemForAction.id ? catalogItem : item
+      )
+    );
+
+    // Update in database
+    try {
+      await supabase
+        .from('staged_furniture')
+        .update({
+          catalog_item_id: catalogItem.id,
+          item_name: catalogItem.name,
+          item_category: catalogItem.category,
+          item_price: catalogItem.price,
+          item_image_url: catalogItem.imageUrl,
+          item_description: catalogItem.description,
+        })
+        .eq('catalog_item_id', selectedItemForAction.id)
+        .eq('project_id', currentProjectId);
+
+      toast({
+        title: 'Product replaced',
+        description: `Replaced with ${catalogItem.name}`,
+      });
+    } catch (error) {
+      console.error('Failed to update staged item:', error);
+    }
+
+    setSelectedItemForAction(null);
+  }, [selectedItemForAction, currentProjectId, user, toast]);
+
+  // Handle custom product created
+  const handleCustomProductCreated = useCallback((customProduct: CustomProductSpec) => {
+    toast({
+      title: 'Custom product created',
+      description: `${customProduct.name} added to your quote`,
+    });
+    setSelectedItemForAction(null);
+  }, [toast]);
 
   const loadStagedFurniture = useCallback(async (renderId?: string | null) => {
     if (!currentProjectId) return;
@@ -3769,6 +3834,8 @@ ABSOLUTE REQUIREMENTS FOR CONSISTENCY:
                 onClearAll={handleClearStagedItems}
                 onRemoveItem={handleCatalogItemSelect}
                 onViewAll={() => setShowStagedItemsModal(true)}
+                onFindSimilar={handleFindSimilar}
+                onCreateCustom={handleCreateCustom}
                 canPosition={!!(currentRenderUrl || roomPhotoUrl)}
                 isGenerating={isGenerating}
               />
@@ -4046,6 +4113,27 @@ ABSOLUTE REQUIREMENTS FOR CONSISTENCY:
           onClose={() => setShowComparisonModal(false)}
         />
       )}
+
+      {/* Similar Products Modal */}
+      <SimilarProductsModal
+        open={showSimilarProductsModal}
+        onOpenChange={setShowSimilarProductsModal}
+        item={selectedItemForAction}
+        currentRenderUrl={currentRenderUrl}
+        catalogItems={catalogItems}
+        onSelect={handleSimilarProductSelect}
+      />
+
+      {/* Custom Product Modal */}
+      <CustomProductModal
+        open={showCustomProductModal}
+        onOpenChange={setShowCustomProductModal}
+        item={selectedItemForAction}
+        currentRenderUrl={currentRenderUrl}
+        projectId={currentProjectId}
+        renderId={currentRenderId}
+        onProductCreated={handleCustomProductCreated}
+      />
     </div>
   </SidebarProvider>
   </PageTransition>
