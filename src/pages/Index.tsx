@@ -3363,7 +3363,8 @@ ABSOLUTE REQUIREMENTS FOR CONSISTENCY:
       for (const item of items) {
         if (!item.file) continue;
         
-        const fileName = `${user.id}/${currentProjectId}/style-${Date.now()}-${item.name}`;
+        const sanitizedName = item.name.replace(/\s+/g, '_').replace(/[^\w.-]/g, '');
+        const fileName = `${user.id}/${currentProjectId}/style-${Date.now()}-${sanitizedName}`;
         const { error: uploadError } = await supabase.storage
           .from('room-uploads')
           .upload(fileName, item.file);

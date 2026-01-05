@@ -35,25 +35,18 @@ export async function getImageAspectRatio(imageUrl: string): Promise<string> {
 }
 
 export function getClosestSupportedRatio(ratio: number): string {
-  // Gemini supported aspect ratios
-  const supported = [
-    { name: '16:9', value: 16 / 9 },   // 1.778 - Landscape wide
-    { name: '4:3', value: 4 / 3 },     // 1.333 - Landscape standard
-    { name: '1:1', value: 1 },          // 1.000 - Square
-    { name: '3:4', value: 3 / 4 },     // 0.750 - Portrait standard
-    { name: '9:16', value: 9 / 16 },   // 0.5625 - Portrait tall
-  ];
+  // Bias toward 16:9 for widescreen renders (ratio >= 1.5)
+  if (ratio >= 1.5) return '16:9';
   
-  let closest = supported[0];
-  let minDiff = Math.abs(ratio - supported[0].value);
+  // Standard landscape (between square and widescreen)
+  if (ratio >= 1.15 && ratio < 1.5) return '4:3';
   
-  for (const s of supported) {
-    const diff = Math.abs(ratio - s.value);
-    if (diff < minDiff) {
-      minDiff = diff;
-      closest = s;
-    }
-  }
+  // Square-ish
+  if (ratio >= 0.85 && ratio < 1.15) return '1:1';
   
-  return closest.name;
+  // Portrait standard
+  if (ratio >= 0.65 && ratio < 0.85) return '3:4';
+  
+  // Portrait tall
+  return '9:16';
 }
