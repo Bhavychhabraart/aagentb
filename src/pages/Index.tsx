@@ -924,7 +924,8 @@ Ready to generate a render! Describe your vision.`;
 
   // Edit existing render - works with or without staged furniture
   const editRender = useCallback(async (content: string, furnitureItems: CatalogFurnitureItem[]) => {
-    if (!user || !currentProjectId || !currentRenderUrl) return;
+    const sourceImageUrl = currentRenderUrl || roomPhotoUrl;
+    if (!user || !currentProjectId || !sourceImageUrl) return;
 
     setIsGenerating(true);
 
@@ -989,7 +990,7 @@ Ready to generate a render! Describe your vision.`;
       );
 
       // Detect aspect ratio to preserve from source image
-      const sourceAspectRatio = await getImageAspectRatio(currentRenderUrl);
+      const sourceAspectRatio = await getImageAspectRatio(sourceImageUrl);
       console.log('Preserving aspect ratio:', sourceAspectRatio);
 
       const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/edit-render`, {
@@ -999,7 +1000,7 @@ Ready to generate a render! Describe your vision.`;
           'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
         },
         body: JSON.stringify({
-          currentRenderUrl,
+          currentRenderUrl: sourceImageUrl,
           userPrompt: content,
           // Only pass furniture items if we have them
           furnitureItems: hasFurniture ? furnitureItems.map(item => ({
@@ -1057,7 +1058,7 @@ Ready to generate a render! Describe your vision.`;
     } finally {
       setIsGenerating(false);
     }
-  }, [user, currentProjectId, currentRenderUrl, currentRenderId, currentUpload, addMessage, toast]);
+  }, [user, currentProjectId, currentRenderUrl, roomPhotoUrl, currentRenderId, currentUpload, addMessage, toast]);
 
   // Generate new render (no existing render)
   const triggerGeneration = useCallback(async (content: string, furnitureItems: CatalogFurnitureItem[] = []) => {
@@ -1217,7 +1218,7 @@ Ready to generate a render! Describe your vision.`;
     // KEY FIX: If a render already exists, ALWAYS use edit mode (not regenerate)
     // - First message (no render): Generate new render
     // - Subsequent messages (render exists): Edit existing render
-    const shouldEdit = currentRenderUrl !== null;
+    const shouldEdit = (currentRenderUrl || roomPhotoUrl) !== null;
 
     // Build message content with staged items info
     const messageContent = stagedItems.length > 0
@@ -1247,7 +1248,7 @@ Ready to generate a render! Describe your vision.`;
         .eq('project_id', currentProjectId);
     }
     setStagedItems([]);
-  }, [user, currentProjectId, addMessage, triggerGeneration, editRender, stagedItems, currentRenderUrl]);
+  }, [user, currentProjectId, addMessage, triggerGeneration, editRender, stagedItems, currentRenderUrl, roomPhotoUrl]);
 
   // ========== AGENT B HANDLERS ==========
   
@@ -1449,7 +1450,7 @@ Ready to generate a render! Describe your vision.`;
     setAgentBUserPrompt('');
 
     // Check if we should edit or generate
-    const shouldEdit = currentRenderUrl !== null;
+    const shouldEdit = (currentRenderUrl || roomPhotoUrl) !== null;
 
     if (shouldEdit) {
       editRender(enhancedPrompt, stagedItems);
@@ -1465,7 +1466,7 @@ Ready to generate a render! Describe your vision.`;
         .eq('project_id', currentProjectId);
     }
     setStagedItems([]);
-  }, [user, currentProjectId, agentBUnderstanding, agentBUserPrompt, agentBAnswers, agentBQuestions, stagedItems, currentRenderUrl, addMessage, editRender, triggerGeneration, learnFromAgentBAnswers]);
+  }, [user, currentProjectId, agentBUnderstanding, agentBUserPrompt, agentBAnswers, agentBQuestions, stagedItems, currentRenderUrl, roomPhotoUrl, addMessage, editRender, triggerGeneration, learnFromAgentBAnswers]);
 
   // Modified handleSendMessage to support Agent B
   const handleSendMessageWithAgentB = useCallback(async (content: string) => {
@@ -1478,7 +1479,7 @@ Ready to generate a render! Describe your vision.`;
     }
 
     // Otherwise, use normal flow (edit mode or Agent B disabled)
-    const shouldEdit = currentRenderUrl !== null;
+    const shouldEdit = (currentRenderUrl || roomPhotoUrl) !== null;
 
     const messageContent = stagedItems.length > 0
       ? `${content}\n\n📦 Staged furniture: ${stagedItems.map(i => i.name).join(', ')}`
@@ -1502,7 +1503,7 @@ Ready to generate a render! Describe your vision.`;
         .eq('project_id', currentProjectId);
     }
     setStagedItems([]);
-  }, [user, currentProjectId, agentBEnabled, wantsNewRender, currentRenderUrl, stagedItems, addMessage, editRender, triggerGeneration, handleAgentBAnalysis]);
+  }, [user, currentProjectId, agentBEnabled, wantsNewRender, currentRenderUrl, roomPhotoUrl, stagedItems, addMessage, editRender, triggerGeneration, handleAgentBAnalysis]);
   
   // Toggle between new render mode and edit mode
   const handleToggleNewRenderMode = useCallback((wantsNew: boolean) => {
@@ -3570,8 +3571,9 @@ ABSOLUTE REQUIREMENTS FOR CONSISTENCY:
 
   // Handle Upscale Render
   const handleUpscaleRender = useCallback(async () => {
-    if (!currentRenderUrl) {
-      toast({ variant: 'destructive', title: 'No render to upscale', description: 'Generate a render first' });
+    const sourceImageUrl = currentRenderUrl || roomPhotoUrl;
+    if (!sourceImageUrl) {
+      toast({ variant: 'destructive', title: 'No image to upscale', description: 'Upload a room photo or generate a render first' });
       return;
     }
     
@@ -3579,7 +3581,7 @@ ABSOLUTE REQUIREMENTS FOR CONSISTENCY:
     
     try {
       const response = await supabase.functions.invoke('upscale-image', {
-        body: { imageUrl: currentRenderUrl }
+        body: { imageUrl: sourceImageUrl }
       });
       
       if (response.error) throw response.error;
@@ -3602,7 +3604,7 @@ ABSOLUTE REQUIREMENTS FOR CONSISTENCY:
     } finally {
       setIsUpscaling(false);
     }
-  }, [currentRenderUrl, projectName, toast]);
+  }, [currentRenderUrl, roomPhotoUrl, projectName, toast]);
 
   // Handle Apply Style - applies style references to current render without changing furniture
   const handleApplyStyle = useCallback(async () => {
@@ -4246,20 +4248,20 @@ ABSOLUTE REQUIREMENTS FOR CONSISTENCY:
       </AlertDialog>
 
       {/* Zone Comparison Modal */}
-      {comparisonZone && layoutImageUrl && currentRenderUrl && (
+      {comparisonZone && layoutImageUrl && (currentRenderUrl || roomPhotoUrl) && (
         <ZoneComparisonModal
           zone={comparisonZone}
           layoutImageUrl={layoutImageUrl}
-          generatedRenderUrl={currentRenderUrl}
+          generatedRenderUrl={currentRenderUrl || roomPhotoUrl || ''}
           onClose={() => setComparisonZone(null)}
         />
       )}
 
       {/* Render Comparison Modal */}
-      {showComparisonModal && currentRenderUrl && (
+      {showComparisonModal && (currentRenderUrl || roomPhotoUrl) && (
         <RenderComparisonModal
           layoutImageUrl={layoutImageUrl}
-          currentRenderUrl={currentRenderUrl}
+          currentRenderUrl={currentRenderUrl || roomPhotoUrl || ''}
           selectedZone={selectedZoneId ? zones.find(z => z.id === selectedZoneId) : null}
           onClose={() => setShowComparisonModal(false)}
         />
@@ -4270,7 +4272,7 @@ ABSOLUTE REQUIREMENTS FOR CONSISTENCY:
         open={showSimilarProductsModal}
         onOpenChange={setShowSimilarProductsModal}
         item={selectedItemForAction}
-        currentRenderUrl={currentRenderUrl}
+        currentRenderUrl={currentRenderUrl || roomPhotoUrl}
         catalogItems={catalogItems}
         onSelect={handleSimilarProductSelect}
       />
@@ -4280,7 +4282,7 @@ ABSOLUTE REQUIREMENTS FOR CONSISTENCY:
         open={showCustomProductModal}
         onOpenChange={setShowCustomProductModal}
         item={selectedItemForAction}
-        currentRenderUrl={currentRenderUrl}
+        currentRenderUrl={currentRenderUrl || roomPhotoUrl}
         projectId={currentProjectId}
         renderId={currentRenderId}
         onProductCreated={handleCustomProductCreated}
