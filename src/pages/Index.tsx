@@ -2308,8 +2308,10 @@ Ready to generate a render! Describe your vision.`;
 
   // Generate batch staging with all confirmed markers
   const handleMarkerBatchGenerate = useCallback(async () => {
-    if (!user || !currentProjectId || !currentRenderUrl) {
-      toast({ variant: 'destructive', title: 'Error', description: 'Missing required data for generation' });
+    const sourceImageUrl = currentRenderUrl || roomPhotoUrl;
+    
+    if (!user || !currentProjectId || !sourceImageUrl) {
+      toast({ variant: 'destructive', title: 'Error', description: 'Upload an image or generate a render first' });
       return;
     }
 
@@ -2340,8 +2342,8 @@ Ready to generate a render! Describe your vision.`;
 
       await addMessage('user', `🎯 Placing ${confirmedMarkers.length} item${confirmedMarkers.length > 1 ? 's' : ''} via marker staging`, { type: 'text' });
 
-      // Detect aspect ratio
-      const sourceAspectRatio = await getImageAspectRatio(currentRenderUrl);
+      // Detect aspect ratio from actual source image
+      const sourceAspectRatio = await getImageAspectRatio(sourceImageUrl);
 
       // Build batch markers payload
       const batchMarkers = confirmedMarkers.map(m => ({
@@ -2361,7 +2363,7 @@ Ready to generate a render! Describe your vision.`;
           'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
         },
         body: JSON.stringify({
-          currentRenderUrl,
+          currentRenderUrl: sourceImageUrl,
           batchMarkers,
           preserveAspectRatio: sourceAspectRatio,
         }),
@@ -2413,7 +2415,7 @@ Ready to generate a render! Describe your vision.`;
     } finally {
       setIsGenerating(false);
     }
-  }, [user, currentProjectId, currentRenderUrl, currentRenderId, stagingMarkers, stagedItems, handleCatalogItemSelect, addMessage, toast, loadAllRenders]);
+  }, [user, currentProjectId, currentRenderUrl, roomPhotoUrl, currentRenderId, stagingMarkers, stagedItems, handleCatalogItemSelect, addMessage, toast, loadAllRenders]);
 
   // Handle render selection from history carousel
   const handleRenderHistorySelect = useCallback((render: RenderHistoryItem) => {
