@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
-import { History, ChevronDown, ChevronUp, Trash2, Camera, Paintbrush, Layers, Eye, Sparkles, Columns2 } from 'lucide-react';
+import { History, ChevronDown, ChevronUp, Trash2, Camera, Paintbrush, Layers, Eye, Sparkles, Columns2, Grid2X2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   Carousel,
@@ -125,6 +125,7 @@ export function RenderHistoryCarousel({
                       original: { icon: <Sparkles className="h-2.5 w-2.5" />, label: 'Original', color: 'bg-primary/80' },
                       edit: { icon: <Paintbrush className="h-2.5 w-2.5" />, label: 'Edit', color: 'bg-amber-500/80' },
                       composite: { icon: <Layers className="h-2.5 w-2.5" />, label: 'Staged', color: 'bg-emerald-500/80' },
+                      multicam_grid: { icon: <Grid2X2 className="h-2.5 w-2.5" />, label: 'Grid', color: 'bg-cyan-500/80' },
                       view_perspective: { icon: <Camera className="h-2.5 w-2.5" />, label: '3/4', color: 'bg-blue-500/80' },
                       view_front: { icon: <Eye className="h-2.5 w-2.5" />, label: 'Front', color: 'bg-blue-500/80' },
                       view_side: { icon: <Eye className="h-2.5 w-2.5" />, label: 'Side', color: 'bg-blue-500/80' },

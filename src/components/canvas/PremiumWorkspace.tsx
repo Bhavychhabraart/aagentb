@@ -123,6 +123,9 @@ interface PremiumWorkspaceProps {
   styleRefCount?: number;
   onApplyStyle?: () => void;
   isApplyingStyle?: boolean;
+  // Multicam history save props
+  onSaveMulticamToHistory?: (imageUrl: string, prompt: string, viewType: string) => void;
+  userId?: string;
 }
 
 interface ToolbarItem {
@@ -199,6 +202,9 @@ export function PremiumWorkspace({
   styleRefCount = 0,
   onApplyStyle,
   isApplyingStyle,
+  // Multicam history save props
+  onSaveMulticamToHistory,
+  userId,
 }: PremiumWorkspaceProps) {
   const [showDirectorInput, setShowDirectorInput] = useState(false);
   const [directorPrompt, setDirectorPrompt] = useState('');
@@ -737,6 +743,8 @@ export function PremiumWorkspace({
                 onSetAsMain={onSetMulticamAsMain}
                 projectId={projectId}
                 currentRenderUrl={renderUrl}
+                onSaveToHistory={onSaveMulticamToHistory}
+                userId={userId}
               />
         )}
 
