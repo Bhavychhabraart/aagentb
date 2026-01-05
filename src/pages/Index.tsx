@@ -2478,8 +2478,9 @@ Ready to generate a render! Describe your vision.`;
       toast({ variant: 'destructive', title: 'Error', description: 'No project selected' });
       return;
     }
-    if (!currentRenderUrl) {
-      toast({ variant: 'destructive', title: 'Render required', description: 'Generate a render first to use AI Director' });
+    const sourceImageUrl = currentRenderUrl || roomPhotoUrl;
+    if (!sourceImageUrl) {
+      toast({ variant: 'destructive', title: 'No image available', description: 'Upload a room photo or generate a render first' });
       return;
     }
 
@@ -2505,7 +2506,7 @@ Ready to generate a render! Describe your vision.`;
       await addMessage('user', `🎬 AI Director: ${prompt}`, { type: 'text' });
 
       // Detect aspect ratio to preserve from source image
-      const sourceAspectRatio = await getImageAspectRatio(currentRenderUrl);
+      const sourceAspectRatio = await getImageAspectRatio(sourceImageUrl);
 
       // Call edit-render with the global prompt
       const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/edit-render`, {
@@ -2515,7 +2516,7 @@ Ready to generate a render! Describe your vision.`;
           'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
         },
         body: JSON.stringify({
-          currentRenderUrl: currentRenderUrl,
+          currentRenderUrl: sourceImageUrl,
           userPrompt: prompt,
           preserveAspectRatio: sourceAspectRatio,
           // No region = global edit
@@ -2553,7 +2554,7 @@ Ready to generate a render! Describe your vision.`;
     } finally {
       setIsSelectiveEditing(false);
     }
-  }, [user, currentProjectId, currentRenderUrl, currentRenderId, currentUpload, addMessage, toast]);
+  }, [user, currentProjectId, currentRenderUrl, roomPhotoUrl, currentRenderId, currentUpload, addMessage, toast]);
 
   // Handle Multicam view generation (with optional zone focus)
   // IMPORTANT: Passes furniture items and style references for CONSISTENT rendering across views
@@ -3618,8 +3619,9 @@ ABSOLUTE REQUIREMENTS FOR CONSISTENCY:
 
   // Handle Apply Style - applies style references to current render without changing furniture
   const handleApplyStyle = useCallback(async () => {
-    if (!currentRenderUrl) {
-      toast({ variant: 'destructive', title: 'No render available', description: 'Generate a render first' });
+    const sourceImageUrl = currentRenderUrl || roomPhotoUrl;
+    if (!sourceImageUrl) {
+      toast({ variant: 'destructive', title: 'No image available', description: 'Upload a room photo or generate a render first' });
       return;
     }
     
@@ -3633,7 +3635,7 @@ ABSOLUTE REQUIREMENTS FOR CONSISTENCY:
     try {
       const response = await supabase.functions.invoke('edit-render', {
         body: {
-          currentRenderUrl,
+          currentRenderUrl: sourceImageUrl,
           styleRefUrls,
           userPrompt: 'Apply the color palette, mood, lighting, and aesthetic from the style reference images. CRITICAL: Do NOT change, move, add, or remove ANY furniture items. Keep all furniture exactly as they are. Only modify: wall colors, lighting atmosphere, color temperature, material finishes, and overall mood to match the style references.',
           textOnlyEdit: true,
@@ -3682,12 +3684,13 @@ ABSOLUTE REQUIREMENTS FOR CONSISTENCY:
     } finally {
       setIsApplyingStyle(false);
     }
-  }, [currentRenderUrl, styleRefUrls, user, currentProjectId, currentRoomId, currentRenderId, toast]);
+  }, [currentRenderUrl, roomPhotoUrl, styleRefUrls, user, currentProjectId, currentRoomId, currentRenderId, toast]);
 
   // Handle Apply Style with Upload - combines upload + apply in atomic operation
   const handleApplyStyleWithUpload = useCallback(async (items: Array<{ file?: File; preview: string; name: string }>) => {
-    if (!currentRenderUrl) {
-      toast({ variant: 'destructive', title: 'No render available', description: 'Generate a render first' });
+    const sourceImageUrl = currentRenderUrl || roomPhotoUrl;
+    if (!sourceImageUrl) {
+      toast({ variant: 'destructive', title: 'No image available', description: 'Upload a room photo or generate a render first' });
       return;
     }
     
@@ -3708,7 +3711,7 @@ ABSOLUTE REQUIREMENTS FOR CONSISTENCY:
       // Apply style with all URLs
       const response = await supabase.functions.invoke('edit-render', {
         body: {
-          currentRenderUrl,
+          currentRenderUrl: sourceImageUrl,
           styleRefUrls: allStyleUrls,
           userPrompt: 'Apply the color palette, mood, lighting, and aesthetic from the style reference images. CRITICAL: Do NOT change, move, add, or remove ANY furniture items. Keep all furniture exactly as they are. Only modify: wall colors, lighting atmosphere, color temperature, material finishes, and overall mood to match the style references.',
           textOnlyEdit: true,
@@ -3757,7 +3760,7 @@ ABSOLUTE REQUIREMENTS FOR CONSISTENCY:
     } finally {
       setIsApplyingStyle(false);
     }
-  }, [currentRenderUrl, styleRefUrls, user, currentProjectId, currentRoomId, currentRenderId, toast, handleStyleRefsFromChat]);
+  }, [currentRenderUrl, roomPhotoUrl, styleRefUrls, user, currentProjectId, currentRoomId, currentRenderId, toast, handleStyleRefsFromChat]);
   const handleSaveMulticamToHistory = useCallback(async (imageUrl: string, prompt: string, viewType: string) => {
     if (!user || !currentProjectId) return;
     
