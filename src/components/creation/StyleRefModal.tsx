@@ -7,7 +7,7 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Upload, Palette, X, Plus } from "lucide-react";
+import { Upload, Palette, X, Plus, Paintbrush } from "lucide-react";
 
 interface UploadedItem {
   file?: File;
@@ -20,6 +20,9 @@ interface StyleRefModalProps {
   onOpenChange: (open: boolean) => void;
   onUpload: (items: UploadedItem[]) => void;
   currentUploads: UploadedItem[];
+  onApplyStyle?: () => void;
+  isApplyingStyle?: boolean;
+  hasRender?: boolean;
 }
 
 export function StyleRefModal({
@@ -27,6 +30,9 @@ export function StyleRefModal({
   onOpenChange,
   onUpload,
   currentUploads,
+  onApplyStyle,
+  isApplyingStyle,
+  hasRender,
 }: StyleRefModalProps) {
   const [previews, setPreviews] = useState<UploadedItem[]>(currentUploads);
   const [isDragging, setIsDragging] = useState(false);
@@ -156,9 +162,18 @@ export function StyleRefModal({
             <Button variant="outline" onClick={() => onOpenChange(false)}>
               Cancel
             </Button>
-            <Button onClick={handleConfirm}>
+            <Button onClick={handleConfirm} variant="secondary">
               {previews.length > 0 ? `Add ${previews.length} Reference${previews.length > 1 ? "s" : ""}` : "Add References"}
             </Button>
+            {previews.length > 0 && hasRender && (
+              <Button 
+                onClick={() => { handleConfirm(); onApplyStyle?.(); }}
+                disabled={isApplyingStyle}
+              >
+                <Paintbrush className="w-4 h-4 mr-2" />
+                {isApplyingStyle ? 'Applying...' : 'Apply Style'}
+              </Button>
+            )}
           </div>
         </div>
       </DialogContent>
