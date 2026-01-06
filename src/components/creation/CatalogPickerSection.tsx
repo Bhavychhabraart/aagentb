@@ -13,7 +13,10 @@ interface CatalogPickerSectionProps {
   selectedItemId: string | null;
 }
 
-const CATEGORIES = ['All', 'Seating', 'Tables', 'Storage', 'Lighting', 'Bedroom', 'Decoration'];
+const CATEGORIES = [
+  'All', 'Seating', 'Tables', 'Storage', 'Lighting', 'Bedroom', 
+  'Outdoor', 'Hospitality', 'Walls', 'Mosaics', 'Decor', 'Art', 'Rugs', 'Decoration'
+];
 
 export function CatalogPickerSection({ onSelect, selectedItemId }: CatalogPickerSectionProps) {
   const [catalogItems, setCatalogItems] = useState<CatalogFurnitureItem[]>([]);
