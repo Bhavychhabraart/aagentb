@@ -398,6 +398,28 @@ export function ZonePreviewConfirm({
 
         {/* Actions */}
         <div className="p-4 border-t border-border bg-muted/20 space-y-3">
+          {isGenerating && (
+            <div className="rounded-lg bg-primary/5 border border-primary/20 p-3 mb-3 animate-in fade-in duration-300">
+              <div className="flex items-center gap-2 mb-2">
+                <Loader2 className="h-4 w-4 animate-spin text-primary" />
+                <span className="text-sm font-medium">Processing zone...</span>
+              </div>
+              <div className="space-y-1 text-xs text-muted-foreground">
+                <div className="flex items-center gap-1.5">
+                  <div className="h-1.5 w-1.5 rounded-full bg-primary animate-pulse" />
+                  <span>Stage 1: AI analyzing floor plan layout</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <div className="h-1.5 w-1.5 rounded-full bg-muted-foreground/30" />
+                  <span>Stage 2: Building precise placement prompt</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <div className="h-1.5 w-1.5 rounded-full bg-muted-foreground/30" />
+                  <span>Stage 3: Generating isometric render</span>
+                </div>
+              </div>
+            </div>
+          )}
           <Button
             className="w-full h-12"
             size="lg"
@@ -407,7 +429,7 @@ export function ZonePreviewConfirm({
             {isGenerating ? (
               <>
                 <Loader2 className="h-5 w-5 mr-2 animate-spin" />
-                Generating Isometric View...
+                Analyzing & Generating...
               </>
             ) : (
               <>
