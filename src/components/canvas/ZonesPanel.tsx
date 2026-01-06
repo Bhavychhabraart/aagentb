@@ -5,7 +5,8 @@ import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { Zone, PolygonPoint } from './ZoneSelector';
-import { ZonePreviewConfirm } from './ZonePreviewConfirm';
+import { ZonePreviewConfirm, ZoneGenerationOptions } from './ZonePreviewConfirm';
+import { CatalogFurnitureItem } from '@/services/catalogService';
 
 interface ZonesPanelProps {
   projectId: string;
@@ -14,10 +15,13 @@ interface ZonesPanelProps {
   onZoneSelect: (zone: Zone | null) => void;
   selectedZoneId: string | null;
   onEditZones: () => void;
-  onGenerateZoneView: (zone: Zone) => void;
+  onGenerateZoneView: (zone: Zone, options: ZoneGenerationOptions) => void;
   onCompareZone?: (zone: Zone) => void;
   isGenerating: boolean;
   onClose: () => void;
+  styleRefUrls?: string[];
+  catalogItems?: CatalogFurnitureItem[];
+  onOpenCatalog?: () => void;
 }
 
 export function ZonesPanel({
@@ -31,6 +35,9 @@ export function ZonesPanel({
   onCompareZone,
   isGenerating,
   onClose,
+  styleRefUrls = [],
+  catalogItems = [],
+  onOpenCatalog,
 }: ZonesPanelProps) {
   const [previewZone, setPreviewZone] = useState<Zone | null>(null);
   const [zones, setZones] = useState<Zone[]>([]);
@@ -244,8 +251,11 @@ export function ZonesPanel({
           zone={previewZone}
           layoutImageUrl={layoutImageUrl}
           isGenerating={isGenerating}
-          onConfirm={() => {
-            onGenerateZoneView(previewZone);
+          existingStyleRefs={styleRefUrls}
+          catalogItems={catalogItems}
+          onOpenCatalog={onOpenCatalog}
+          onConfirm={(options) => {
+            onGenerateZoneView(previewZone, options);
             setPreviewZone(null);
           }}
           onCancel={() => setPreviewZone(null)}

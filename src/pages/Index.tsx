@@ -9,6 +9,7 @@ import { AgentBUnderstanding } from '@/components/canvas/AgentBBrief';
 import { AgentBQuestion, AgentBAnswer } from '@/components/canvas/AgentBQuestions';
 import { RenderViewer } from '@/components/canvas/RenderViewer';
 import { PremiumWorkspace, Zone, PolygonPoint, ViewType, viewTypeOptions } from '@/components/canvas/PremiumWorkspace';
+import { ZoneGenerationOptions } from '@/components/canvas/ZonePreviewConfirm';
 import { SleekChatInput } from '@/components/canvas/SleekChatInput';
 import { StagedItemsDock } from '@/components/canvas/StagedItemsDock';
 import { StagedItemsModal } from '@/components/canvas/StagedItemsModal';
@@ -2838,7 +2839,7 @@ ABSOLUTE REQUIREMENTS FOR CONSISTENCY:
   }, []);
 
   // Generate a focused render of a zone with specific view type
-  const handleGenerateZoneView = useCallback(async (zone: Zone, viewType: ViewType = 'detail') => {
+  const handleGenerateZoneView = useCallback(async (zone: Zone, options: ZoneGenerationOptions) => {
     if (!user || !currentProjectId || !layoutImageUrl) {
       toast({ variant: 'destructive', title: 'Error', description: 'Upload a layout first to create zone views' });
       return;
@@ -2846,11 +2847,11 @@ ABSOLUTE REQUIREMENTS FOR CONSISTENCY:
 
     setIsMulticamGenerating(true);
     setGeneratingZoneName(zone.name);
-    setGeneratingViewType(viewType);
+    setGeneratingViewType(options.viewType);
 
     try {
       // Get view type label for display
-      const viewLabel = viewTypeOptions.find(v => v.id === viewType)?.label || 'Detail';
+      const viewLabel = viewTypeOptions.find(v => v.id === options.viewType)?.label || 'Detail';
       
       // Create render record FIRST to save to history
       const { data: renderRecord, error: renderError } = await supabase
@@ -2858,7 +2859,7 @@ ABSOLUTE REQUIREMENTS FOR CONSISTENCY:
         .insert({
           project_id: currentProjectId,
           user_id: user.id,
-          prompt: `Zone: ${zone.name} - ${viewLabel} view`,
+          prompt: `Zone: ${zone.name} - ${viewLabel} view${options.customPrompt ? ` | ${options.customPrompt}` : ''}`,
           status: 'generating',
           room_upload_id: currentUpload?.id || null,
           parent_render_id: currentRenderId,
@@ -2890,12 +2891,28 @@ ABSOLUTE REQUIREMENTS FOR CONSISTENCY:
         console.warn('Failed to crop zone from layout, proceeding without visual reference:', cropError);
       }
 
-      const zonePrompt = `Generate a photorealistic 3D render of this specific area from the 2D floor plan. Zone: "${zone.name}". Interpret the 2D layout and create an immersive ${viewLabel.toLowerCase()} perspective view.`;
+      // Build enhanced prompt with custom instructions
+      let zonePrompt = `Generate a photorealistic 3D render of this specific area from the 2D floor plan. Zone: "${zone.name}". Interpret the 2D layout and create an immersive ${viewLabel.toLowerCase()} perspective view.`;
+      
+      if (options.customPrompt) {
+        zonePrompt += ` Additional requirements: ${options.customPrompt}`;
+      }
 
       await addMessage('user', `🎯 Generating ${viewLabel} view for zone: ${zone.name}...`, { type: 'text' });
 
       // Detect aspect ratio to preserve from source image (use render if exists, otherwise default)
       const sourceAspectRatio = currentRenderUrl ? await getImageAspectRatio(currentRenderUrl) : '16:9';
+
+      // Merge existing style refs with any new ones from options
+      const allStyleRefs = [...new Set([...styleRefUrls, ...options.styleRefUrls])];
+      
+      // Prepare furniture items from selected products
+      const furnitureItems = options.selectedProducts.map(p => ({
+        name: p.name,
+        category: p.category,
+        description: p.description || '',
+        imageUrl: p.imageUrl,
+      }));
 
       const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/edit-render`, {
         method: 'POST',
@@ -2914,8 +2931,9 @@ ABSOLUTE REQUIREMENTS FOR CONSISTENCY:
             width: zone.x_end - zone.x_start,
             height: zone.y_end - zone.y_start,
           },
-          viewType: viewType,
-          styleRefUrls: styleRefUrls,
+          viewType: options.viewType,
+          styleRefUrls: allStyleRefs,
+          furnitureItems: furnitureItems.length > 0 ? furnitureItems : undefined,
           preserveAspectRatio: sourceAspectRatio,
           layoutBasedZone: true, // Flag to use layout-based generation
         }),

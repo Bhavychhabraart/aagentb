@@ -14,28 +14,61 @@ export async function cropRectangleFromImage(
     
     img.onload = () => {
       try {
+        // VALIDATE input bounds
+        if (typeof bounds.x_start !== 'number' || typeof bounds.y_start !== 'number' ||
+            typeof bounds.x_end !== 'number' || typeof bounds.y_end !== 'number') {
+          throw new Error('Invalid bounds: all coordinates must be numbers');
+        }
+        
+        // Round to 2 decimal places for precision
+        const roundedBounds = {
+          x_start: Math.round(bounds.x_start * 100) / 100,
+          y_start: Math.round(bounds.y_start * 100) / 100,
+          x_end: Math.round(bounds.x_end * 100) / 100,
+          y_end: Math.round(bounds.y_end * 100) / 100,
+        };
+        
         // CLAMP coordinates to valid range 0-100
-        const x_start = Math.max(0, Math.min(100, bounds.x_start));
-        const y_start = Math.max(0, Math.min(100, bounds.y_start));
-        const x_end = Math.max(0, Math.min(100, bounds.x_end));
-        const y_end = Math.max(0, Math.min(100, bounds.y_end));
+        const x_start = Math.max(0, Math.min(100, roundedBounds.x_start));
+        const y_start = Math.max(0, Math.min(100, roundedBounds.y_start));
+        const x_end = Math.max(0, Math.min(100, roundedBounds.x_end));
+        const y_end = Math.max(0, Math.min(100, roundedBounds.y_end));
         
-        console.log('Crop input bounds:', bounds);
-        console.log('Clamped bounds:', { x_start, y_start, x_end, y_end });
-        console.log('Image dimensions:', img.naturalWidth, 'x', img.naturalHeight);
+        // Ensure end > start (swap if necessary)
+        const finalX1 = Math.min(x_start, x_end);
+        const finalY1 = Math.min(y_start, y_end);
+        const finalX2 = Math.max(x_start, x_end);
+        const finalY2 = Math.max(y_start, y_end);
         
-        // Calculate pixel coordinates from percentage values
-        const cropX = (x_start / 100) * img.naturalWidth;
-        const cropY = (y_start / 100) * img.naturalHeight;
-        const cropWidth = ((x_end - x_start) / 100) * img.naturalWidth;
-        const cropHeight = ((y_end - y_start) / 100) * img.naturalHeight;
+        // Validate dimensions
+        const widthPercent = finalX2 - finalX1;
+        const heightPercent = finalY2 - finalY1;
+        
+        if (widthPercent < 0.5 || heightPercent < 0.5) {
+          throw new Error(`Zone too small: ${widthPercent.toFixed(1)}% x ${heightPercent.toFixed(1)}% (min 0.5%)`);
+        }
+        
+        console.log('=== CROP DEBUG ===');
+        console.log('Input bounds:', bounds);
+        console.log('Clamped & ordered bounds:', { x_start: finalX1, y_start: finalY1, x_end: finalX2, y_end: finalY2 });
+        console.log('Image natural dimensions:', img.naturalWidth, 'x', img.naturalHeight);
+        
+        // Calculate pixel coordinates from percentage values using natural dimensions
+        const cropX = Math.round((finalX1 / 100) * img.naturalWidth);
+        const cropY = Math.round((finalY1 / 100) * img.naturalHeight);
+        const cropWidth = Math.round((widthPercent / 100) * img.naturalWidth);
+        const cropHeight = Math.round((heightPercent / 100) * img.naturalHeight);
         
         console.log('Crop rectangle (pixels):', { cropX, cropY, cropWidth, cropHeight });
         
+        // Ensure minimum canvas size
+        const canvasWidth = Math.max(10, cropWidth);
+        const canvasHeight = Math.max(10, cropHeight);
+        
         // Create canvas with the cropped dimensions
         const canvas = document.createElement('canvas');
-        canvas.width = Math.max(1, Math.round(cropWidth));
-        canvas.height = Math.max(1, Math.round(cropHeight));
+        canvas.width = canvasWidth;
+        canvas.height = canvasHeight;
         
         const ctx = canvas.getContext('2d');
         if (!ctx) {
@@ -43,26 +76,30 @@ export async function cropRectangleFromImage(
           return;
         }
         
-        // Draw the cropped region
+        // Draw the cropped region with high quality
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = 'high';
         ctx.drawImage(
           img,
           cropX, cropY, cropWidth, cropHeight, // Source rect
-          0, 0, canvas.width, canvas.height    // Dest rect
+          0, 0, canvasWidth, canvasHeight      // Dest rect
         );
         
-        // Convert to base64 data URL (JPEG for smaller size)
+        // Convert to base64 data URL (JPEG for smaller size, high quality)
         const dataUrl = canvas.toDataURL('image/jpeg', 0.95);
         
-        console.log(`Cropped rectangle: ${canvas.width}x${canvas.height}px from (${x_start.toFixed(1)}%, ${y_start.toFixed(1)}%) to (${x_end.toFixed(1)}%, ${y_end.toFixed(1)}%)`);
+        console.log(`✓ Cropped: ${canvasWidth}x${canvasHeight}px from (${finalX1.toFixed(1)}%, ${finalY1.toFixed(1)}%) to (${finalX2.toFixed(1)}%, ${finalY2.toFixed(1)}%)`);
+        console.log('=== END CROP DEBUG ===');
         
         resolve(dataUrl);
       } catch (err) {
+        console.error('Crop error:', err);
         reject(err);
       }
     };
     
     img.onerror = () => {
-      reject(new Error('Failed to load image for cropping'));
+      reject(new Error(`Failed to load image for cropping: ${imageUrl.substring(0, 100)}...`));
     };
     
     img.src = imageUrl;
