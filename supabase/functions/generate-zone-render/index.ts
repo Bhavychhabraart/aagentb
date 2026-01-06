@@ -35,7 +35,7 @@ serve(async (req) => {
       throw new Error('layoutZoneBase64 is required - the cropped zone image from snipping tool');
     }
 
-    console.log('=== GENERATE ZONE RENDER (Direct Gemini 3) ===');
+    console.log('=== GENERATE ZONE RENDER (Nano Banana Model) ===');
     console.log('Layout zone image:', layoutZoneBase64 ? 'provided' : 'none');
     console.log('Style references:', styleRefUrls?.length || 0);
     console.log('Furniture items:', furnitureItems?.length || 0);
@@ -43,18 +43,11 @@ serve(async (req) => {
 
     // Build content array - LAYOUT ZONE IMAGE IS THE PRIMARY INPUT
     const content: Array<{ type: string; text?: string; image_url?: { url: string } }> = [];
-    let imageIndex = 1;
-    
-    // Track image positions
-    let layoutZoneIndex: number | null = null;
-    const styleImageIndices: number[] = [];
-    const furnitureImageIndices: { name: string; category: string; index: number }[] = [];
 
-    // Add style reference images FIRST
+    // Add style reference images first
     if (styleRefUrls && styleRefUrls.length > 0) {
       for (const styleUrl of styleRefUrls) {
         content.push({ type: 'image_url', image_url: { url: styleUrl } });
-        styleImageIndices.push(imageIndex++);
       }
     }
 
@@ -63,164 +56,52 @@ serve(async (req) => {
     for (const item of furnitureWithImages) {
       if (item.imageUrl) {
         content.push({ type: 'image_url', image_url: { url: item.imageUrl } });
-        furnitureImageIndices.push({ name: item.name, category: item.category, index: imageIndex++ });
       }
     }
 
     // Add LAYOUT ZONE IMAGE LAST (most important - AI pays more attention to recent images)
     content.push({ type: 'image_url', image_url: { url: layoutZoneBase64 } });
-    layoutZoneIndex = imageIndex++;
 
-    // Build the focused prompt for zone-to-isometric conversion
-    let prompt = `You are an EXPERT 3D architectural visualization artist. Your specialty is converting 2D floor plan zones into PHOTOREALISTIC isometric 3D interior renders.
+    // Simple, focused prompt that lets Nano Banana do its step-by-step analysis
+    let prompt = `Convert this 2D floor plan layout into a photorealistic isometric 3D interior render.
 
-╔═══════════════════════════════════════════════════════════════════════════════╗
-║              TASK: CONVERT 2D FLOOR PLAN TO 3D ISOMETRIC RENDER               ║
-╚═══════════════════════════════════════════════════════════════════════════════╝
+PROCESS:
+1. First analyze the floor plan to understand all elements - furniture positions, walls, windows, doors
+2. Note the exact positions and proportions of every item
+3. Determine appropriate materials and textures for each element
+4. Create an isometric 3D render (45° elevated corner view) that matches the floor plan EXACTLY
+5. Verify every furniture piece is in the correct position before completing
 
-IMAGE ${layoutZoneIndex}: 2D FLOOR PLAN ZONE (THE PRIMARY SOURCE - ABSOLUTE AUTHORITY)
+REQUIREMENTS:
+- EVERY furniture item in the floor plan must appear in the render at the EXACT same position
+- Photorealistic quality - like a real photograph
+- Isometric camera angle (elevated corner view showing floor + two walls)
+- Natural lighting and realistic materials`;
 
-This is a cropped section of a 2D floor plan. Your job is to:
-1. IDENTIFY every furniture shape, wall, window, and door in this floor plan
-2. UNDERSTAND the exact positions and proportions of all elements
-3. CONVERT this 2D view into a PHOTOREALISTIC 3D isometric render
-
-═══════════════════════════════════════════════════════════════
-                    ACCURACY REQUIREMENTS (CRITICAL)
-═══════════════════════════════════════════════════════════════
-
-✓ EVERY furniture piece visible in the floor plan MUST appear in the 3D render
-✓ Positions MUST match EXACTLY (if something is in the left half of the floor plan, it's in the left half of the render)
-✓ Proportions and relative sizes MUST be preserved
-✓ Wall positions, windows, and doors MUST match the floor plan
-✓ The spatial relationships between items MUST be identical
-
-═══════════════════════════════════════════════════════════════
-                    ISOMETRIC CAMERA (MANDATORY)
-═══════════════════════════════════════════════════════════════
-
-CAMERA POSITION: ISOMETRIC VIEW (45° elevated corner)
-- Elevation: 30-45° above ground plane
-- Rotation: 45° diagonal corner view
-- Shows: Floor plane + two adjacent walls
-- Full zone visibility - everything in frame
-- Near-orthographic projection (minimal distortion)
-
-Visual Reference:
-     ╱‾‾‾‾‾‾‾‾╲
-    ╱   CEILING  ╲
-   ╱______________╲
-   ╲      |      ╱
-    ╲ WALL | WALL╱
-     ╲____|____╱
-         FLOOR
-
-DO NOT render from:
-✗ Eye-level perspective
-✗ Bird's-eye/top-down view
-✗ Front-facing flat view
-
-═══════════════════════════════════════════════════════════════
-                    PHOTOREALISTIC QUALITY
-═══════════════════════════════════════════════════════════════
-
-RENDERING STYLE: ULTRA-PHOTOREALISTIC
-Reference Quality: RED Cinema Camera, Architectural Digest, Dwell Magazine
-
-MUST INCLUDE:
-• Physically-based rendering (PBR) for all materials
-• Ray-traced global illumination
-• Natural lighting through windows
-• Accurate shadows with soft falloff
-• Realistic material textures (wood grain, fabric weave, metal reflections)
-• Contact shadows and ambient occlusion
-• 8K equivalent sharpness
-
-MUST AVOID:
-✗ Cartoon, illustrated, or stylized aesthetics
-✗ Video game or CGI appearance
-✗ Flat colors or fake materials
-✗ Plastic-looking surfaces
-
-`;
-
-    // Add style reference instructions
-    if (styleImageIndices.length > 0) {
-      const styleRange = styleImageIndices.length === 1 
-        ? `IMAGE ${styleImageIndices[0]}` 
-        : `IMAGES ${styleImageIndices.join(', ')}`;
-      
-      prompt += `
-═══════════════════════════════════════════════════════════════
-                    STYLE REFERENCES
-═══════════════════════════════════════════════════════════════
-
-${styleRange}: STYLE REFERENCES
-- Match the aesthetic, mood, and atmosphere from these references
-- Copy the color palette, materials, and finishes
-- Replicate the lighting style and ambiance
-
-`;
+    // Add style reference note if provided
+    if (styleRefUrls && styleRefUrls.length > 0) {
+      prompt += `\n\nSTYLE: Match the aesthetic, colors, and materials from the style reference images provided.`;
     }
 
-    // Add furniture instructions
-    if (furnitureImageIndices.length > 0) {
-      prompt += `
-═══════════════════════════════════════════════════════════════
-                    SPECIFIC FURNITURE PRODUCTS
-═══════════════════════════════════════════════════════════════
-
-The following specific products should be included in the render:
-
-`;
-      for (const { name, category, index } of furnitureImageIndices) {
-        prompt += `• "${name}" (${category}) - See IMAGE ${index}
-  → Copy this product EXACTLY as shown
-  → Shape, colors, and materials must match perfectly
-  → Place according to floor plan layout
-
-`;
-      }
+    // Add furniture product note if provided
+    if (furnitureWithImages.length > 0) {
+      const furnitureNames = furnitureWithImages.map(f => f.name).join(', ');
+      prompt += `\n\nFURNITURE: Include these specific products exactly as shown in their reference images: ${furnitureNames}`;
     }
 
     // Add custom prompt if provided
     if (customPrompt) {
-      prompt += `
-═══════════════════════════════════════════════════════════════
-                    ADDITIONAL REQUIREMENTS
-═══════════════════════════════════════════════════════════════
-
-${customPrompt}
-
-`;
+      prompt += `\n\nADDITIONAL NOTES: ${customPrompt}`;
     }
 
-    // Final output requirements
-    prompt += `
-═══════════════════════════════════════════════════════════════
-                    OUTPUT REQUIREMENTS
-═══════════════════════════════════════════════════════════════
-
-1. ULTRA-PHOTOREALISTIC quality - must look like a real photograph
-2. ISOMETRIC CAMERA ANGLE - 45° elevated corner view (MANDATORY)
-3. 16:9 LANDSCAPE aspect ratio
-4. ALL furniture from the floor plan visible and correctly positioned
-5. Magazine cover quality (Architectural Digest standard)
-
-⚠️ VERIFICATION BEFORE OUTPUT:
-□ Every furniture piece from floor plan is in the render
-□ Positions match the floor plan layout
-□ Isometric camera angle (not eye-level, not top-down)
-□ Photorealistic quality achieved
-
-Output: ONLY the final ultra-photorealistic isometric 3D render.`;
+    prompt += `\n\nOutput: A single photorealistic isometric 3D render of this floor plan.`;
 
     content.push({ type: 'text', text: prompt });
 
     console.log('Prompt length:', prompt.length);
     console.log('Total images in request:', content.filter(c => c.type === 'image_url').length);
 
-    // Call Gemini 3 Pro Image directly - same as homepage generation
+    // Call Nano Banana model - proven to give 100% accurate renders
     const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -228,10 +109,9 @@ Output: ONLY the final ultra-photorealistic isometric 3D render.`;
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'google/gemini-3-pro-image-preview',
+        model: 'google/gemini-2.5-flash-image-preview',
         messages: [{ role: 'user', content }],
         modalities: ['image', 'text'],
-        generationConfig: { aspectRatio: "16:9" }
       }),
     });
 
