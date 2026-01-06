@@ -56,6 +56,3 @@ verify_jwt = false
 
 [functions.analyze-zone]
 verify_jwt = false
-
-[functions.generate-zone-isometric]
-verify_jwt = false

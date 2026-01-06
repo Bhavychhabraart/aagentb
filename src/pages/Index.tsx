@@ -10,7 +10,6 @@ import { AgentBQuestion, AgentBAnswer } from '@/components/canvas/AgentBQuestion
 import { RenderViewer } from '@/components/canvas/RenderViewer';
 import { PremiumWorkspace, Zone, PolygonPoint, ViewType, viewTypeOptions } from '@/components/canvas/PremiumWorkspace';
 import { ZoneGenerationOptions } from '@/components/canvas/ZonePreviewConfirm';
-import { LayoutAnalysisPreview, LayoutAnalysis } from '@/components/canvas/LayoutAnalysisPreview';
 import { SleekChatInput } from '@/components/canvas/SleekChatInput';
 import { StagedItemsDock } from '@/components/canvas/StagedItemsDock';
 import { StagedItemsModal } from '@/components/canvas/StagedItemsModal';
@@ -43,8 +42,6 @@ import { AutoFurnishPanel } from '@/components/canvas/AutoFurnishPanel';
 import { FullScreenCatalogModal } from '@/components/canvas/FullScreenCatalogModal';
 import { MarkerStagingPanel, StagingMarker } from '@/components/canvas/MarkerStagingPanel';
 import { MarkerProductSourceModal } from '@/components/canvas/MarkerProductSourceModal';
-import { SnippingTool, SnippedRegion } from '@/components/canvas/SnippingTool';
-import { ZoneCreationModal, ZoneConfiguration } from '@/components/canvas/ZoneCreationModal';
 import { Button } from '@/components/ui/button';
 import { Move, Plus } from 'lucide-react';
 import { formatDownloadFilename } from '@/utils/formatDownloadFilename';
@@ -149,22 +146,8 @@ const Index = () => {
   // Zone comparison state
   const [comparisonZone, setComparisonZone] = useState<Zone | null>(null);
   
-  // Snipping tool and zone creation modal state
-  const [showSnippingTool, setShowSnippingTool] = useState(false);
-  const [snippedRegion, setSnippedRegion] = useState<SnippedRegion | null>(null);
-  const [showZoneCreationModal, setShowZoneCreationModal] = useState(false);
-  const [isGeneratingZoneIsometric, setIsGeneratingZoneIsometric] = useState(false);
-  
   // Render comparison modal state
   const [showComparisonModal, setShowComparisonModal] = useState(false);
-
-  // Layout analysis preview state (two-stage generation)
-  const [showLayoutAnalysisPreview, setShowLayoutAnalysisPreview] = useState(false);
-  const [pendingLayoutAnalysis, setPendingLayoutAnalysis] = useState<LayoutAnalysis | null>(null);
-  const [isAnalyzingLayout, setIsAnalyzingLayout] = useState(false);
-  const [layoutAnalysisError, setLayoutAnalysisError] = useState<string | null>(null);
-  const [pendingGenerationPrompt, setPendingGenerationPrompt] = useState('');
-  const [pendingGenerationFurniture, setPendingGenerationFurniture] = useState<CatalogFurnitureItem[]>([]);
 
   // Agent B state
   const [agentBEnabled, setAgentBEnabled] = useState(false);
@@ -1253,17 +1236,8 @@ Ready to generate a render! Describe your vision.`;
       // Edit existing render (with or without staged furniture)
       editRender(content, stagedItems);
     } else {
-      // NEW: If layout exists, show layout analysis preview modal first
-      if (layoutImageUrl) {
-        setPendingGenerationPrompt(content);
-        setPendingGenerationFurniture([...stagedItems]);
-        setPendingLayoutAnalysis(null);
-        setLayoutAnalysisError(null);
-        setShowLayoutAnalysisPreview(true);
-      } else {
-        // No layout, proceed directly to generation
-        triggerGeneration(content, stagedItems);
-      }
+      // Generate first render
+      triggerGeneration(content, stagedItems);
     }
     
     // Clear staged items from DB and state after sending
@@ -1274,164 +1248,7 @@ Ready to generate a render! Describe your vision.`;
         .eq('project_id', currentProjectId);
     }
     setStagedItems([]);
-  }, [user, currentProjectId, addMessage, triggerGeneration, editRender, stagedItems, currentRenderUrl, layoutImageUrl]);
-
-  // Handle layout analysis for two-stage generation
-  const handleAnalyzeLayoutForGeneration = useCallback(async () => {
-    if (!layoutImageUrl) return;
-    
-    setIsAnalyzingLayout(true);
-    setLayoutAnalysisError(null);
-    
-    try {
-      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/analyze-layout`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
-        },
-        body: JSON.stringify({ layoutImageUrl }),
-      });
-      
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.error || 'Layout analysis failed');
-      }
-      
-      const data = await response.json();
-      
-      if (data.analysis) {
-        setPendingLayoutAnalysis(data.analysis);
-        console.log('Layout analysis complete:', data.analysis.roomShape, data.analysis.dimensions);
-        toast({ title: 'Layout analyzed', description: `Detected ${data.analysis.roomShape} room with ${data.analysis.windows?.length || 0} windows` });
-      } else {
-        throw new Error('No analysis data returned');
-      }
-    } catch (err) {
-      console.error('Layout analysis failed:', err);
-      setLayoutAnalysisError(err instanceof Error ? err.message : 'Analysis failed');
-    } finally {
-      setIsAnalyzingLayout(false);
-    }
-  }, [layoutImageUrl, toast]);
-
-  // Handle confirmation of layout analysis and proceed to generation
-  const handleConfirmLayoutAnalysis = useCallback(async (analysis: LayoutAnalysis) => {
-    if (!user || !currentProjectId) return;
-    
-    setShowLayoutAnalysisPreview(false);
-    setIsGenerating(true);
-    
-    try {
-      // Fetch all project reference images
-      const references = await fetchProjectReferences(currentProjectId);
-      
-      // Combine staged furniture with project products
-      const allProducts = [
-        ...pendingGenerationFurniture.map(item => ({
-          name: item.name,
-          category: item.category,
-          description: item.description,
-          imageUrl: item.imageUrl,
-        })),
-        ...references.productItems.map(p => ({
-          name: p.name,
-          category: 'Product',
-          description: `User-uploaded product: ${p.name}`,
-          imageUrl: p.imageUrl,
-        })),
-      ];
-
-      // Build enhanced prompt with furniture context
-      let enhancedPrompt = pendingGenerationPrompt;
-      if (allProducts.length > 0) {
-        const furnitureContext = allProducts.map(item => 
-          `- ${item.name} (${item.category}): ${item.description}`
-        ).join('\n');
-        enhancedPrompt = `${pendingGenerationPrompt}\n\n[Include these specific products/furniture in the design:\n${furnitureContext}]`;
-      }
-
-      // Create render record
-      const { data: renderRecord, error: renderError } = await supabase
-        .from('renders')
-        .insert({
-          project_id: currentProjectId,
-          user_id: user.id,
-          prompt: enhancedPrompt,
-          room_upload_id: currentUpload?.id || null,
-          status: 'generating',
-        })
-        .select()
-        .single();
-
-      if (renderError) throw renderError;
-
-      await addMessage('assistant', 
-        `Layout verified: ${analysis.roomShape} room (${analysis.dimensions.width}×${analysis.dimensions.depth}ft) with ${analysis.windows.length} windows. Generating precise render...`,
-        { type: 'text', status: 'pending' }
-      );
-
-      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-render`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
-        },
-        body: JSON.stringify({
-          prompt: enhancedPrompt,
-          layoutImageUrl: references.layoutUrl,
-          roomPhotoUrl: references.roomPhotoUrl,
-          styleRefUrls: references.styleRefUrls,
-          furnitureItems: allProducts,
-          // Pass pre-analyzed layout for 111% accuracy mode (skip re-analysis)
-          layoutAnalysis: analysis,
-        }),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.error || 'Generation failed');
-      }
-
-      const { imageUrl } = await response.json();
-
-      // Update render record
-      await supabase
-        .from('renders')
-        .update({ render_url: imageUrl, status: 'completed' })
-        .eq('id', renderRecord.id);
-
-      setCurrentRenderUrl(imageUrl);
-      setCurrentRenderId(renderRecord.id);
-
-      await addMessage('assistant', 'Your render is ready! You can download it using the controls above.', {
-        type: 'render',
-        imageUrl,
-        status: 'ready',
-      });
-
-      toast({ title: 'Render complete', description: 'Your design is ready to view.' });
-
-    } catch (error) {
-      console.error('Render generation failed:', error);
-      const message = error instanceof Error ? error.message : 'Unknown error';
-      await addMessage('assistant', `Sorry, generation failed: ${message}`, { type: 'text', status: 'failed' });
-      toast({ variant: 'destructive', title: 'Generation failed', description: message });
-    } finally {
-      setIsGenerating(false);
-      setPendingGenerationPrompt('');
-      setPendingGenerationFurniture([]);
-    }
-  }, [user, currentProjectId, pendingGenerationPrompt, pendingGenerationFurniture, currentUpload, addMessage, toast]);
-
-  // Cancel layout analysis preview
-  const handleCancelLayoutAnalysis = useCallback(() => {
-    setShowLayoutAnalysisPreview(false);
-    setPendingLayoutAnalysis(null);
-    setLayoutAnalysisError(null);
-    setPendingGenerationPrompt('');
-    setPendingGenerationFurniture([]);
-  }, []);
+  }, [user, currentProjectId, addMessage, triggerGeneration, editRender, stagedItems, currentRenderUrl]);
 
   // ========== AGENT B HANDLERS ==========
   
@@ -3083,29 +2900,8 @@ ABSOLUTE REQUIREMENTS FOR CONSISTENCY:
 
       await addMessage('user', `🎯 Generating ${viewLabel} view for zone: ${zone.name}...`, { type: 'text' });
 
-      // Calculate aspect ratio from zone dimensions to preserve exact orientation
-      const zoneWidth = zone.x_end - zone.x_start;
-      const zoneHeight = zone.y_end - zone.y_start;
-      const zoneRatio = zoneWidth / zoneHeight;
-      const zoneOrientation = zoneRatio > 1 ? 'landscape' : zoneRatio < 1 ? 'portrait' : 'square';
-      // Map to closest supported ratio based on zone orientation
-      let zoneAspectRatio: string;
-      if (zoneRatio >= 2.0) {
-        zoneAspectRatio = '21:9'; // Ultra-wide landscape
-      } else if (zoneRatio >= 1.5) {
-        zoneAspectRatio = '16:9'; // Wide landscape
-      } else if (zoneRatio >= 1.2) {
-        zoneAspectRatio = '4:3'; // Standard landscape
-      } else if (zoneRatio >= 0.85) {
-        zoneAspectRatio = '1:1'; // Square
-      } else if (zoneRatio >= 0.65) {
-        zoneAspectRatio = '3:4'; // Standard portrait
-      } else if (zoneRatio >= 0.5) {
-        zoneAspectRatio = '9:16'; // Tall portrait
-      } else {
-        zoneAspectRatio = '9:21'; // Ultra-tall portrait
-      }
-      console.log(`Zone ${zone.name} dimensions: ${zoneWidth.toFixed(1)}% x ${zoneHeight.toFixed(1)}% = ratio ${zoneRatio.toFixed(2)} (${zoneOrientation}) -> ${zoneAspectRatio}`);
+      // Detect aspect ratio to preserve from source image (use render if exists, otherwise default)
+      const sourceAspectRatio = currentRenderUrl ? await getImageAspectRatio(currentRenderUrl) : '16:9';
 
       // Merge existing style refs with any new ones from options
       const allStyleRefs = [...new Set([...styleRefUrls, ...options.styleRefUrls])];
@@ -3138,8 +2934,7 @@ ABSOLUTE REQUIREMENTS FOR CONSISTENCY:
           viewType: options.viewType,
           styleRefUrls: allStyleRefs,
           furnitureItems: furnitureItems.length > 0 ? furnitureItems : undefined,
-          preserveAspectRatio: zoneAspectRatio,
-          zoneOrientation: zoneOrientation, // Pass orientation for prompt guidance
+          preserveAspectRatio: sourceAspectRatio,
           layoutBasedZone: true, // Flag to use layout-based generation
           preAnalysis: options.preAnalysis, // Pre-analyzed zone data (skips Stage 1 if provided)
         }),
@@ -3183,108 +2978,6 @@ ABSOLUTE REQUIREMENTS FOR CONSISTENCY:
       setGeneratingViewType(null);
     }
   }, [user, currentProjectId, currentRenderUrl, currentRenderId, currentUpload, styleRefUrls, layoutImageUrl, addMessage, toast, loadAllRenders]);
-
-  // =========== SNIPPING TOOL ZONE CREATION ===========
-
-  // Handle snipping tool completion
-  const handleSnippingComplete = useCallback((region: SnippedRegion) => {
-    console.log('Snipping complete:', region);
-    setSnippedRegion(region);
-    setShowSnippingTool(false);
-    setShowZoneCreationModal(true);
-  }, []);
-
-  // Handle zone configuration and generation
-  const handleZoneConfigGenerate = useCallback(async (config: ZoneConfiguration) => {
-    if (!user || !currentProjectId) {
-      toast({ variant: 'destructive', title: 'Error', description: 'Please sign in and select a project' });
-      return;
-    }
-
-    setIsGeneratingZoneIsometric(true);
-
-    try {
-      // Create render record first
-      const { data: renderRecord, error: renderError } = await supabase
-        .from('renders')
-        .insert({
-          project_id: currentProjectId,
-          user_id: user.id,
-          prompt: `Zone: ${config.name} (${config.zoneType}) - Isometric View`,
-          status: 'generating',
-          room_upload_id: currentUpload?.id || null,
-          parent_render_id: currentRenderId,
-        })
-        .select()
-        .single();
-
-      if (renderError) throw renderError;
-
-      await addMessage('user', `🎯 Generating isometric view for "${config.name}"...`, { type: 'text' });
-
-      // Call the new generate-zone-isometric edge function
-      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-zone-isometric`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
-        },
-        body: JSON.stringify(config),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.error || 'Zone generation failed');
-      }
-
-      const result = await response.json();
-
-      if (!result.success || !result.imageUrl) {
-        throw new Error(result.error || 'No image generated');
-      }
-
-      // Update render record with the generated image
-      await supabase
-        .from('renders')
-        .update({ render_url: result.imageUrl, status: 'completed' })
-        .eq('id', renderRecord.id);
-
-      // Update current render state
-      setCurrentRenderUrl(result.imageUrl);
-      setCurrentRenderId(renderRecord.id);
-
-      await addMessage('assistant', `Isometric view of "${config.name}" generated!`, {
-        type: 'render',
-        imageUrl: result.imageUrl,
-        status: 'ready',
-      });
-
-      // Reload all renders to include the new one in history
-      await loadAllRenders();
-
-      toast({ title: 'Zone render ready', description: `"${config.name}" isometric view generated with ${config.furniture.length} furniture items` });
-      
-      // Close the modal
-      setShowZoneCreationModal(false);
-      setSnippedRegion(null);
-    } catch (error) {
-      console.error('Zone isometric generation failed:', error);
-      const message = error instanceof Error ? error.message : 'Unknown error';
-      await addMessage('assistant', `Failed to generate zone: ${message}`, { type: 'text', status: 'failed' });
-      toast({ variant: 'destructive', title: 'Failed', description: message });
-    } finally {
-      setIsGeneratingZoneIsometric(false);
-    }
-  }, [user, currentProjectId, currentRenderId, currentUpload, addMessage, toast, loadAllRenders]);
-
-  // Open snipping tool for zone creation
-  const handleOpenSnippingTool = useCallback(() => {
-    if (!layoutImageUrl) {
-      toast({ variant: 'destructive', title: 'Error', description: 'Please upload a layout first' });
-      return;
-    }
-    setShowSnippingTool(true);
-  }, [layoutImageUrl, toast]);
 
   // =========== CAMERA CRUD OPERATIONS ===========
 
@@ -4487,7 +4180,6 @@ ABSOLUTE REQUIREMENTS FOR CONSISTENCY:
           onGenerateZoneView={handleGenerateZoneView}
           onCompareZone={(zone) => setComparisonZone(zone)}
           isGenerating={isGenerating || isMulticamGenerating}
-          onOpenSnippingTool={handleOpenSnippingTool}
         />
       )}
 
@@ -4610,46 +4302,6 @@ ABSOLUTE REQUIREMENTS FOR CONSISTENCY:
         renderId={currentRenderId}
         onProductCreated={handleCustomProductCreated}
       />
-
-      {/* Layout Analysis Preview Modal (Two-Stage Generation) */}
-      {showLayoutAnalysisPreview && layoutImageUrl && (
-        <LayoutAnalysisPreview
-          layoutImageUrl={layoutImageUrl}
-          analysis={pendingLayoutAnalysis}
-          isAnalyzing={isAnalyzingLayout}
-          analysisError={layoutAnalysisError}
-          onAnalyze={handleAnalyzeLayoutForGeneration}
-          onConfirm={handleConfirmLayoutAnalysis}
-          onCancel={handleCancelLayoutAnalysis}
-          isGenerating={isGenerating}
-        />
-      )}
-
-      {/* Snipping Tool for Zone Creation */}
-      {showSnippingTool && layoutImageUrl && (
-        <SnippingTool
-          imageUrl={layoutImageUrl}
-          onComplete={handleSnippingComplete}
-          onCancel={() => setShowSnippingTool(false)}
-        />
-      )}
-
-      {/* Zone Creation Modal */}
-      {showZoneCreationModal && snippedRegion && (
-        <ZoneCreationModal
-          snippedRegion={snippedRegion}
-          onGenerate={handleZoneConfigGenerate}
-          onReSnip={() => {
-            setShowZoneCreationModal(false);
-            setShowSnippingTool(true);
-          }}
-          onCancel={() => {
-            setShowZoneCreationModal(false);
-            setSnippedRegion(null);
-          }}
-          isGenerating={isGeneratingZoneIsometric}
-        />
-      )}
     </div>
   </SidebarProvider>
   </PageTransition>

@@ -552,11 +552,6 @@ ${renderIndex ? `- IMAGE ${renderIndex}: Existing 3D render (style reference)` :
 ${styleRefIndices.length > 0 ? styleRefIndices.map((idx, i) => `- IMAGE ${idx}: Style Reference ${i + 1}`).join('\n') : ''}
 ${productIndices.length > 0 ? productIndices.map(p => `- IMAGE ${p.index}: Product "${p.name}"`).join('\n') : ''}`;
 
-        // Get zone orientation from request
-        const zoneOrientation = (req as any).zoneOrientation || 'landscape';
-        const orientationDesc = zoneOrientation === 'landscape' ? 'WIDER than tall (horizontal)' : 
-                               zoneOrientation === 'portrait' ? 'TALLER than wide (vertical)' : 'equal width and height';
-        
         zonePrompt = `You are an expert architectural renderer specializing in ISOMETRIC 3D VISUALIZATION.
 ${imageRefList}
 
@@ -566,21 +561,6 @@ ${imageRefList}
 ║  The floor plan has been PRE-ANALYZED by AI to extract precise positions       ║
 ║  Follow the furniture placement instructions EXACTLY                           ║
 ╚═══════════════════════════════════════════════════════════════════════════════╝
-
-═══════════════════════════════════════════════════════════════
-           ⚠️ CRITICAL: PRESERVE ZONE ORIENTATION
-═══════════════════════════════════════════════════════════════
-
-INPUT ZONE ORIENTATION: ${zoneOrientation.toUpperCase()} (${orientationDesc})
-OUTPUT MUST MATCH THIS ORIENTATION EXACTLY!
-
-RULES:
-- If zone is LANDSCAPE -> output MUST be landscape (wider than tall)
-- If zone is PORTRAIT -> output MUST be portrait (taller than wide)  
-- If zone is SQUARE -> output MUST be approximately square
-- DO NOT add L-shaped rooms or corner configurations
-- DO NOT reshape, crop, or distort the floor plan proportions
-- Render as a simple RECTANGULAR room matching the zone's exact shape
 ${furniturePlacementInstructions}
 ${architecturalSection}
 ${styleInstructions}

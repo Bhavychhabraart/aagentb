@@ -51,7 +51,6 @@ export interface ZoneGenerationOptions {
   selectedProducts: CatalogFurnitureItem[];
   customPrompt: string;
   preAnalysis?: ZoneAnalysis;
-  guideUrl?: string;
 }
 
 interface ZonePreviewConfirmProps {
@@ -86,21 +85,11 @@ export function ZonePreviewConfirm({
   const [isUploadingStyle, setIsUploadingStyle] = useState(false);
   const [showProductPicker, setShowProductPicker] = useState(false);
 
-  // Analysis state
+  // NEW: Analysis state
   const [analysisResult, setAnalysisResult] = useState<ZoneAnalysis | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [analysisError, setAnalysisError] = useState<string | null>(null);
   const [showFurnitureDetails, setShowFurnitureDetails] = useState(true);
-
-  // Guide state
-  const [guideUrl, setGuideUrl] = useState<string | null>(null);
-  const [isUploadingGuide, setIsUploadingGuide] = useState(false);
-  
-  // Style/Guide analysis state
-  const [styleAnalysis, setStyleAnalysis] = useState<string | null>(null);
-  const [isAnalyzingStyle, setIsAnalyzingStyle] = useState(false);
-  const [guideAnalysis, setGuideAnalysis] = useState<string | null>(null);
-  const [isAnalyzingGuide, setIsAnalyzingGuide] = useState(false);
 
   useEffect(() => {
     const loadPreview = async () => {
@@ -158,33 +147,8 @@ export function ZonePreviewConfirm({
     setIsAnalyzing(true);
     setAnalysisError(null);
 
-    // Set a timeout to prevent infinite loading
-    const timeoutId = setTimeout(() => {
-      setIsAnalyzing(false);
-      setAnalysisError('Analysis timed out. Please try again.');
-      toast.error('Analysis timed out after 60 seconds');
-    }, 60000);
-
     try {
       console.log('=== CALLING ZONE ANALYSIS ===');
-      console.log('Preview URL length:', previewUrl.length);
-      console.log('Guide URL:', guideUrl || 'none');
-      
-      // Convert guide URL to base64 if present
-      let guideBase64: string | undefined;
-      if (guideUrl) {
-        try {
-          const guideResponse = await fetch(guideUrl);
-          const guideBlob = await guideResponse.blob();
-          guideBase64 = await new Promise((resolve) => {
-            const reader = new FileReader();
-            reader.onloadend = () => resolve(reader.result as string);
-            reader.readAsDataURL(guideBlob);
-          });
-        } catch (guideErr) {
-          console.warn('Failed to convert guide to base64:', guideErr);
-        }
-      }
       
       const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/analyze-zone`, {
         method: 'POST',
@@ -195,20 +159,15 @@ export function ZonePreviewConfirm({
         body: JSON.stringify({
           layoutZoneBase64: previewUrl,
           zoneName: zone.name,
-          guideBase64,
         }),
       });
 
-      clearTimeout(timeoutId);
-
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
-        const errorMsg = errorData.error || `Analysis failed (${response.status})`;
-        throw new Error(errorMsg);
+        throw new Error(errorData.error || 'Analysis failed');
       }
 
       const data = await response.json();
-      console.log('Analysis response:', data);
       
       if (data.success && data.analysis) {
         setAnalysisResult(data.analysis);
@@ -218,136 +177,13 @@ export function ZonePreviewConfirm({
         throw new Error(data.error || 'Analysis returned no results');
       }
     } catch (err) {
-      clearTimeout(timeoutId);
       console.error('Zone analysis failed:', err);
-      const errorMsg = err instanceof Error ? err.message : 'Analysis failed';
-      setAnalysisError(errorMsg);
-      toast.error(`Analysis failed: ${errorMsg}`);
+      setAnalysisError(err instanceof Error ? err.message : 'Analysis failed');
+      toast.error('Failed to analyze zone');
     } finally {
       setIsAnalyzing(false);
     }
-  }, [previewUrl, zone.name, guideUrl]);
-
-  // Handle guide upload
-  const handleGuideUpload = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    
-    setIsUploadingGuide(true);
-    setGuideAnalysis(null); // Reset analysis when uploading new guide
-    try {
-      const fileName = `guides/${Date.now()}-${file.name}`;
-      const { error: uploadError } = await supabase.storage
-        .from('room-uploads')
-        .upload(fileName, file);
-      
-      if (uploadError) throw uploadError;
-      
-      const { data: { publicUrl } } = supabase.storage
-        .from('room-uploads')
-        .getPublicUrl(fileName);
-      
-      setGuideUrl(publicUrl);
-      toast.success('Design guide uploaded');
-    } catch (err) {
-      console.error('Guide upload failed:', err);
-      toast.error('Failed to upload design guide');
-    } finally {
-      setIsUploadingGuide(false);
-    }
-  }, []);
-
-  // Analyze guide image
-  const handleAnalyzeGuide = useCallback(async () => {
-    if (!guideUrl) return;
-    
-    setIsAnalyzingGuide(true);
-    try {
-      // Convert guide URL to base64
-      const response = await fetch(guideUrl);
-      const blob = await response.blob();
-      const base64 = await new Promise<string>((resolve) => {
-        const reader = new FileReader();
-        reader.onloadend = () => resolve(reader.result as string);
-        reader.readAsDataURL(blob);
-      });
-      
-      const analysisResponse = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/analyze-zone`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
-        },
-        body: JSON.stringify({
-          layoutZoneBase64: base64,
-          zoneName: 'Design Guide Analysis',
-          analysisType: 'guide',
-        }),
-      });
-      
-      if (!analysisResponse.ok) throw new Error('Guide analysis failed');
-      
-      const data = await analysisResponse.json();
-      if (data.guideInsights) {
-        setGuideAnalysis(data.guideInsights);
-        toast.success('Guide analyzed');
-      } else if (data.analysis?.sceneDescription) {
-        setGuideAnalysis(data.analysis.sceneDescription);
-        toast.success('Guide analyzed');
-      }
-    } catch (err) {
-      console.error('Guide analysis failed:', err);
-      toast.error('Failed to analyze guide');
-    } finally {
-      setIsAnalyzingGuide(false);
-    }
-  }, [guideUrl]);
-
-  // Analyze style references
-  const handleAnalyzeStyle = useCallback(async () => {
-    if (styleRefUrls.length === 0) return;
-    
-    setIsAnalyzingStyle(true);
-    try {
-      // Convert first style ref to base64
-      const response = await fetch(styleRefUrls[0]);
-      const blob = await response.blob();
-      const base64 = await new Promise<string>((resolve) => {
-        const reader = new FileReader();
-        reader.onloadend = () => resolve(reader.result as string);
-        reader.readAsDataURL(blob);
-      });
-      
-      const analysisResponse = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/analyze-zone`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
-        },
-        body: JSON.stringify({
-          layoutZoneBase64: base64,
-          zoneName: 'Style Reference Analysis',
-          analysisType: 'style',
-        }),
-      });
-      
-      if (!analysisResponse.ok) throw new Error('Style analysis failed');
-      
-      const data = await analysisResponse.json();
-      if (data.styleInsights) {
-        setStyleAnalysis(data.styleInsights);
-        toast.success('Style analyzed');
-      } else if (data.analysis?.sceneDescription) {
-        setStyleAnalysis(data.analysis.sceneDescription);
-        toast.success('Style analyzed');
-      }
-    } catch (err) {
-      console.error('Style analysis failed:', err);
-      toast.error('Failed to analyze style');
-    } finally {
-      setIsAnalyzingStyle(false);
-    }
-  }, [styleRefUrls]);
+  }, [previewUrl, zone.name]);
 
   const handleStyleRefUpload = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -398,14 +234,13 @@ export function ZonePreviewConfirm({
   };
 
   const handleConfirm = () => {
-    // Pass preAnalysis and guideUrl if available
+    // Pass preAnalysis if available
     onConfirm({
       viewType: 'isometric',
       styleRefUrls,
       selectedProducts,
       customPrompt,
       preAnalysis: analysisResult || undefined,
-      guideUrl: guideUrl || undefined,
     });
   };
 
@@ -608,78 +443,6 @@ export function ZonePreviewConfirm({
             </div>
           </div>
 
-          {/* Design Guide Section */}
-          <div>
-            <label className="text-sm font-medium mb-3 flex items-center justify-between">
-              <span className="flex items-center gap-1.5">
-                <ImageIcon className="h-4 w-4 text-emerald-500" />
-                Design Guide
-                <span className="text-muted-foreground font-normal text-xs">(optional)</span>
-              </span>
-              {guideUrl && !guideAnalysis && (
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={handleAnalyzeGuide}
-                  disabled={isAnalyzingGuide}
-                  className="h-6 text-xs px-2"
-                >
-                  {isAnalyzingGuide ? (
-                    <Loader2 className="h-3 w-3 animate-spin mr-1" />
-                  ) : (
-                    <Sparkles className="h-3 w-3 mr-1" />
-                  )}
-                  Analyze
-                </Button>
-              )}
-            </label>
-            <div className="flex items-start gap-3">
-              {guideUrl ? (
-                <div className="relative group">
-                  <img
-                    src={guideUrl}
-                    alt="Design guide"
-                    className="h-20 w-20 object-cover rounded-lg border border-border"
-                  />
-                  <button
-                    onClick={() => { setGuideUrl(null); setGuideAnalysis(null); }}
-                    className="absolute -top-1.5 -right-1.5 h-5 w-5 bg-destructive text-destructive-foreground rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity shadow-sm"
-                  >
-                    <X className="h-3 w-3" />
-                  </button>
-                </div>
-              ) : (
-                <label className="h-20 w-20 border-2 border-dashed border-border rounded-lg flex flex-col items-center justify-center cursor-pointer hover:bg-muted/50 hover:border-muted-foreground/50 transition-all">
-                  {isUploadingGuide ? (
-                    <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
-                  ) : (
-                    <>
-                      <Upload className="h-5 w-5 text-muted-foreground" />
-                      <span className="text-[10px] text-muted-foreground mt-1">Guide</span>
-                    </>
-                  )}
-                  <input
-                    type="file"
-                    accept="image/*"
-                    className="hidden"
-                    onChange={handleGuideUpload}
-                    disabled={isUploadingGuide}
-                  />
-                </label>
-              )}
-              <div className="flex-1 space-y-2">
-                <p className="text-xs text-muted-foreground">
-                  Upload a design guide to help the AI understand layout patterns and design rules.
-                </p>
-                {guideAnalysis && (
-                  <div className="text-xs bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 rounded p-2 italic">
-                    "{guideAnalysis}"
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-
           {/* Isometric View Info */}
           <div className="rounded-lg bg-primary/5 border border-primary/20 p-4">
             <div className="flex items-start gap-3">
@@ -697,28 +460,10 @@ export function ZonePreviewConfirm({
 
           {/* Style Reference Section */}
           <div>
-            <label className="text-sm font-medium mb-3 flex items-center justify-between">
-              <span className="flex items-center gap-1.5">
-                <Sparkles className="h-4 w-4 text-amber-500" />
-                Style References
-                <span className="text-muted-foreground font-normal text-xs">(optional)</span>
-              </span>
-              {styleRefUrls.length > 0 && !styleAnalysis && (
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={handleAnalyzeStyle}
-                  disabled={isAnalyzingStyle}
-                  className="h-6 text-xs px-2"
-                >
-                  {isAnalyzingStyle ? (
-                    <Loader2 className="h-3 w-3 animate-spin mr-1" />
-                  ) : (
-                    <Sparkles className="h-3 w-3 mr-1" />
-                  )}
-                  Analyze
-                </Button>
-              )}
+            <label className="text-sm font-medium mb-3 flex items-center gap-1.5">
+              <Sparkles className="h-4 w-4 text-amber-500" />
+              Style References
+              <span className="text-muted-foreground font-normal text-xs">(optional)</span>
             </label>
             <div className="flex flex-wrap gap-2">
               {styleRefUrls.map((url, index) => (
@@ -729,7 +474,7 @@ export function ZonePreviewConfirm({
                     className="h-16 w-16 object-cover rounded-lg border border-border"
                   />
                   <button
-                    onClick={() => { removeStyleRef(index); setStyleAnalysis(null); }}
+                    onClick={() => removeStyleRef(index)}
                     className="absolute -top-1.5 -right-1.5 h-5 w-5 bg-destructive text-destructive-foreground rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity shadow-sm"
                   >
                     <X className="h-3 w-3" />
@@ -753,11 +498,6 @@ export function ZonePreviewConfirm({
                 </label>
               )}
             </div>
-            {styleAnalysis && (
-              <div className="text-xs bg-amber-500/10 text-amber-700 dark:text-amber-300 rounded p-2 mt-2 italic">
-                "{styleAnalysis}"
-              </div>
-            )}
             <p className="text-xs text-muted-foreground mt-2">
               Upload images to match their aesthetic style and mood
             </p>

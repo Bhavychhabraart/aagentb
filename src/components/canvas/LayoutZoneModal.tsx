@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { X, Layers, Plus, Trash2, Camera, Edit3, Columns2, Scissors } from 'lucide-react';
+import { X, Layers, Plus, Trash2, Camera, Edit3, Columns2 } from 'lucide-react';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import * as VisuallyHidden from '@radix-ui/react-visually-hidden';
 import { Button } from '@/components/ui/button';
@@ -26,7 +26,6 @@ interface LayoutZoneModalProps {
   styleRefUrls?: string[];
   catalogItems?: CatalogFurnitureItem[];
   onOpenCatalog?: () => void;
-  onOpenSnippingTool?: () => void;
 }
 
 export function LayoutZoneModal({
@@ -43,7 +42,6 @@ export function LayoutZoneModal({
   styleRefUrls = [],
   catalogItems = [],
   onOpenCatalog,
-  onOpenSnippingTool,
 }: LayoutZoneModalProps) {
   const [zones, setZones] = useState<Zone[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -165,33 +163,15 @@ export function LayoutZoneModal({
             <div className="p-4 border-b border-border">
               <div className="flex items-center justify-between mb-3">
                 <span className="text-sm font-medium">Zones ({zones.length})</span>
-                <div className="flex items-center gap-2">
-                  {onOpenSnippingTool && (
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => {
-                        onClose();
-                        onOpenSnippingTool();
-                      }}
-                      disabled={!layoutImageUrl}
-                      className="gap-1.5"
-                      title="Use pixel-perfect snipping tool"
-                    >
-                      <Scissors className="h-3.5 w-3.5" />
-                      Snip
-                    </Button>
-                  )}
-                  <Button
-                    size="sm"
-                    onClick={() => setIsDrawing(true)}
-                    disabled={!layoutImageUrl || isDrawing}
-                    className="gap-1.5"
-                  >
-                    <Plus className="h-3.5 w-3.5" />
-                    Add
-                  </Button>
-                </div>
+                <Button
+                  size="sm"
+                  onClick={() => setIsDrawing(true)}
+                  disabled={!layoutImageUrl || isDrawing}
+                  className="gap-1.5"
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                  Add Zone
+                </Button>
               </div>
               {isDrawing && (
                 <div className="text-xs text-primary bg-primary/10 px-3 py-2 rounded-lg">
