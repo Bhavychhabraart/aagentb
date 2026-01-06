@@ -2936,6 +2936,7 @@ ABSOLUTE REQUIREMENTS FOR CONSISTENCY:
           furnitureItems: furnitureItems.length > 0 ? furnitureItems : undefined,
           preserveAspectRatio: sourceAspectRatio,
           layoutBasedZone: true, // Flag to use layout-based generation
+          preAnalysis: options.preAnalysis, // Pre-analyzed zone data (skips Stage 1 if provided)
         }),
       });
 

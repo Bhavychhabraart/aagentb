@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { X, Loader2, Upload, Plus, Sparkles, Image as ImageIcon, Maximize2, Grid3X3 } from 'lucide-react';
+import { X, Loader2, Upload, Plus, Sparkles, Image as ImageIcon, Maximize2, Grid3X3, RefreshCw, CheckCircle2, AlertCircle, ChevronDown, ChevronUp, MapPin } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { cropRectangleFromImage } from '@/utils/cropZoneImage';
@@ -12,11 +12,45 @@ import { toast } from 'sonner';
 // Only isometric view - single view type for maximum accuracy
 export type ViewType = 'isometric';
 
+// Zone analysis types
+interface FurnitureAnalysis {
+  type: string;
+  shape: 'rectangular' | 'circular' | 'L-shaped' | 'irregular';
+  centerX: number;
+  centerY: number;
+  widthPercent: number;
+  heightPercent: number;
+  rotationDegrees: number;
+  facingDirection: string;
+  estimatedRealSize: string;
+}
+
+interface ArchitecturalFeature {
+  type: 'window' | 'door' | 'opening' | 'column' | 'stairs';
+  wall: 'top' | 'bottom' | 'left' | 'right' | 'center';
+  positionPercent: number;
+  widthPercent: number;
+}
+
+export interface ZoneAnalysis {
+  zoneType: string;
+  estimatedDimensions: {
+    widthFeet: number;
+    depthFeet: number;
+    aspectRatio: string;
+  };
+  furniture: FurnitureAnalysis[];
+  architecturalFeatures: ArchitecturalFeature[];
+  spatialRelationships: string[];
+  sceneDescription: string;
+}
+
 export interface ZoneGenerationOptions {
   viewType: ViewType;
   styleRefUrls: string[];
   selectedProducts: CatalogFurnitureItem[];
   customPrompt: string;
+  preAnalysis?: ZoneAnalysis;
 }
 
 interface ZonePreviewConfirmProps {
@@ -50,6 +84,12 @@ export function ZonePreviewConfirm({
   const [customPrompt, setCustomPrompt] = useState('');
   const [isUploadingStyle, setIsUploadingStyle] = useState(false);
   const [showProductPicker, setShowProductPicker] = useState(false);
+
+  // NEW: Analysis state
+  const [analysisResult, setAnalysisResult] = useState<ZoneAnalysis | null>(null);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [analysisError, setAnalysisError] = useState<string | null>(null);
+  const [showFurnitureDetails, setShowFurnitureDetails] = useState(true);
 
   useEffect(() => {
     const loadPreview = async () => {
@@ -96,6 +136,54 @@ export function ZonePreviewConfirm({
 
     loadPreview();
   }, [zone, layoutImageUrl]);
+
+  // Analyze zone when preview is ready
+  const handleAnalyzeZone = useCallback(async () => {
+    if (!previewUrl) {
+      toast.error('Preview not ready yet');
+      return;
+    }
+
+    setIsAnalyzing(true);
+    setAnalysisError(null);
+
+    try {
+      console.log('=== CALLING ZONE ANALYSIS ===');
+      
+      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/analyze-zone`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+        },
+        body: JSON.stringify({
+          layoutZoneBase64: previewUrl,
+          zoneName: zone.name,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || 'Analysis failed');
+      }
+
+      const data = await response.json();
+      
+      if (data.success && data.analysis) {
+        setAnalysisResult(data.analysis);
+        console.log('Zone analysis complete:', data.analysis);
+        toast.success(`Detected ${data.analysis.furniture?.length || 0} furniture items`);
+      } else {
+        throw new Error(data.error || 'Analysis returned no results');
+      }
+    } catch (err) {
+      console.error('Zone analysis failed:', err);
+      setAnalysisError(err instanceof Error ? err.message : 'Analysis failed');
+      toast.error('Failed to analyze zone');
+    } finally {
+      setIsAnalyzing(false);
+    }
+  }, [previewUrl, zone.name]);
 
   const handleStyleRefUpload = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -146,17 +234,23 @@ export function ZonePreviewConfirm({
   };
 
   const handleConfirm = () => {
-    // Always use isometric view for maximum accuracy
+    // Pass preAnalysis if available
     onConfirm({
       viewType: 'isometric',
       styleRefUrls,
       selectedProducts,
       customPrompt,
+      preAnalysis: analysisResult || undefined,
     });
   };
 
   const zoneWidth = zone.x_end - zone.x_start;
   const zoneHeight = zone.y_end - zone.y_start;
+
+  // Format zone type for display
+  const formatZoneType = (type: string) => {
+    return type.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+  };
 
   return (
     <div className="fixed inset-0 z-50 bg-background/95 backdrop-blur-sm flex animate-in fade-in duration-200">
@@ -234,6 +328,121 @@ export function ZonePreviewConfirm({
 
         {/* Scrollable configuration area */}
         <div className="flex-1 overflow-y-auto p-4 space-y-6">
+          
+          {/* STEP 1: Analyze Zone Section */}
+          <div className="rounded-lg border border-border overflow-hidden">
+            <div className="bg-muted/30 p-3 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className={cn(
+                  "h-6 w-6 rounded-full flex items-center justify-center text-xs font-medium",
+                  analysisResult ? "bg-green-500/20 text-green-600" : "bg-primary/20 text-primary"
+                )}>
+                  {analysisResult ? <CheckCircle2 className="h-4 w-4" /> : "1"}
+                </div>
+                <span className="font-medium text-sm">Analyze Zone</span>
+              </div>
+              {!analysisResult && !isAnalyzing && previewUrl && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={handleAnalyzeZone}
+                  className="h-7 text-xs"
+                >
+                  <Sparkles className="h-3 w-3 mr-1" />
+                  Analyze
+                </Button>
+              )}
+              {analysisResult && (
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={handleAnalyzeZone}
+                  disabled={isAnalyzing}
+                  className="h-7 text-xs"
+                >
+                  <RefreshCw className={cn("h-3 w-3 mr-1", isAnalyzing && "animate-spin")} />
+                  Re-analyze
+                </Button>
+              )}
+            </div>
+
+            {/* Analysis Status/Results */}
+            <div className="p-3">
+              {isAnalyzing ? (
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <Loader2 className="h-4 w-4 animate-spin text-primary" />
+                  <span>AI analyzing floor plan layout...</span>
+                </div>
+              ) : analysisError ? (
+                <div className="flex items-center gap-2 text-sm text-destructive">
+                  <AlertCircle className="h-4 w-4" />
+                  <span>{analysisError}</span>
+                </div>
+              ) : analysisResult ? (
+                <div className="space-y-3">
+                  {/* Zone Type & Dimensions */}
+                  <div className="flex items-center gap-3">
+                    <div className="px-2 py-1 rounded bg-primary/10 text-primary text-xs font-medium">
+                      {formatZoneType(analysisResult.zoneType)}
+                    </div>
+                    <span className="text-xs text-muted-foreground">
+                      ~{analysisResult.estimatedDimensions.widthFeet}ft × {analysisResult.estimatedDimensions.depthFeet}ft
+                    </span>
+                  </div>
+
+                  {/* Furniture List */}
+                  {analysisResult.furniture.length > 0 && (
+                    <div>
+                      <button
+                        onClick={() => setShowFurnitureDetails(!showFurnitureDetails)}
+                        className="flex items-center gap-1 text-xs font-medium text-muted-foreground hover:text-foreground mb-2"
+                      >
+                        {showFurnitureDetails ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+                        Detected Furniture ({analysisResult.furniture.length} items)
+                      </button>
+                      
+                      {showFurnitureDetails && (
+                        <div className="space-y-1.5 max-h-40 overflow-y-auto">
+                          {analysisResult.furniture.map((item, idx) => (
+                            <div key={idx} className="flex items-center gap-2 text-xs bg-muted/50 rounded p-2">
+                              <MapPin className="h-3 w-3 text-muted-foreground shrink-0" />
+                              <div className="flex-1 min-w-0">
+                                <span className="font-medium capitalize">{item.type.replace(/_/g, ' ')}</span>
+                                <span className="text-muted-foreground ml-1">
+                                  ({item.centerX.toFixed(0)}%, {item.centerY.toFixed(0)}%)
+                                </span>
+                              </div>
+                              <span className="text-muted-foreground shrink-0">{item.estimatedRealSize}</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Architectural Features */}
+                  {analysisResult.architecturalFeatures.length > 0 && (
+                    <div className="text-xs text-muted-foreground">
+                      <span className="font-medium">Features: </span>
+                      {analysisResult.architecturalFeatures.map(f => 
+                        `${f.type} (${f.wall} wall)`
+                      ).join(', ')}
+                    </div>
+                  )}
+
+                  {/* Scene Description */}
+                  <div className="text-xs text-muted-foreground bg-muted/30 rounded p-2 italic">
+                    "{analysisResult.sceneDescription}"
+                  </div>
+                </div>
+              ) : (
+                <p className="text-xs text-muted-foreground">
+                  Click "Analyze" to detect furniture and layout from the floor plan. This helps generate more accurate results.
+                </p>
+              )}
+            </div>
+          </div>
+
           {/* Isometric View Info */}
           <div className="rounded-lg bg-primary/5 border border-primary/20 p-4">
             <div className="flex items-start gap-3">
@@ -402,15 +611,26 @@ export function ZonePreviewConfirm({
             <div className="rounded-lg bg-primary/5 border border-primary/20 p-3 mb-3 animate-in fade-in duration-300">
               <div className="flex items-center gap-2 mb-2">
                 <Loader2 className="h-4 w-4 animate-spin text-primary" />
-                <span className="text-sm font-medium">Processing zone...</span>
+                <span className="text-sm font-medium">
+                  {analysisResult ? 'Generating with pre-analyzed layout...' : 'Processing zone...'}
+                </span>
               </div>
               <div className="space-y-1 text-xs text-muted-foreground">
                 <div className="flex items-center gap-1.5">
-                  <div className="h-1.5 w-1.5 rounded-full bg-primary animate-pulse" />
-                  <span>Stage 1: AI analyzing floor plan layout</span>
+                  <div className={cn(
+                    "h-1.5 w-1.5 rounded-full",
+                    analysisResult ? "bg-green-500" : "bg-primary animate-pulse"
+                  )} />
+                  <span className={analysisResult ? "line-through opacity-50" : ""}>
+                    Stage 1: AI analyzing floor plan layout
+                  </span>
+                  {analysisResult && <CheckCircle2 className="h-3 w-3 text-green-500" />}
                 </div>
                 <div className="flex items-center gap-1.5">
-                  <div className="h-1.5 w-1.5 rounded-full bg-muted-foreground/30" />
+                  <div className={cn(
+                    "h-1.5 w-1.5 rounded-full",
+                    analysisResult ? "bg-primary animate-pulse" : "bg-muted-foreground/30"
+                  )} />
                   <span>Stage 2: Building precise placement prompt</span>
                 </div>
                 <div className="flex items-center gap-1.5">
@@ -429,12 +649,15 @@ export function ZonePreviewConfirm({
             {isGenerating ? (
               <>
                 <Loader2 className="h-5 w-5 mr-2 animate-spin" />
-                Analyzing & Generating...
+                Generating...
               </>
             ) : (
               <>
                 <Grid3X3 className="h-5 w-5 mr-2" />
                 Generate Isometric View
+                {analysisResult && (
+                  <span className="ml-2 text-xs opacity-70">(analyzed)</span>
+                )}
               </>
             )}
           </Button>
