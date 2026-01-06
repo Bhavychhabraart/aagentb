@@ -43,7 +43,7 @@ serve(async (req) => {
   }
 
   try {
-    const { layoutZoneBase64, zoneName } = await req.json();
+    const { layoutZoneBase64, zoneName, guideBase64 } = await req.json();
     
     const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
     
@@ -58,8 +58,10 @@ serve(async (req) => {
     console.log('=== ZONE ANALYSIS REQUEST ===');
     console.log('Zone name:', zoneName || 'unnamed');
     console.log('Image data length:', layoutZoneBase64.length);
+    console.log('Guide provided:', !!guideBase64);
 
     const analysisPrompt = `You are an expert floor plan analyst. Analyze this 2D floor plan zone image and extract PRECISE information about every element visible.
+${guideBase64 ? '\nIMPORTANT: A design guide image has been provided as reference. Use this guide to understand design standards, furniture arrangement patterns, and style preferences that should be reflected in your analysis.' : ''}
 
 ANALYZE THE IMAGE AND RETURN A JSON OBJECT with this exact structure:
 
@@ -111,8 +113,31 @@ IMPORTANT RULES:
 
 Analyze the floor plan zone image now and return the JSON:`;
 
-    console.log('Calling Gemini 2.5 Pro for zone analysis...');
+    console.log('Calling Gemini 2.5 Flash for zone analysis...');
     
+    // Build user content array with images
+    const userContent: any[] = [];
+    
+    // Add zone image first
+    userContent.push({
+      type: 'image_url',
+      image_url: { url: layoutZoneBase64 }
+    });
+    
+    // Add guide image if provided
+    if (guideBase64) {
+      userContent.push({
+        type: 'image_url',
+        image_url: { url: guideBase64 }
+      });
+    }
+    
+    // Add the analysis prompt
+    userContent.push({
+      type: 'text',
+      text: analysisPrompt
+    });
+
     const analysisResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -120,13 +145,10 @@ Analyze the floor plan zone image now and return the JSON:`;
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'google/gemini-2.5-pro',
+        model: 'google/gemini-2.5-flash',
         messages: [{
           role: 'user',
-          content: [
-            { type: 'image_url', image_url: { url: layoutZoneBase64 } },
-            { type: 'text', text: analysisPrompt }
-          ]
+          content: userContent
         }],
       }),
     });
