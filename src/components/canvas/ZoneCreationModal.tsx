@@ -11,6 +11,26 @@ import { toast } from 'sonner';
 import { FurnitureSpecifier, FurnitureSpec } from './FurnitureSpecifier';
 import { SnippedRegion } from './SnippingTool';
 
+export interface FullZoneAnalysis {
+  zoneType?: string;
+  furniture?: Array<{
+    type: string;
+    centerX?: number;
+    centerY?: number;
+    facingDirection?: string;
+    estimatedRealSize?: string;
+    confidence?: number;
+  }>;
+  sceneDescription?: string;
+  spatialRelationships?: string[];
+  architecturalFeatures?: string[];
+  suggestedStyle?: string;
+  estimatedDimensions?: {
+    widthFeet?: number;
+    depthFeet?: number;
+  };
+}
+
 export interface ZoneConfiguration {
   name: string;
   zoneType: string;
@@ -33,6 +53,7 @@ export interface ZoneConfiguration {
   croppedImageDataUrl: string;
   aspectRatio: number;
   orientation: 'landscape' | 'portrait' | 'square';
+  fullAnalysis?: FullZoneAnalysis;
 }
 
 interface ZoneCreationModalProps {
@@ -93,7 +114,8 @@ export function ZoneCreationModal({
   // AI Detection state
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [analysisComplete, setAnalysisComplete] = useState(false);
-  const [detectedFurniture, setDetectedFurniture] = useState<Array<{ type: string; position?: string }>>([]);
+  const [detectedFurniture, setDetectedFurniture] = useState<Array<{ type: string; position?: string; centerX?: number; centerY?: number; facingDirection?: string; estimatedRealSize?: string }>>([]);
+  const [fullAnalysis, setFullAnalysis] = useState<FullZoneAnalysis | null>(null);
   
   // Style/Guide uploads
   const [styleRefUrl, setStyleRefUrl] = useState<string | null>(null);
@@ -129,6 +151,9 @@ export function ZoneCreationModal({
       if (data.success && data.analysis) {
         const analysis = data.analysis;
         
+        // Store the FULL analysis for generation
+        setFullAnalysis(analysis);
+        
         // Update zone type if detected
         if (analysis.zoneType) {
           const matchedType = ZONE_TYPES.find(t => 
@@ -148,11 +173,15 @@ export function ZoneCreationModal({
           }));
         }
         
-        // Extract detected furniture
+        // Extract detected furniture WITH full position data
         if (analysis.furniture && analysis.furniture.length > 0) {
-          const furniture = analysis.furniture.map((f: { type: string; facingDirection?: string }) => ({
+          const furniture = analysis.furniture.map((f: any) => ({
             type: f.type,
             position: f.facingDirection || 'Center',
+            centerX: f.centerX,
+            centerY: f.centerY,
+            facingDirection: f.facingDirection,
+            estimatedRealSize: f.estimatedRealSize,
           }));
           setDetectedFurniture(furniture);
         }
@@ -239,6 +268,7 @@ export function ZoneCreationModal({
       croppedImageDataUrl: snippedRegion.croppedDataUrl,
       aspectRatio: snippedRegion.aspectRatio,
       orientation: snippedRegion.orientation,
+      fullAnalysis: fullAnalysis || undefined,
     };
     
     onGenerate(config);

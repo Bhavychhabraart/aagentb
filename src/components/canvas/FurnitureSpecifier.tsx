@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Plus, X, ChevronDown, ChevronUp, GripVertical } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -16,8 +16,18 @@ export interface FurnitureSpec {
   enabled: boolean;
 }
 
+export interface DetectedFurniture {
+  type: string;
+  position?: string;
+  centerX?: number;
+  centerY?: number;
+  facingDirection?: string;
+  estimatedRealSize?: string;
+  confidence?: number;
+}
+
 interface FurnitureSpecifierProps {
-  detectedFurniture: Array<{ type: string; position?: string }>;
+  detectedFurniture: DetectedFurniture[];
   onSpecsChange: (specs: FurnitureSpec[]) => void;
 }
 
@@ -56,21 +66,28 @@ const POSITIONS = [
 ];
 
 export function FurnitureSpecifier({ detectedFurniture, onSpecsChange }: FurnitureSpecifierProps) {
-  const [specs, setSpecs] = useState<FurnitureSpec[]>(() => 
-    detectedFurniture.map((f, i) => ({
-      id: `detected-${i}`,
-      type: f.type,
-      material: 'Fabric',
-      color: 'Gray',
-      position: f.position || 'Center',
-      isCustom: false,
-      enabled: true,
-    }))
-  );
-  
-  const [expandedId, setExpandedId] = useState<string | null>(specs[0]?.id || null);
+  const [specs, setSpecs] = useState<FurnitureSpec[]>([]);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
   const [showAddForm, setShowAddForm] = useState(false);
   const [customType, setCustomType] = useState('');
+
+  // Sync specs when detectedFurniture changes - this is the KEY fix
+  useEffect(() => {
+    if (detectedFurniture.length > 0) {
+      const newSpecs = detectedFurniture.map((f, i) => ({
+        id: `detected-${i}`,
+        type: f.type,
+        material: 'Fabric',
+        color: 'Gray',
+        position: f.position || f.facingDirection || `Position ${f.centerX?.toFixed(0) || 50}%, ${f.centerY?.toFixed(0) || 50}%`,
+        isCustom: false,
+        enabled: true,
+      }));
+      setSpecs(newSpecs);
+      setExpandedId(newSpecs[0]?.id || null);
+      onSpecsChange(newSpecs);
+    }
+  }, [detectedFurniture]);
 
   const updateSpec = (id: string, updates: Partial<FurnitureSpec>) => {
     const newSpecs = specs.map(s => s.id === id ? { ...s, ...updates } : s);
