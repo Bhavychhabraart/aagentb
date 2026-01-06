@@ -43,7 +43,7 @@ serve(async (req) => {
   }
 
   try {
-    const { layoutZoneBase64, zoneName, guideBase64 } = await req.json();
+    const { layoutZoneBase64, zoneName, guideBase64, analysisType } = await req.json();
     
     const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
     
@@ -59,8 +59,50 @@ serve(async (req) => {
     console.log('Zone name:', zoneName || 'unnamed');
     console.log('Image data length:', layoutZoneBase64.length);
     console.log('Guide provided:', !!guideBase64);
+    console.log('Analysis type:', analysisType || 'zone');
 
-    const analysisPrompt = `You are an expert floor plan analyst. Analyze this 2D floor plan zone image and extract PRECISE information about every element visible.
+    // Different prompts for different analysis types
+    let analysisPrompt: string;
+    
+    if (analysisType === 'style') {
+      // Style reference analysis prompt
+      analysisPrompt = `You are an expert interior design analyst. Analyze this style reference image and extract the design characteristics.
+
+ANALYZE THE IMAGE AND RETURN A JSON OBJECT with this exact structure:
+
+{
+  "styleInsights": "<A 2-3 sentence description of the style: color palette (warm/cool/neutral tones), materials (wood, metal, fabric types), lighting mood (bright/moody/natural), furniture style (modern/traditional/scandinavian/industrial), and overall aesthetic feel>",
+  "zoneType": "style_reference",
+  "estimatedDimensions": { "widthFeet": 12, "depthFeet": 10, "aspectRatio": "4:3" },
+  "furniture": [],
+  "architecturalFeatures": [],
+  "spatialRelationships": [],
+  "sceneDescription": "<Brief description of what's shown in the reference image>"
+}
+
+Focus on extracting: color palette, material finishes, lighting mood, furniture style, and overall aesthetic.
+Output ONLY valid JSON, no markdown code blocks or explanation.`;
+    } else if (analysisType === 'guide') {
+      // Design guide analysis prompt
+      analysisPrompt = `You are an expert interior design analyst. Analyze this design guide image and extract the design rules and patterns.
+
+ANALYZE THE IMAGE AND RETURN A JSON OBJECT with this exact structure:
+
+{
+  "guideInsights": "<A 2-3 sentence description of the design rules shown: furniture arrangement patterns, spatial guidelines, layout standards, style preferences, and any specific design requirements visible>",
+  "zoneType": "design_guide",
+  "estimatedDimensions": { "widthFeet": 12, "depthFeet": 10, "aspectRatio": "4:3" },
+  "furniture": [],
+  "architecturalFeatures": [],
+  "spatialRelationships": [],
+  "sceneDescription": "<Brief description of what design standards are shown>"
+}
+
+Focus on extracting: design rules, furniture arrangement patterns, spatial guidelines, and style preferences.
+Output ONLY valid JSON, no markdown code blocks or explanation.`;
+    } else {
+      // Standard zone analysis prompt
+      analysisPrompt = `You are an expert floor plan analyst. Analyze this 2D floor plan zone image and extract PRECISE information about every element visible.
 ${guideBase64 ? '\nIMPORTANT: A design guide image has been provided as reference. Use this guide to understand design standards, furniture arrangement patterns, and style preferences that should be reflected in your analysis.' : ''}
 
 ANALYZE THE IMAGE AND RETURN A JSON OBJECT with this exact structure:
@@ -112,6 +154,7 @@ IMPORTANT RULES:
 7. If you see symbols or icons in the floor plan, interpret what furniture they represent
 
 Analyze the floor plan zone image now and return the JSON:`;
+    }
 
     console.log('Calling Gemini 2.5 Flash for zone analysis...');
     
@@ -245,10 +288,20 @@ Analyze the floor plan zone image now and return the JSON:`;
       };
     }
 
-    return new Response(JSON.stringify({ 
+    // Include styleInsights/guideInsights if present
+    const responseData: any = { 
       analysis: zoneAnalysis,
       success: true 
-    }), {
+    };
+    
+    if ((zoneAnalysis as any).styleInsights) {
+      responseData.styleInsights = (zoneAnalysis as any).styleInsights;
+    }
+    if ((zoneAnalysis as any).guideInsights) {
+      responseData.guideInsights = (zoneAnalysis as any).guideInsights;
+    }
+
+    return new Response(JSON.stringify(responseData), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
 

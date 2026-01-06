@@ -3075,8 +3075,29 @@ ABSOLUTE REQUIREMENTS FOR CONSISTENCY:
 
       await addMessage('user', `🎯 Generating ${viewLabel} view for zone: ${zone.name}...`, { type: 'text' });
 
-      // Detect aspect ratio to preserve from source image (use render if exists, otherwise default)
-      const sourceAspectRatio = currentRenderUrl ? await getImageAspectRatio(currentRenderUrl) : '16:9';
+      // Calculate aspect ratio from zone dimensions to preserve exact orientation
+      const zoneWidth = zone.x_end - zone.x_start;
+      const zoneHeight = zone.y_end - zone.y_start;
+      const zoneRatio = zoneWidth / zoneHeight;
+      const zoneOrientation = zoneRatio > 1 ? 'landscape' : zoneRatio < 1 ? 'portrait' : 'square';
+      // Map to closest supported ratio based on zone orientation
+      let zoneAspectRatio: string;
+      if (zoneRatio >= 2.0) {
+        zoneAspectRatio = '21:9'; // Ultra-wide landscape
+      } else if (zoneRatio >= 1.5) {
+        zoneAspectRatio = '16:9'; // Wide landscape
+      } else if (zoneRatio >= 1.2) {
+        zoneAspectRatio = '4:3'; // Standard landscape
+      } else if (zoneRatio >= 0.85) {
+        zoneAspectRatio = '1:1'; // Square
+      } else if (zoneRatio >= 0.65) {
+        zoneAspectRatio = '3:4'; // Standard portrait
+      } else if (zoneRatio >= 0.5) {
+        zoneAspectRatio = '9:16'; // Tall portrait
+      } else {
+        zoneAspectRatio = '9:21'; // Ultra-tall portrait
+      }
+      console.log(`Zone ${zone.name} dimensions: ${zoneWidth.toFixed(1)}% x ${zoneHeight.toFixed(1)}% = ratio ${zoneRatio.toFixed(2)} (${zoneOrientation}) -> ${zoneAspectRatio}`);
 
       // Merge existing style refs with any new ones from options
       const allStyleRefs = [...new Set([...styleRefUrls, ...options.styleRefUrls])];
@@ -3109,7 +3130,8 @@ ABSOLUTE REQUIREMENTS FOR CONSISTENCY:
           viewType: options.viewType,
           styleRefUrls: allStyleRefs,
           furnitureItems: furnitureItems.length > 0 ? furnitureItems : undefined,
-          preserveAspectRatio: sourceAspectRatio,
+          preserveAspectRatio: zoneAspectRatio,
+          zoneOrientation: zoneOrientation, // Pass orientation for prompt guidance
           layoutBasedZone: true, // Flag to use layout-based generation
           preAnalysis: options.preAnalysis, // Pre-analyzed zone data (skips Stage 1 if provided)
         }),

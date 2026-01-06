@@ -95,6 +95,12 @@ export function ZonePreviewConfirm({
   // Guide state
   const [guideUrl, setGuideUrl] = useState<string | null>(null);
   const [isUploadingGuide, setIsUploadingGuide] = useState(false);
+  
+  // Style/Guide analysis state
+  const [styleAnalysis, setStyleAnalysis] = useState<string | null>(null);
+  const [isAnalyzingStyle, setIsAnalyzingStyle] = useState(false);
+  const [guideAnalysis, setGuideAnalysis] = useState<string | null>(null);
+  const [isAnalyzingGuide, setIsAnalyzingGuide] = useState(false);
 
   useEffect(() => {
     const loadPreview = async () => {
@@ -228,6 +234,7 @@ export function ZonePreviewConfirm({
     if (!file) return;
     
     setIsUploadingGuide(true);
+    setGuideAnalysis(null); // Reset analysis when uploading new guide
     try {
       const fileName = `guides/${Date.now()}-${file.name}`;
       const { error: uploadError } = await supabase.storage
@@ -249,6 +256,98 @@ export function ZonePreviewConfirm({
       setIsUploadingGuide(false);
     }
   }, []);
+
+  // Analyze guide image
+  const handleAnalyzeGuide = useCallback(async () => {
+    if (!guideUrl) return;
+    
+    setIsAnalyzingGuide(true);
+    try {
+      // Convert guide URL to base64
+      const response = await fetch(guideUrl);
+      const blob = await response.blob();
+      const base64 = await new Promise<string>((resolve) => {
+        const reader = new FileReader();
+        reader.onloadend = () => resolve(reader.result as string);
+        reader.readAsDataURL(blob);
+      });
+      
+      const analysisResponse = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/analyze-zone`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+        },
+        body: JSON.stringify({
+          layoutZoneBase64: base64,
+          zoneName: 'Design Guide Analysis',
+          analysisType: 'guide',
+        }),
+      });
+      
+      if (!analysisResponse.ok) throw new Error('Guide analysis failed');
+      
+      const data = await analysisResponse.json();
+      if (data.guideInsights) {
+        setGuideAnalysis(data.guideInsights);
+        toast.success('Guide analyzed');
+      } else if (data.analysis?.sceneDescription) {
+        setGuideAnalysis(data.analysis.sceneDescription);
+        toast.success('Guide analyzed');
+      }
+    } catch (err) {
+      console.error('Guide analysis failed:', err);
+      toast.error('Failed to analyze guide');
+    } finally {
+      setIsAnalyzingGuide(false);
+    }
+  }, [guideUrl]);
+
+  // Analyze style references
+  const handleAnalyzeStyle = useCallback(async () => {
+    if (styleRefUrls.length === 0) return;
+    
+    setIsAnalyzingStyle(true);
+    try {
+      // Convert first style ref to base64
+      const response = await fetch(styleRefUrls[0]);
+      const blob = await response.blob();
+      const base64 = await new Promise<string>((resolve) => {
+        const reader = new FileReader();
+        reader.onloadend = () => resolve(reader.result as string);
+        reader.readAsDataURL(blob);
+      });
+      
+      const analysisResponse = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/analyze-zone`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+        },
+        body: JSON.stringify({
+          layoutZoneBase64: base64,
+          zoneName: 'Style Reference Analysis',
+          analysisType: 'style',
+        }),
+      });
+      
+      if (!analysisResponse.ok) throw new Error('Style analysis failed');
+      
+      const data = await analysisResponse.json();
+      if (data.styleInsights) {
+        setStyleAnalysis(data.styleInsights);
+        toast.success('Style analyzed');
+      } else if (data.analysis?.sceneDescription) {
+        setStyleAnalysis(data.analysis.sceneDescription);
+        toast.success('Style analyzed');
+      }
+    } catch (err) {
+      console.error('Style analysis failed:', err);
+      toast.error('Failed to analyze style');
+    } finally {
+      setIsAnalyzingStyle(false);
+    }
+  }, [styleRefUrls]);
 
   const handleStyleRefUpload = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -511,10 +610,28 @@ export function ZonePreviewConfirm({
 
           {/* Design Guide Section */}
           <div>
-            <label className="text-sm font-medium mb-3 flex items-center gap-1.5">
-              <ImageIcon className="h-4 w-4 text-emerald-500" />
-              Design Guide
-              <span className="text-muted-foreground font-normal text-xs">(optional)</span>
+            <label className="text-sm font-medium mb-3 flex items-center justify-between">
+              <span className="flex items-center gap-1.5">
+                <ImageIcon className="h-4 w-4 text-emerald-500" />
+                Design Guide
+                <span className="text-muted-foreground font-normal text-xs">(optional)</span>
+              </span>
+              {guideUrl && !guideAnalysis && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={handleAnalyzeGuide}
+                  disabled={isAnalyzingGuide}
+                  className="h-6 text-xs px-2"
+                >
+                  {isAnalyzingGuide ? (
+                    <Loader2 className="h-3 w-3 animate-spin mr-1" />
+                  ) : (
+                    <Sparkles className="h-3 w-3 mr-1" />
+                  )}
+                  Analyze
+                </Button>
+              )}
             </label>
             <div className="flex items-start gap-3">
               {guideUrl ? (
@@ -525,7 +642,7 @@ export function ZonePreviewConfirm({
                     className="h-20 w-20 object-cover rounded-lg border border-border"
                   />
                   <button
-                    onClick={() => setGuideUrl(null)}
+                    onClick={() => { setGuideUrl(null); setGuideAnalysis(null); }}
                     className="absolute -top-1.5 -right-1.5 h-5 w-5 bg-destructive text-destructive-foreground rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity shadow-sm"
                   >
                     <X className="h-3 w-3" />
@@ -550,9 +667,16 @@ export function ZonePreviewConfirm({
                   />
                 </label>
               )}
-              <p className="text-xs text-muted-foreground flex-1">
-                Upload a design guide or style reference to help the AI understand specific layout patterns, furniture standards, or design rules.
-              </p>
+              <div className="flex-1 space-y-2">
+                <p className="text-xs text-muted-foreground">
+                  Upload a design guide to help the AI understand layout patterns and design rules.
+                </p>
+                {guideAnalysis && (
+                  <div className="text-xs bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 rounded p-2 italic">
+                    "{guideAnalysis}"
+                  </div>
+                )}
+              </div>
             </div>
           </div>
 
@@ -573,10 +697,28 @@ export function ZonePreviewConfirm({
 
           {/* Style Reference Section */}
           <div>
-            <label className="text-sm font-medium mb-3 flex items-center gap-1.5">
-              <Sparkles className="h-4 w-4 text-amber-500" />
-              Style References
-              <span className="text-muted-foreground font-normal text-xs">(optional)</span>
+            <label className="text-sm font-medium mb-3 flex items-center justify-between">
+              <span className="flex items-center gap-1.5">
+                <Sparkles className="h-4 w-4 text-amber-500" />
+                Style References
+                <span className="text-muted-foreground font-normal text-xs">(optional)</span>
+              </span>
+              {styleRefUrls.length > 0 && !styleAnalysis && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={handleAnalyzeStyle}
+                  disabled={isAnalyzingStyle}
+                  className="h-6 text-xs px-2"
+                >
+                  {isAnalyzingStyle ? (
+                    <Loader2 className="h-3 w-3 animate-spin mr-1" />
+                  ) : (
+                    <Sparkles className="h-3 w-3 mr-1" />
+                  )}
+                  Analyze
+                </Button>
+              )}
             </label>
             <div className="flex flex-wrap gap-2">
               {styleRefUrls.map((url, index) => (
@@ -587,7 +729,7 @@ export function ZonePreviewConfirm({
                     className="h-16 w-16 object-cover rounded-lg border border-border"
                   />
                   <button
-                    onClick={() => removeStyleRef(index)}
+                    onClick={() => { removeStyleRef(index); setStyleAnalysis(null); }}
                     className="absolute -top-1.5 -right-1.5 h-5 w-5 bg-destructive text-destructive-foreground rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity shadow-sm"
                   >
                     <X className="h-3 w-3" />
@@ -611,6 +753,11 @@ export function ZonePreviewConfirm({
                 </label>
               )}
             </div>
+            {styleAnalysis && (
+              <div className="text-xs bg-amber-500/10 text-amber-700 dark:text-amber-300 rounded p-2 mt-2 italic">
+                "{styleAnalysis}"
+              </div>
+            )}
             <p className="text-xs text-muted-foreground mt-2">
               Upload images to match their aesthetic style and mood
             </p>
