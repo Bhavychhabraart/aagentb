@@ -62,20 +62,20 @@ serve(async (req) => {
     // Add LAYOUT ZONE IMAGE LAST (most important - AI pays more attention to recent images)
     content.push({ type: 'image_url', image_url: { url: layoutZoneBase64 } });
 
-    // Simple, focused prompt that lets Nano Banana do its step-by-step analysis
-    let prompt = `Convert this 2D floor plan layout into a photorealistic isometric 3D interior render.
+    // Simple, focused prompt for top-down view
+    let prompt = `Convert this 2D floor plan layout into a photorealistic top-down 3D interior render.
 
 PROCESS:
 1. First analyze the floor plan to understand all elements - furniture positions, walls, windows, doors
 2. Note the exact positions and proportions of every item
 3. Determine appropriate materials and textures for each element
-4. Create an isometric 3D render (45° elevated corner view) that matches the floor plan EXACTLY
+4. Create a top-down 3D render (bird's eye view looking straight down) that matches the floor plan EXACTLY
 5. Verify every furniture piece is in the correct position before completing
 
 REQUIREMENTS:
 - EVERY furniture item in the floor plan must appear in the render at the EXACT same position
 - Photorealistic quality - like a real photograph
-- Isometric camera angle (elevated corner view showing floor + two walls)
+- Top-down camera angle (bird's eye view looking straight down at the floor)
 - Natural lighting and realistic materials`;
 
     // Add style reference note if provided
@@ -94,7 +94,7 @@ REQUIREMENTS:
       prompt += `\n\nADDITIONAL NOTES: ${customPrompt}`;
     }
 
-    prompt += `\n\nOutput: A single photorealistic isometric 3D render of this floor plan.`;
+    prompt += `\n\nOutput: A single photorealistic top-down 3D render of this floor plan.`;
 
     content.push({ type: 'text', text: prompt });
 
