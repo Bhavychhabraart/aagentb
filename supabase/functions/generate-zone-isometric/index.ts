@@ -1,3 +1,4 @@
+import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 
 const corsHeaders = {
@@ -208,45 +209,74 @@ ${config.additionalPrompt ? `\nADDITIONAL REQUIREMENTS: ${config.additionalPromp
       });
     }
 
-    console.log("Calling Gemini 3.0 Pro Image for high-quality generation...");
+    console.log("Image URL type:", config.croppedImageDataUrl?.startsWith('http') ? 'URL' : 'base64');
+    console.log("Starting image generation with model fallback...");
 
-    // Use GEMINI 3.0 PRO IMAGE for best quality
-    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        "Authorization": `Bearer ${LOVABLE_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "google/gemini-3-pro-image-preview",
-        messages,
-        modalities: ["image", "text"],
-      }),
-    });
+    // Try models in order - fallback if first fails
+    const models = [
+      "google/gemini-3-pro-image-preview",
+      "google/gemini-2.5-flash-image-preview"
+    ];
+    
+    let lastError: Error | null = null;
+    let imageUrl: string | null = null;
+    
+    for (const model of models) {
+      try {
+        console.log(`Trying model: ${model}`);
+        
+        const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+          method: "POST",
+          headers: {
+            "Authorization": `Bearer ${LOVABLE_API_KEY}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            model,
+            messages,
+            modalities: ["image", "text"],
+          }),
+        });
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error("Gemini 3.0 error:", response.status, errorText);
-      
-      if (response.status === 429) {
-        throw new Error("Rate limit exceeded. Please try again in a moment.");
+        if (!response.ok) {
+          const errorText = await response.text();
+          console.error(`Model ${model} error:`, response.status, errorText);
+          
+          if (response.status === 429) {
+            throw new Error("Rate limit exceeded. Please try again in a moment.");
+          }
+          if (response.status === 402) {
+            throw new Error("API credits exhausted. Please add funds to continue.");
+          }
+          
+          lastError = new Error(`${model} failed: ${response.status}`);
+          continue; // Try next model
+        }
+
+        const data = await response.json();
+        console.log(`Model ${model} response received`);
+
+        // Extract the generated image
+        imageUrl = data.choices?.[0]?.message?.images?.[0]?.image_url?.url;
+        
+        if (imageUrl) {
+          console.log(`Success with model: ${model}`);
+          break; // Success!
+        } else {
+          console.log(`No image from ${model}, response:`, JSON.stringify(data).substring(0, 300));
+          lastError = new Error(`${model} returned no image`);
+        }
+      } catch (err) {
+        console.error(`Model ${model} threw error:`, err);
+        if (err instanceof Error && (err.message.includes("Rate limit") || err.message.includes("API credits"))) {
+          throw err; // Don't retry on rate limit or credit issues
+        }
+        lastError = err instanceof Error ? err : new Error(String(err));
       }
-      if (response.status === 402) {
-        throw new Error("API credits exhausted. Please add funds to continue.");
-      }
-      
-      throw new Error(`Image generation failed: ${response.status}`);
     }
-
-    const data = await response.json();
-    console.log("Gemini 3.0 Pro Image response received");
-
-    // Extract the generated image
-    const imageUrl = data.choices?.[0]?.message?.images?.[0]?.image_url?.url;
     
     if (!imageUrl) {
-      console.error("No image in response:", JSON.stringify(data).substring(0, 500));
-      throw new Error("No image generated in response");
+      throw lastError || new Error("All models failed to generate image");
     }
 
     console.log("╔═══════════════════════════════════════════════════════════════╗");

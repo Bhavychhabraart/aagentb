@@ -249,29 +249,60 @@ export function ZoneCreationModal({
     }
   };
 
-  const handleGenerate = () => {
-    const config: ZoneConfiguration = {
-      name,
-      zoneType,
-      customZoneType: zoneType === 'Custom' ? customZoneType : undefined,
-      dimensions,
-      ceilingType,
-      floorType,
-      wallColor,
-      windowCount,
-      doorCount,
-      naturalLight,
-      furniture: furnitureSpecs,
-      styleRefUrl: styleRefUrl || undefined,
-      guideUrl: guideUrl || undefined,
-      additionalPrompt,
-      croppedImageDataUrl: snippedRegion.croppedDataUrl,
-      aspectRatio: snippedRegion.aspectRatio,
-      orientation: snippedRegion.orientation,
-      fullAnalysis: fullAnalysis || undefined,
-    };
+  const [isUploadingZone, setIsUploadingZone] = useState(false);
+
+  const handleGenerate = async () => {
+    // Upload the cropped image to storage first to avoid large base64 payloads
+    setIsUploadingZone(true);
     
-    onGenerate(config);
+    try {
+      // Convert base64 to blob
+      const response = await fetch(snippedRegion.croppedDataUrl);
+      const blob = await response.blob();
+      
+      const fileName = `zone-crops/${Date.now()}-zone.png`;
+      const { error: uploadError } = await supabase.storage
+        .from('room-uploads')
+        .upload(fileName, blob, { contentType: 'image/png' });
+      
+      if (uploadError) {
+        toast.error('Failed to upload zone image');
+        setIsUploadingZone(false);
+        return;
+      }
+      
+      const { data: { publicUrl } } = supabase.storage
+        .from('room-uploads')
+        .getPublicUrl(fileName);
+      
+      const config: ZoneConfiguration = {
+        name,
+        zoneType,
+        customZoneType: zoneType === 'Custom' ? customZoneType : undefined,
+        dimensions,
+        ceilingType,
+        floorType,
+        wallColor,
+        windowCount,
+        doorCount,
+        naturalLight,
+        furniture: furnitureSpecs,
+        styleRefUrl: styleRefUrl || undefined,
+        guideUrl: guideUrl || undefined,
+        additionalPrompt,
+        croppedImageDataUrl: publicUrl, // Use uploaded URL instead of base64
+        aspectRatio: snippedRegion.aspectRatio,
+        orientation: snippedRegion.orientation,
+        fullAnalysis: fullAnalysis || undefined,
+      };
+      
+      onGenerate(config);
+    } catch (err) {
+      console.error('Error preparing zone generation:', err);
+      toast.error('Failed to prepare zone for generation');
+    } finally {
+      setIsUploadingZone(false);
+    }
   };
 
   const selectedWallColor = WALL_COLORS.find(c => c.name === wallColor);
@@ -623,13 +654,23 @@ export function ZoneCreationModal({
           </Button>
           <Button
             onClick={handleGenerate}
-            disabled={isGenerating || !name.trim()}
+            disabled={isGenerating || isUploadingZone || !name.trim() || isAnalyzing}
             className="gap-2"
           >
-            {isGenerating ? (
+            {isUploadingZone ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Uploading...
+              </>
+            ) : isGenerating ? (
               <>
                 <Loader2 className="h-4 w-4 animate-spin" />
                 Generating...
+              </>
+            ) : isAnalyzing ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Analyzing...
               </>
             ) : (
               <>
