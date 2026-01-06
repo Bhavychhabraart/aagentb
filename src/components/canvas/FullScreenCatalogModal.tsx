@@ -60,7 +60,22 @@ export function FullScreenCatalogModal({
     setDisplayCount(ITEMS_PER_PAGE);
   }, [searchQuery, selectedCategory]);
 
-  const categories = [...new Set(catalogItems.map(item => item.category))];
+  // Define preferred category order for consistent display
+  const CATEGORY_ORDER = [
+    'Seating', 'Tables', 'Storage', 'Lighting', 'Bedroom',
+    'Outdoor', 'Hospitality', 'Walls', 'Mosaics', 'Decor', 'Art', 'Rugs', 'Decoration'
+  ];
+  
+  const categories = [...new Set(catalogItems.map(item => item.category))]
+    .sort((a, b) => {
+      const indexA = CATEGORY_ORDER.indexOf(a);
+      const indexB = CATEGORY_ORDER.indexOf(b);
+      // Categories not in the order list go to the end
+      if (indexA === -1 && indexB === -1) return a.localeCompare(b);
+      if (indexA === -1) return 1;
+      if (indexB === -1) return -1;
+      return indexA - indexB;
+    });
 
   const filteredItems = catalogItems.filter(item => {
     const matchesCategory = !selectedCategory || item.category === selectedCategory;
