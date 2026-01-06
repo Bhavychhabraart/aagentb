@@ -43,6 +43,8 @@ import { AutoFurnishPanel } from '@/components/canvas/AutoFurnishPanel';
 import { FullScreenCatalogModal } from '@/components/canvas/FullScreenCatalogModal';
 import { MarkerStagingPanel, StagingMarker } from '@/components/canvas/MarkerStagingPanel';
 import { MarkerProductSourceModal } from '@/components/canvas/MarkerProductSourceModal';
+import { SnippingTool, SnippedRegion } from '@/components/canvas/SnippingTool';
+import { ZoneCreationModal, ZoneConfiguration } from '@/components/canvas/ZoneCreationModal';
 import { Button } from '@/components/ui/button';
 import { Move, Plus } from 'lucide-react';
 import { formatDownloadFilename } from '@/utils/formatDownloadFilename';
@@ -146,6 +148,12 @@ const Index = () => {
   
   // Zone comparison state
   const [comparisonZone, setComparisonZone] = useState<Zone | null>(null);
+  
+  // Snipping tool and zone creation modal state
+  const [showSnippingTool, setShowSnippingTool] = useState(false);
+  const [snippedRegion, setSnippedRegion] = useState<SnippedRegion | null>(null);
+  const [showZoneCreationModal, setShowZoneCreationModal] = useState(false);
+  const [isGeneratingZoneIsometric, setIsGeneratingZoneIsometric] = useState(false);
   
   // Render comparison modal state
   const [showComparisonModal, setShowComparisonModal] = useState(false);
@@ -3176,6 +3184,108 @@ ABSOLUTE REQUIREMENTS FOR CONSISTENCY:
     }
   }, [user, currentProjectId, currentRenderUrl, currentRenderId, currentUpload, styleRefUrls, layoutImageUrl, addMessage, toast, loadAllRenders]);
 
+  // =========== SNIPPING TOOL ZONE CREATION ===========
+
+  // Handle snipping tool completion
+  const handleSnippingComplete = useCallback((region: SnippedRegion) => {
+    console.log('Snipping complete:', region);
+    setSnippedRegion(region);
+    setShowSnippingTool(false);
+    setShowZoneCreationModal(true);
+  }, []);
+
+  // Handle zone configuration and generation
+  const handleZoneConfigGenerate = useCallback(async (config: ZoneConfiguration) => {
+    if (!user || !currentProjectId) {
+      toast({ variant: 'destructive', title: 'Error', description: 'Please sign in and select a project' });
+      return;
+    }
+
+    setIsGeneratingZoneIsometric(true);
+
+    try {
+      // Create render record first
+      const { data: renderRecord, error: renderError } = await supabase
+        .from('renders')
+        .insert({
+          project_id: currentProjectId,
+          user_id: user.id,
+          prompt: `Zone: ${config.name} (${config.zoneType}) - Isometric View`,
+          status: 'generating',
+          room_upload_id: currentUpload?.id || null,
+          parent_render_id: currentRenderId,
+        })
+        .select()
+        .single();
+
+      if (renderError) throw renderError;
+
+      await addMessage('user', `🎯 Generating isometric view for "${config.name}"...`, { type: 'text' });
+
+      // Call the new generate-zone-isometric edge function
+      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-zone-isometric`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+        },
+        body: JSON.stringify(config),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || 'Zone generation failed');
+      }
+
+      const result = await response.json();
+
+      if (!result.success || !result.imageUrl) {
+        throw new Error(result.error || 'No image generated');
+      }
+
+      // Update render record with the generated image
+      await supabase
+        .from('renders')
+        .update({ render_url: result.imageUrl, status: 'completed' })
+        .eq('id', renderRecord.id);
+
+      // Update current render state
+      setCurrentRenderUrl(result.imageUrl);
+      setCurrentRenderId(renderRecord.id);
+
+      await addMessage('assistant', `Isometric view of "${config.name}" generated!`, {
+        type: 'render',
+        imageUrl: result.imageUrl,
+        status: 'ready',
+      });
+
+      // Reload all renders to include the new one in history
+      await loadAllRenders();
+
+      toast({ title: 'Zone render ready', description: `"${config.name}" isometric view generated with ${config.furniture.length} furniture items` });
+      
+      // Close the modal
+      setShowZoneCreationModal(false);
+      setSnippedRegion(null);
+    } catch (error) {
+      console.error('Zone isometric generation failed:', error);
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      await addMessage('assistant', `Failed to generate zone: ${message}`, { type: 'text', status: 'failed' });
+      toast({ variant: 'destructive', title: 'Failed', description: message });
+    } finally {
+      setIsGeneratingZoneIsometric(false);
+    }
+  }, [user, currentProjectId, currentRenderId, currentUpload, addMessage, toast, loadAllRenders]);
+
+  // Open snipping tool for zone creation
+  const handleOpenSnippingTool = useCallback(() => {
+    if (!layoutImageUrl) {
+      toast({ variant: 'destructive', title: 'Error', description: 'Please upload a layout first' });
+      return;
+    }
+    setShowSnippingTool(true);
+  }, [layoutImageUrl, toast]);
+
   // =========== CAMERA CRUD OPERATIONS ===========
 
   // Load cameras for current room
@@ -4377,6 +4487,7 @@ ABSOLUTE REQUIREMENTS FOR CONSISTENCY:
           onGenerateZoneView={handleGenerateZoneView}
           onCompareZone={(zone) => setComparisonZone(zone)}
           isGenerating={isGenerating || isMulticamGenerating}
+          onOpenSnippingTool={handleOpenSnippingTool}
         />
       )}
 
@@ -4511,6 +4622,32 @@ ABSOLUTE REQUIREMENTS FOR CONSISTENCY:
           onConfirm={handleConfirmLayoutAnalysis}
           onCancel={handleCancelLayoutAnalysis}
           isGenerating={isGenerating}
+        />
+      )}
+
+      {/* Snipping Tool for Zone Creation */}
+      {showSnippingTool && layoutImageUrl && (
+        <SnippingTool
+          imageUrl={layoutImageUrl}
+          onComplete={handleSnippingComplete}
+          onCancel={() => setShowSnippingTool(false)}
+        />
+      )}
+
+      {/* Zone Creation Modal */}
+      {showZoneCreationModal && snippedRegion && (
+        <ZoneCreationModal
+          snippedRegion={snippedRegion}
+          onGenerate={handleZoneConfigGenerate}
+          onReSnip={() => {
+            setShowZoneCreationModal(false);
+            setShowSnippingTool(true);
+          }}
+          onCancel={() => {
+            setShowZoneCreationModal(false);
+            setSnippedRegion(null);
+          }}
+          isGenerating={isGeneratingZoneIsometric}
         />
       )}
     </div>
