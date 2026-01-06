@@ -299,10 +299,120 @@ Output: The edited room image with ultra-photorealistic quality.`;
       let zonePrompt: string;
       
       if (layoutBasedZone && layoutZoneBase64) {
-        // LAYOUT-BASED ZONE GENERATION - Uses 2D layout as source of truth
-        console.log('Using LAYOUT-BASED zone generation mode');
-        console.log('Style refs provided:', styleRefUrls?.length || 0);
-        console.log('Furniture items provided:', furnitureItems?.length || 0);
+        // ═══════════════════════════════════════════════════════════════════════════
+        // TWO-STAGE PIPELINE: Gemini 2.5 Analysis → Precise Prompt → Gemini 3 Gen
+        // ═══════════════════════════════════════════════════════════════════════════
+        console.log('=== STAGE 1: ZONE ANALYSIS WITH GEMINI 2.5 PRO ===');
+        console.log('Analyzing cropped zone image to extract precise furniture layout...');
+        
+        // STAGE 1: Analyze the zone with Gemini 2.5 Pro (text/vision)
+        const analysisPrompt = `You are an expert floor plan analyst. Analyze this 2D floor plan zone image and extract PRECISE information about every element visible.
+
+ANALYZE THE IMAGE AND RETURN A JSON OBJECT with this exact structure:
+
+{
+  "zoneType": "living_area | dining_area | bedroom | office | kitchen | hallway | bathroom",
+  "estimatedDimensions": {
+    "widthFeet": <estimated width in feet>,
+    "depthFeet": <estimated depth in feet>,
+    "aspectRatio": "<width:height ratio like 4:3 or 16:9>"
+  },
+  "furniture": [
+    {
+      "type": "<exact furniture type: sofa, armchair, coffee_table, dining_table, bed, desk, etc>",
+      "shape": "rectangular | circular | L-shaped | irregular",
+      "centerX": <0-100 percentage from left edge>,
+      "centerY": <0-100 percentage from top edge>,
+      "widthPercent": <0-100 percentage of total zone width>,
+      "heightPercent": <0-100 percentage of total zone height>,
+      "rotationDegrees": <0, 45, 90, 135, 180, etc>,
+      "facingDirection": "north | south | east | west | ne | nw | se | sw",
+      "estimatedRealSize": "<like '7ft sofa' or '4ft round table'>"
+    }
+  ],
+  "architecturalFeatures": [
+    {
+      "type": "window | door | opening | column | stairs",
+      "wall": "top | bottom | left | right | center",
+      "positionPercent": <0-100 along that wall>,
+      "widthPercent": <0-100 width as percentage>
+    }
+  ],
+  "spatialRelationships": [
+    "<description like 'sofa faces the window on the top wall'>",
+    "<description like 'coffee table is centered in front of sofa'>",
+    "<description like 'armchairs flank the sofa on both sides'>"
+  ],
+  "sceneDescription": "<A detailed 2-3 sentence description of what this zone represents, the overall arrangement, and the likely function of the space>"
+}
+
+IMPORTANT RULES:
+1. Identify EVERY distinct shape as a piece of furniture
+2. Be PRECISE about positions - use percentages from 0-100
+3. Note the ORIENTATION/ROTATION of each piece
+4. Identify relationships between furniture pieces
+5. Include ALL windows and doors visible in the zone
+6. Output ONLY valid JSON, no markdown or explanation
+
+Analyze the floor plan zone image now:`;
+
+        const analysisResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${LOVABLE_API_KEY}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            model: 'google/gemini-2.5-pro',
+            messages: [{
+              role: 'user',
+              content: [
+                { type: 'image_url', image_url: { url: layoutZoneBase64 } },
+                { type: 'text', text: analysisPrompt }
+              ]
+            }],
+          }),
+        });
+
+        if (!analysisResponse.ok) {
+          console.error('Gemini 2.5 analysis failed:', analysisResponse.status);
+          // Fall back to direct generation if analysis fails
+        }
+
+        let zoneAnalysis: any = null;
+        let analysisText = '';
+        
+        try {
+          const analysisData = await analysisResponse.json();
+          analysisText = analysisData.choices?.[0]?.message?.content || '';
+          console.log('Raw analysis response:', analysisText.substring(0, 500) + '...');
+          
+          // Extract JSON from the response (handle markdown code blocks)
+          let jsonStr = analysisText;
+          const jsonMatch = analysisText.match(/```(?:json)?\s*([\s\S]*?)```/);
+          if (jsonMatch) {
+            jsonStr = jsonMatch[1].trim();
+          } else {
+            // Try to find raw JSON object
+            const rawJsonMatch = analysisText.match(/\{[\s\S]*\}/);
+            if (rawJsonMatch) {
+              jsonStr = rawJsonMatch[0];
+            }
+          }
+          
+          zoneAnalysis = JSON.parse(jsonStr);
+          console.log('=== ZONE ANALYSIS COMPLETE ===');
+          console.log('Zone type:', zoneAnalysis.zoneType);
+          console.log('Furniture count:', zoneAnalysis.furniture?.length || 0);
+          console.log('Architectural features:', zoneAnalysis.architecturalFeatures?.length || 0);
+          console.log('Scene description:', zoneAnalysis.sceneDescription);
+        } catch (parseError) {
+          console.error('Failed to parse zone analysis:', parseError);
+          console.log('Will proceed with basic prompt (analysis unavailable)');
+        }
+
+        // STAGE 2: Build PRECISE prompt from analysis
+        console.log('=== STAGE 2: BUILDING PRECISE GENERATION PROMPT ===');
         
         // Extract zone bounds from focusRegion for explicit coordinates
         const zoneBounds = focusRegion ? {
@@ -332,7 +442,7 @@ Output: The edited room image with ultra-photorealistic quality.`;
           renderIndex = imageIndex++;
         }
         
-        // Add STYLE REFERENCE images (NEW)
+        // Add STYLE REFERENCE images
         const styleRefIndices: number[] = [];
         if (styleRefUrls && styleRefUrls.length > 0) {
           for (const styleUrl of styleRefUrls) {
@@ -342,7 +452,7 @@ Output: The edited room image with ultra-photorealistic quality.`;
           console.log('Added style references as images:', styleRefIndices);
         }
         
-        // Add PRODUCT images (NEW)
+        // Add PRODUCT images
         const productIndices: { index: number; name: string; category: string }[] = [];
         if (furnitureItems && furnitureItems.length > 0) {
           for (const item of furnitureItems) {
@@ -358,25 +468,47 @@ Output: The edited room image with ultra-photorealistic quality.`;
           console.log('Added product images:', productIndices.map(p => p.name));
         }
         
-        // Build enhanced image reference list
-        let imageRefList = `
-IMAGES PROVIDED:
-- IMAGE ${layoutZoneIndex}: CROPPED 2D FLOOR PLAN ZONE - THE EXACT AREA TO RENDER IN 3D
-${fullLayoutIndex ? `- IMAGE ${fullLayoutIndex}: Full 2D floor plan (overall spatial context)` : ''}
-${renderIndex ? `- IMAGE ${renderIndex}: Existing 3D render (style/material reference)` : ''}`;
+        // Build ANALYSIS-ENHANCED furniture placement instructions
+        let furniturePlacementInstructions = '';
+        if (zoneAnalysis && zoneAnalysis.furniture && zoneAnalysis.furniture.length > 0) {
+          furniturePlacementInstructions = `
+╔═══════════════════════════════════════════════════════════════════════════════╗
+║     AI-ANALYZED FURNITURE LAYOUT (EXTRACTED FROM 2D FLOOR PLAN)              ║
+╠═══════════════════════════════════════════════════════════════════════════════╣
+║  Zone Type: ${(zoneAnalysis.zoneType || 'unknown').toUpperCase().padEnd(55)}║
+║  Dimensions: ~${zoneAnalysis.estimatedDimensions?.widthFeet || '?'}ft × ${zoneAnalysis.estimatedDimensions?.depthFeet || '?'}ft (${zoneAnalysis.estimatedDimensions?.aspectRatio || '?'})${' '.repeat(32)}║
+║  Total Items: ${String(zoneAnalysis.furniture.length).padEnd(54)}║
+╚═══════════════════════════════════════════════════════════════════════════════╝
 
-        if (styleRefIndices.length > 0) {
-          imageRefList += `\n\nSTYLE REFERENCES (MUST MATCH):`;
-          styleRefIndices.forEach((idx, i) => {
-            imageRefList += `\n- IMAGE ${idx}: Style Reference ${i + 1} - COPY THIS AESTHETIC EXACTLY`;
-          });
+PRECISE FURNITURE PLACEMENT (FOLLOW EXACTLY):
+${zoneAnalysis.furniture.map((f: any, i: number) => `
+┌─────────────────────────────────────────────────────────────────────────┐
+│ ITEM ${i + 1}: ${(f.type || 'Unknown').toUpperCase()}
+├─────────────────────────────────────────────────────────────────────────┤
+│ Shape: ${f.shape || 'rectangular'}
+│ Position: Center at (${f.centerX?.toFixed(1) || '?'}%, ${f.centerY?.toFixed(1) || '?'}%) from top-left
+│ Size: ${f.widthPercent?.toFixed(1) || '?'}% width × ${f.heightPercent?.toFixed(1) || '?'}% height of zone
+│ Rotation: ${f.rotationDegrees || 0}° | Facing: ${f.facingDirection || 'forward'}
+│ Real-world size: ${f.estimatedRealSize || 'standard size'}
+└─────────────────────────────────────────────────────────────────────────┘`).join('\n')}
+
+SPATIAL RELATIONSHIPS TO MAINTAIN:
+${(zoneAnalysis.spatialRelationships || []).map((r: string, i: number) => `${i + 1}. ${r}`).join('\n') || '(none specified)'}
+
+SCENE DESCRIPTION:
+${zoneAnalysis.sceneDescription || 'Standard interior space with furniture arranged as shown in the floor plan.'}
+`;
         }
-        
-        if (productIndices.length > 0) {
-          imageRefList += `\n\nPRODUCTS TO INCLUDE (COPY EXACTLY):`;
-          productIndices.forEach((p) => {
-            imageRefList += `\n- IMAGE ${p.index}: "${p.name}" (${p.category}) - PLACE THIS PRODUCT in the zone`;
-          });
+
+        // Build architectural features section
+        let architecturalSection = '';
+        if (zoneAnalysis?.architecturalFeatures?.length > 0) {
+          architecturalSection = `
+ARCHITECTURAL FEATURES (MUST INCLUDE):
+${zoneAnalysis.architecturalFeatures.map((f: any, i: number) => 
+  `${i + 1}. ${f.type?.toUpperCase()}: ${f.wall} wall at ${f.positionPercent}% (width: ${f.widthPercent}%)`
+).join('\n')}
+`;
         }
         
         // Build style reference instructions
@@ -387,57 +519,42 @@ ${renderIndex ? `- IMAGE ${renderIndex}: Existing 3D render (style/material refe
 ${styleRefIndices.map((idx, i) => `║  Style Reference ${i + 1} (IMAGE ${idx}): COPY THIS AESTHETIC                    ║`).join('\n')}
 ╚═══════════════════════════════════════════════════════════════════════════════╝
 
-STYLE MATCHING REQUIREMENTS:
-- MATCH the exact color palette, mood, and atmosphere from style references
-- REPLICATE lighting style (warm/cool, soft/dramatic, natural/artificial)  
-- USE SAME material choices and textures visible in style images
-- MAINTAIN design language consistency across the render
-- The generated zone MUST feel like it belongs in the same project as the style refs` : '';
+- MATCH exact color palette, mood, and atmosphere
+- REPLICATE lighting style (warm/cool, soft/dramatic)  
+- USE SAME material textures visible in style images` : '';
 
         // Build product placement instructions  
         const productInstructions = productIndices.length > 0 ? `
 ╔═══════════════════════════════════════════════════════════════════════════════╗
-║                    PRODUCT PLACEMENT (HIGHEST ACCURACY)                        ║
+║                    PRODUCT PLACEMENT (COPY EXACTLY)                            ║
 ╠═══════════════════════════════════════════════════════════════════════════════╣
-${productIndices.map(p => `║  "${p.name}" (${p.category}): COPY EXACTLY from IMAGE ${p.index}           ║`).join('\n')}
+${productIndices.map(p => `║  "${p.name}" (${p.category}): SEE IMAGE ${p.index}                              ║`).join('\n')}
 ╚═══════════════════════════════════════════════════════════════════════════════╝
 
-PRODUCT PLACEMENT REQUIREMENTS:
-${productIndices.map((p, i) => `${i + 1}. "${p.name}" from IMAGE ${p.index}:
-   - COPY the product EXACTLY as shown - same shape, color, material, proportions
-   - Place appropriately within the floor plan zone layout
-   - Scale realistically relative to room dimensions
-   - Apply proper shadows and lighting integration`).join('\n')}` : '';
+${productIndices.map((p, i) => `${i + 1}. "${p.name}" - COPY EXACTLY from IMAGE ${p.index}`).join('\n')}` : '';
         
-        zonePrompt = `You are an expert architectural renderer specializing in ISOMETRIC 3D VISUALIZATION from 2D floor plans.
+        // Build image reference list
+        const imageRefList = `
+IMAGES PROVIDED:
+- IMAGE ${layoutZoneIndex}: CROPPED 2D FLOOR PLAN ZONE - THE EXACT AREA TO RENDER
+${fullLayoutIndex ? `- IMAGE ${fullLayoutIndex}: Full 2D floor plan (overall context)` : ''}
+${renderIndex ? `- IMAGE ${renderIndex}: Existing 3D render (style reference)` : ''}
+${styleRefIndices.length > 0 ? styleRefIndices.map((idx, i) => `- IMAGE ${idx}: Style Reference ${i + 1}`).join('\n') : ''}
+${productIndices.length > 0 ? productIndices.map(p => `- IMAGE ${p.index}: Product "${p.name}"`).join('\n') : ''}`;
+
+        zonePrompt = `You are an expert architectural renderer specializing in ISOMETRIC 3D VISUALIZATION.
 ${imageRefList}
 
-${zoneBounds ? `
 ╔═══════════════════════════════════════════════════════════════════════════════╗
-║                    ZONE BOUNDING BOX COORDINATES                              ║
+║           ISOMETRIC 3D PROJECTION FROM ANALYZED FLOOR PLAN                     ║
 ╠═══════════════════════════════════════════════════════════════════════════════╣
-║  Left edge:   ${zoneBounds.x_start.toFixed(1)}% from layout left                                      ║
-║  Top edge:    ${zoneBounds.y_start.toFixed(1)}% from layout top                                       ║
-║  Right edge:  ${zoneBounds.x_end.toFixed(1)}% from layout left                                       ║
-║  Bottom edge: ${zoneBounds.y_end.toFixed(1)}% from layout top                                        ║
-║  Width:       ${zoneBounds.width.toFixed(1)}% of full layout                                         ║
-║  Height:      ${zoneBounds.height.toFixed(1)}% of full layout                                        ║
+║  The floor plan has been PRE-ANALYZED by AI to extract precise positions       ║
+║  Follow the furniture placement instructions EXACTLY                           ║
 ╚═══════════════════════════════════════════════════════════════════════════════╝
-` : ''}
+${furniturePlacementInstructions}
+${architecturalSection}
 ${styleInstructions}
 ${productInstructions}
-
-╔═══════════════════════════════════════════════════════════════════════════════╗
-║           ISOMETRIC 3D PROJECTION - 1000% LAYOUT ACCURACY MODE                ║
-╠═══════════════════════════════════════════════════════════════════════════════╣
-║  THIS IS AN ISOMETRIC VIEW ONLY - NO OTHER VIEW TYPE IS ACCEPTABLE            ║
-║  EVERY ELEMENT FROM THE 2D FLOOR PLAN MUST APPEAR IN THE 3D RENDER           ║
-║  POSITIONS, SCALE, AND PROPORTIONS MUST BE PIXEL-PERFECT                      ║
-╚═══════════════════════════════════════════════════════════════════════════════╝
-
-YOUR TASK:
-Transform the cropped 2D floor plan zone (IMAGE ${layoutZoneIndex}) into a photorealistic ISOMETRIC 3D interior render.
-Render ONLY what appears within the specified bounding box - nothing more, nothing less.
 
 ═══════════════════════════════════════════════════════════════
                ISOMETRIC CAMERA REQUIREMENTS
@@ -448,59 +565,11 @@ Render ONLY what appears within the specified bounding box - nothing more, nothi
    - Viewing direction at 45 degrees from room corner
    - NO perspective distortion - parallel lines STAY parallel
    - All three visible axes (X, Y, Z) have equal visual weight
-   - Like an architectural axonometric drawing but photorealistic
 
 2. FRAMING:
    - The ENTIRE zone must be visible in the frame
    - Camera positioned to show the floor plan area from corner
-   - Consistent scale across the entire image (no foreshortening)
-   - Ceiling should be visible but not dominating
-
-═══════════════════════════════════════════════════════════════
-               LAYOUT ACCURACY REQUIREMENTS (NON-NEGOTIABLE)
-═══════════════════════════════════════════════════════════════
-
-1. FLOOR PLAN TO 3D TRANSLATION:
-   - EVERY furniture shape in the 2D layout MUST appear in the render
-   - Rectangular outlines → appropriate furniture (sofa, table, bed)
-   - Circular shapes → round tables, rugs, ottomans
-   - L-shaped forms → sectional sofas, corner desks
-   - Small squares → chairs, side tables, lamps, plants
-   - Wall openings → windows (with glass) or doors
-
-2. POSITION MATCHING (CRITICAL):
-   - Furniture positions must EXACTLY match the floor plan
-   - If an item is 30% from left wall in 2D, it must be 30% from left in 3D
-   - Spacing between furniture pieces must be proportionally accurate
-   - Wall-to-furniture distances must be maintained
-   
-3. SCALE ACCURACY:
-   - Large items stay large, small items stay small
-   - Relative proportions between furniture pieces must match floor plan
-   - Room proportions (length:width ratio) must be exact
-
-${productIndices.length > 0 ? `
-═══════════════════════════════════════════════════════════════
-               SPECIFIC PRODUCTS TO INCLUDE
-═══════════════════════════════════════════════════════════════
-${productIndices.map((p, i) => `
-${i + 1}. "${p.name}" (${p.category}) - SEE IMAGE ${p.index}
-   - COPY this product EXACTLY as shown in the reference image
-   - Same shape, color, material, and proportions
-   - Place at appropriate position according to floor plan
-   - Apply correct lighting and shadows
-`).join('')}
-` : ''}
-
-${styleRefIndices.length > 0 ? `
-═══════════════════════════════════════════════════════════════
-               STYLE REFERENCE MATCHING
-═══════════════════════════════════════════════════════════════
-- Match the EXACT aesthetic from the style reference images
-- Copy the color palette, lighting mood, and atmosphere
-- Use similar materials and textures
-- The render should feel like part of the same design project
-` : ''}
+   - Consistent scale across the entire image
 
 ═══════════════════════════════════════════════════════════════
                PHOTOREALISTIC QUALITY
@@ -513,14 +582,7 @@ ${styleRefIndices.length > 0 ? `
 - Natural daylight or warm interior lighting
 - NO cartoon, illustration, CGI, or video game aesthetics
 
-${renderIndex ? `
-Match the visual style from IMAGE ${renderIndex}:
-- Same color palette and material choices
-- Similar lighting mood
-- Consistent design language
-` : ''}
-
-ADDITIONAL DIRECTION: ${userPrompt || 'Create a beautiful, realistic isometric view of this floor plan zone.'}
+ADDITIONAL DIRECTION: ${userPrompt || 'Create a beautiful, realistic isometric view.'}
 
 ═══════════════════════════════════════════════════════════════
                FINAL VERIFICATION CHECKLIST
@@ -529,15 +591,15 @@ ADDITIONAL DIRECTION: ${userPrompt || 'Create a beautiful, realistic isometric v
 Before outputting, verify:
 ✓ Isometric camera angle (30-45° elevation, corner view)
 ✓ NO perspective distortion (parallel lines stay parallel)
-✓ EVERY furniture piece from floor plan is present
-✓ Positions match the 2D layout EXACTLY
-✓ Scale and proportions are accurate
+✓ EVERY furniture piece from the analysis is present at the EXACT positions specified
+✓ Furniture sizes and proportions match the analysis
+✓ Spatial relationships are maintained (e.g., coffee table in front of sofa)
 ${productIndices.length > 0 ? '✓ All specified products are included and match their reference images' : ''}
 ${styleRefIndices.length > 0 ? '✓ Style matches the provided reference images' : ''}
 ✓ Photorealistic quality - looks like a real photograph
-✓ Zone boundaries respected - only the specified area is rendered
+✓ Zone boundaries respected
 
-OUTPUT: A photorealistic ISOMETRIC 3D visualization of the floor plan zone with 1000% layout accuracy.`;
+OUTPUT: A photorealistic ISOMETRIC 3D visualization with AI-analyzed furniture placement.`;
 
       } else if (zoneImageBase64) {
         // RENDER-BASED ZONE (existing behavior) - Uses cropped render as reference
