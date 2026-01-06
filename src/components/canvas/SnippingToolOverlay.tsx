@@ -86,32 +86,49 @@ export function SnippingToolOverlay({ imageUrl, onCapture, onCancel }: SnippingT
     const scaleY = img.naturalHeight / imgRect.height;
     
     // Convert to natural image coordinates
-    const cropX = left * scaleX;
-    const cropY = top * scaleY;
-    const cropW = width * scaleX;
-    const cropH = height * scaleY;
+    const cropX = Math.round(left * scaleX);
+    const cropY = Math.round(top * scaleY);
+    const cropW = Math.round(width * scaleX);
+    const cropH = Math.round(height * scaleY);
     
-    // Create canvas and crop
-    const canvas = document.createElement('canvas');
-    canvas.width = cropW;
-    canvas.height = cropH;
-    const ctx = canvas.getContext('2d');
-    
-    if (ctx) {
-      ctx.drawImage(img, cropX, cropY, cropW, cropH, 0, 0, cropW, cropH);
-      const croppedDataUrl = canvas.toDataURL('image/jpeg', 0.95);
+    try {
+      // Load image fresh with CORS to avoid tainted canvas
+      const tempImg = new Image();
+      tempImg.crossOrigin = 'anonymous';
       
-      // Brief delay for visual feedback
-      setTimeout(() => {
-        onCapture(croppedDataUrl);
-      }, 150);
-    } else {
+      await new Promise<void>((resolve, reject) => {
+        tempImg.onload = () => resolve();
+        tempImg.onerror = () => reject(new Error('Failed to load image'));
+        // Add cache buster to force fresh load with CORS
+        tempImg.src = imageUrl + (imageUrl.includes('?') ? '&' : '?') + 't=' + Date.now();
+      });
+      
+      // Create canvas and crop
+      const canvas = document.createElement('canvas');
+      canvas.width = cropW;
+      canvas.height = cropH;
+      const ctx = canvas.getContext('2d');
+      
+      if (ctx) {
+        ctx.drawImage(tempImg, cropX, cropY, cropW, cropH, 0, 0, cropW, cropH);
+        const croppedDataUrl = canvas.toDataURL('image/jpeg', 0.95);
+        
+        // Brief delay for visual feedback
+        setTimeout(() => {
+          onCapture(croppedDataUrl);
+        }, 150);
+      } else {
+        throw new Error('Could not get canvas context');
+      }
+    } catch (error) {
+      console.error('Failed to crop image:', error);
+      // Reset state on error
       setIsCapturing(false);
       setIsDragging(false);
       setDragStart(null);
       setDragEnd(null);
     }
-  }, [isDragging, dragStart, dragEnd, onCapture]);
+  }, [isDragging, dragStart, dragEnd, onCapture, imageUrl]);
 
   // Get selection rectangle style relative to image
   const getSelectionStyle = () => {
