@@ -48,6 +48,12 @@ const FALLBACK_CATALOG: CatalogFurnitureItem[] = [
   { id: 'table-1', name: 'BentStudio Oak Coffee Table', category: 'Tables', description: 'Raw edge solid oak coffee table', price: 1200, imageUrl: 'https://images.unsplash.com/photo-1533090481720-856c6e3c1fdc?auto=format&fit=crop&w=400&q=80', brand: 'BentStudio' },
   { id: 'lamp-1', name: 'BentStudio Arc Lamp', category: 'Lighting', description: 'Oversized floor arch lamp, brushed steel', price: 450, imageUrl: 'https://images.unsplash.com/photo-1513506003011-3b03c80165bd?auto=format&fit=crop&w=400&q=80', brand: 'BentStudio' },
   { id: 'bed-1', name: 'BentStudio Royal Bed', category: 'Bedroom', description: 'King size platform bed, linen headboard', price: 4000, imageUrl: 'https://images.unsplash.com/photo-1505693416388-b0346efee539?auto=format&fit=crop&w=400&q=80', brand: 'BentStudio' },
+  // New category fallbacks
+  { id: 'outdoor-1', name: 'BentStudio Patio Set', category: 'Outdoor', description: 'Weather-resistant outdoor seating set', price: 1800, imageUrl: 'https://images.unsplash.com/photo-1600210492486-724fe5c67fb0?auto=format&fit=crop&w=400&q=80', brand: 'BentStudio' },
+  { id: 'light-1', name: 'BentStudio Chandelier', category: 'Lighting', description: 'Modern crystal chandelier', price: 650, imageUrl: 'https://images.unsplash.com/photo-1540932239986-30128078f3c5?auto=format&fit=crop&w=400&q=80', brand: 'BentStudio' },
+  { id: 'decor-1', name: 'BentStudio Ceramic Vase', category: 'Decor', description: 'Handcrafted ceramic vase', price: 120, imageUrl: 'https://images.unsplash.com/photo-1578500494198-246f612d3b3d?auto=format&fit=crop&w=400&q=80', brand: 'BentStudio' },
+  { id: 'wall-1', name: 'BentStudio Wall Panel', category: 'Walls', description: 'Decorative 3D wall panel', price: 85, imageUrl: 'https://images.unsplash.com/photo-1558618666-fcd25c85cd64?auto=format&fit=crop&w=400&q=80', brand: 'BentStudio' },
+  { id: 'mosaic-1', name: 'BentStudio Mosaic Tile', category: 'Mosaics', description: 'Artisan mosaic tile set', price: 95, imageUrl: 'https://images.unsplash.com/photo-1558618666-fcd25c85cd64?auto=format&fit=crop&w=400&q=80', brand: 'BentStudio' },
 ];
 
 function getBentchairImageUrl(product: BentchairProduct): string | null {
@@ -69,17 +75,44 @@ function inferCategory(category: string, title: string): string {
   const t = title.toLowerCase();
   const c = category.toLowerCase();
 
-  if (c.includes('rug') || t.includes('rug')) return 'Decoration';
-  if (c.includes('art') || t.includes('art')) return 'Decoration';
+  // Rugs and Art
+  if (c.includes('rug') || t.includes('rug')) return 'Rugs';
+  if (c.includes('art') || t.includes('art') || t.includes('painting') || t.includes('print')) return 'Art';
+  
+  // Seating
   if (t.includes('sofa') || t.includes('couch') || c.includes('sofa')) return 'Seating';
-  if (t.includes('chair') || t.includes('seat') || t.includes('armchair')) return 'Seating';
+  if (t.includes('chair') || t.includes('seat') || t.includes('armchair') || t.includes('stool')) return 'Seating';
+  
+  // Tables
   if (t.includes('dining table') || c.includes('dining')) return 'Tables';
   if (t.includes('coffee') || t.includes('center')) return 'Tables';
-  if (t.includes('side table') || t.includes('end table')) return 'Tables';
-  if (t.includes('bed')) return 'Bedroom';
-  if (t.includes('cabinet') || t.includes('console') || t.includes('tv')) return 'Storage';
-  if (t.includes('lamp') || t.includes('light')) return 'Lighting';
-  return 'Decoration';
+  if (t.includes('side table') || t.includes('end table') || t.includes('console')) return 'Tables';
+  
+  // Bedroom
+  if (t.includes('bed') || t.includes('mattress') || t.includes('headboard')) return 'Bedroom';
+  
+  // Storage
+  if (t.includes('cabinet') || t.includes('tv') || t.includes('shelf') || t.includes('bookcase')) return 'Storage';
+  
+  // Lighting
+  if (c.includes('lighting') || t.includes('lamp') || t.includes('light') || t.includes('chandelier') || t.includes('sconce') || t.includes('pendant')) return 'Lighting';
+  
+  // Outdoor
+  if (c.includes('outdoor') || t.includes('patio') || t.includes('garden') || t.includes('outdoor')) return 'Outdoor';
+  
+  // Hospitality
+  if (c.includes('hospitality') || t.includes('hospitality') || t.includes('hotel')) return 'Hospitality';
+  
+  // Walls
+  if (c.includes('wall') || t.includes('wall panel') || t.includes('wallpaper') || t.includes('wall art')) return 'Walls';
+  
+  // Mosaics
+  if (c.includes('mosaic') || t.includes('mosaic') || t.includes('tile')) return 'Mosaics';
+  
+  // Decor
+  if (c.includes('decor') || t.includes('vase') || t.includes('sculpture') || t.includes('accessory') || t.includes('mirror') || t.includes('clock')) return 'Decor';
+  
+  return 'Decor';
 }
 
 async function fetchCategory(href: string): Promise<BentchairProduct[]> {
@@ -133,21 +166,49 @@ export async function fetchFurnitureCatalog(): Promise<CatalogFurnitureItem[]> {
     // Fetch from both BentChair API and vendor products in parallel
     const [bentchairResult, vendorProducts] = await Promise.all([
       (async () => {
-        const [furnitureResult, artResult, rugsResult] = await Promise.allSettled([
+        const [
+          furnitureResult,
+          artResult,
+          rugsResult,
+          outdoorResult,
+          hospitalityResult,
+          lightingResult,
+          wallsResult,
+          mosaicsResult,
+          decorResult
+        ] = await Promise.allSettled([
           fetchCategory('furniture'),
           fetchCategory('art'),
-          fetchCategory('rugs')
+          fetchCategory('rugs'),
+          fetchCategory('outdoor'),
+          fetchCategory('hospitality'),
+          fetchCategory('lighting'),
+          fetchCategory('walls'),
+          fetchCategory('mosaics'),
+          fetchCategory('decor')
         ]);
 
         const furnitureData = furnitureResult.status === 'fulfilled' ? furnitureResult.value : [];
         const artData = artResult.status === 'fulfilled' ? artResult.value : [];
         const rugsData = rugsResult.status === 'fulfilled' ? rugsResult.value : [];
+        const outdoorData = outdoorResult.status === 'fulfilled' ? outdoorResult.value : [];
+        const hospitalityData = hospitalityResult.status === 'fulfilled' ? hospitalityResult.value : [];
+        const lightingData = lightingResult.status === 'fulfilled' ? lightingResult.value : [];
+        const wallsData = wallsResult.status === 'fulfilled' ? wallsResult.value : [];
+        const mosaicsData = mosaicsResult.status === 'fulfilled' ? mosaicsResult.value : [];
+        const decorData = decorResult.status === 'fulfilled' ? decorResult.value : [];
 
         const furniture = furnitureData.map(p => ({ ...p, _inferred_category: 'Furniture' }));
         const art = artData.map(p => ({ ...p, _inferred_category: 'Art' }));
-        const rugs = rugsData.map(p => ({ ...p, _inferred_category: 'Rug' }));
+        const rugs = rugsData.map(p => ({ ...p, _inferred_category: 'Rugs' }));
+        const outdoor = outdoorData.map(p => ({ ...p, _inferred_category: 'Outdoor' }));
+        const hospitality = hospitalityData.map(p => ({ ...p, _inferred_category: 'Hospitality' }));
+        const lighting = lightingData.map(p => ({ ...p, _inferred_category: 'Lighting' }));
+        const walls = wallsData.map(p => ({ ...p, _inferred_category: 'Walls' }));
+        const mosaics = mosaicsData.map(p => ({ ...p, _inferred_category: 'Mosaics' }));
+        const decor = decorData.map(p => ({ ...p, _inferred_category: 'Decor' }));
 
-        return [...furniture, ...art, ...rugs];
+        return [...furniture, ...art, ...rugs, ...outdoor, ...hospitality, ...lighting, ...walls, ...mosaics, ...decor];
       })(),
       fetchVendorProducts()
     ]);
