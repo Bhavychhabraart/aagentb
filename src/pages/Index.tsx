@@ -10,6 +10,7 @@ import { AgentBQuestion, AgentBAnswer } from '@/components/canvas/AgentBQuestion
 import { RenderViewer } from '@/components/canvas/RenderViewer';
 import { PremiumWorkspace, Zone, PolygonPoint, ViewType, viewTypeOptions } from '@/components/canvas/PremiumWorkspace';
 import { ZoneGenerationOptions } from '@/components/canvas/ZonePreviewConfirm';
+import { LayoutAnalysisPreview, LayoutAnalysis } from '@/components/canvas/LayoutAnalysisPreview';
 import { SleekChatInput } from '@/components/canvas/SleekChatInput';
 import { StagedItemsDock } from '@/components/canvas/StagedItemsDock';
 import { StagedItemsModal } from '@/components/canvas/StagedItemsModal';
@@ -148,6 +149,14 @@ const Index = () => {
   
   // Render comparison modal state
   const [showComparisonModal, setShowComparisonModal] = useState(false);
+
+  // Layout analysis preview state (two-stage generation)
+  const [showLayoutAnalysisPreview, setShowLayoutAnalysisPreview] = useState(false);
+  const [pendingLayoutAnalysis, setPendingLayoutAnalysis] = useState<LayoutAnalysis | null>(null);
+  const [isAnalyzingLayout, setIsAnalyzingLayout] = useState(false);
+  const [layoutAnalysisError, setLayoutAnalysisError] = useState<string | null>(null);
+  const [pendingGenerationPrompt, setPendingGenerationPrompt] = useState('');
+  const [pendingGenerationFurniture, setPendingGenerationFurniture] = useState<CatalogFurnitureItem[]>([]);
 
   // Agent B state
   const [agentBEnabled, setAgentBEnabled] = useState(false);
@@ -1236,8 +1245,17 @@ Ready to generate a render! Describe your vision.`;
       // Edit existing render (with or without staged furniture)
       editRender(content, stagedItems);
     } else {
-      // Generate first render
-      triggerGeneration(content, stagedItems);
+      // NEW: If layout exists, show layout analysis preview modal first
+      if (layoutImageUrl) {
+        setPendingGenerationPrompt(content);
+        setPendingGenerationFurniture([...stagedItems]);
+        setPendingLayoutAnalysis(null);
+        setLayoutAnalysisError(null);
+        setShowLayoutAnalysisPreview(true);
+      } else {
+        // No layout, proceed directly to generation
+        triggerGeneration(content, stagedItems);
+      }
     }
     
     // Clear staged items from DB and state after sending
@@ -1248,7 +1266,164 @@ Ready to generate a render! Describe your vision.`;
         .eq('project_id', currentProjectId);
     }
     setStagedItems([]);
-  }, [user, currentProjectId, addMessage, triggerGeneration, editRender, stagedItems, currentRenderUrl]);
+  }, [user, currentProjectId, addMessage, triggerGeneration, editRender, stagedItems, currentRenderUrl, layoutImageUrl]);
+
+  // Handle layout analysis for two-stage generation
+  const handleAnalyzeLayoutForGeneration = useCallback(async () => {
+    if (!layoutImageUrl) return;
+    
+    setIsAnalyzingLayout(true);
+    setLayoutAnalysisError(null);
+    
+    try {
+      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/analyze-layout`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+        },
+        body: JSON.stringify({ layoutImageUrl }),
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || 'Layout analysis failed');
+      }
+      
+      const data = await response.json();
+      
+      if (data.analysis) {
+        setPendingLayoutAnalysis(data.analysis);
+        console.log('Layout analysis complete:', data.analysis.roomShape, data.analysis.dimensions);
+        toast({ title: 'Layout analyzed', description: `Detected ${data.analysis.roomShape} room with ${data.analysis.windows?.length || 0} windows` });
+      } else {
+        throw new Error('No analysis data returned');
+      }
+    } catch (err) {
+      console.error('Layout analysis failed:', err);
+      setLayoutAnalysisError(err instanceof Error ? err.message : 'Analysis failed');
+    } finally {
+      setIsAnalyzingLayout(false);
+    }
+  }, [layoutImageUrl, toast]);
+
+  // Handle confirmation of layout analysis and proceed to generation
+  const handleConfirmLayoutAnalysis = useCallback(async (analysis: LayoutAnalysis) => {
+    if (!user || !currentProjectId) return;
+    
+    setShowLayoutAnalysisPreview(false);
+    setIsGenerating(true);
+    
+    try {
+      // Fetch all project reference images
+      const references = await fetchProjectReferences(currentProjectId);
+      
+      // Combine staged furniture with project products
+      const allProducts = [
+        ...pendingGenerationFurniture.map(item => ({
+          name: item.name,
+          category: item.category,
+          description: item.description,
+          imageUrl: item.imageUrl,
+        })),
+        ...references.productItems.map(p => ({
+          name: p.name,
+          category: 'Product',
+          description: `User-uploaded product: ${p.name}`,
+          imageUrl: p.imageUrl,
+        })),
+      ];
+
+      // Build enhanced prompt with furniture context
+      let enhancedPrompt = pendingGenerationPrompt;
+      if (allProducts.length > 0) {
+        const furnitureContext = allProducts.map(item => 
+          `- ${item.name} (${item.category}): ${item.description}`
+        ).join('\n');
+        enhancedPrompt = `${pendingGenerationPrompt}\n\n[Include these specific products/furniture in the design:\n${furnitureContext}]`;
+      }
+
+      // Create render record
+      const { data: renderRecord, error: renderError } = await supabase
+        .from('renders')
+        .insert({
+          project_id: currentProjectId,
+          user_id: user.id,
+          prompt: enhancedPrompt,
+          room_upload_id: currentUpload?.id || null,
+          status: 'generating',
+        })
+        .select()
+        .single();
+
+      if (renderError) throw renderError;
+
+      await addMessage('assistant', 
+        `Layout verified: ${analysis.roomShape} room (${analysis.dimensions.width}×${analysis.dimensions.depth}ft) with ${analysis.windows.length} windows. Generating precise render...`,
+        { type: 'text', status: 'pending' }
+      );
+
+      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-render`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+        },
+        body: JSON.stringify({
+          prompt: enhancedPrompt,
+          layoutImageUrl: references.layoutUrl,
+          roomPhotoUrl: references.roomPhotoUrl,
+          styleRefUrls: references.styleRefUrls,
+          furnitureItems: allProducts,
+          // Pass pre-analyzed layout for 111% accuracy mode (skip re-analysis)
+          layoutAnalysis: analysis,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || 'Generation failed');
+      }
+
+      const { imageUrl } = await response.json();
+
+      // Update render record
+      await supabase
+        .from('renders')
+        .update({ render_url: imageUrl, status: 'completed' })
+        .eq('id', renderRecord.id);
+
+      setCurrentRenderUrl(imageUrl);
+      setCurrentRenderId(renderRecord.id);
+
+      await addMessage('assistant', 'Your render is ready! You can download it using the controls above.', {
+        type: 'render',
+        imageUrl,
+        status: 'ready',
+      });
+
+      toast({ title: 'Render complete', description: 'Your design is ready to view.' });
+
+    } catch (error) {
+      console.error('Render generation failed:', error);
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      await addMessage('assistant', `Sorry, generation failed: ${message}`, { type: 'text', status: 'failed' });
+      toast({ variant: 'destructive', title: 'Generation failed', description: message });
+    } finally {
+      setIsGenerating(false);
+      setPendingGenerationPrompt('');
+      setPendingGenerationFurniture([]);
+    }
+  }, [user, currentProjectId, pendingGenerationPrompt, pendingGenerationFurniture, currentUpload, addMessage, toast]);
+
+  // Cancel layout analysis preview
+  const handleCancelLayoutAnalysis = useCallback(() => {
+    setShowLayoutAnalysisPreview(false);
+    setPendingLayoutAnalysis(null);
+    setLayoutAnalysisError(null);
+    setPendingGenerationPrompt('');
+    setPendingGenerationFurniture([]);
+  }, []);
 
   // ========== AGENT B HANDLERS ==========
   
@@ -4302,6 +4477,20 @@ ABSOLUTE REQUIREMENTS FOR CONSISTENCY:
         renderId={currentRenderId}
         onProductCreated={handleCustomProductCreated}
       />
+
+      {/* Layout Analysis Preview Modal (Two-Stage Generation) */}
+      {showLayoutAnalysisPreview && layoutImageUrl && (
+        <LayoutAnalysisPreview
+          layoutImageUrl={layoutImageUrl}
+          analysis={pendingLayoutAnalysis}
+          isAnalyzing={isAnalyzingLayout}
+          analysisError={layoutAnalysisError}
+          onAnalyze={handleAnalyzeLayoutForGeneration}
+          onConfirm={handleConfirmLayoutAnalysis}
+          onCancel={handleCancelLayoutAnalysis}
+          isGenerating={isGenerating}
+        />
+      )}
     </div>
   </SidebarProvider>
   </PageTransition>
