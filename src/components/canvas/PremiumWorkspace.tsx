@@ -37,7 +37,8 @@ import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { ZoneGenerationOptions } from './ZonePreviewConfirm';
 
-export type ViewType = 'detail' | 'cinematic' | 'eye-level' | 'dramatic' | 'bird-eye';
+// ViewType now includes 'isometric' as the primary view type for zone generation
+export type ViewType = 'detail' | 'cinematic' | 'eye-level' | 'dramatic' | 'bird-eye' | 'isometric';
 
 export interface ViewTypeOption {
   id: ViewType;
@@ -46,7 +47,9 @@ export interface ViewTypeOption {
   description: string;
 }
 
+// Keep viewTypeOptions for backward compatibility, add isometric
 export const viewTypeOptions: ViewTypeOption[] = [
+  { id: 'isometric', icon: Eye, label: 'Isometric', description: 'True isometric 3D projection' },
   { id: 'detail', icon: Eye, label: 'Detail', description: 'Close-up detailed view' },
   { id: 'cinematic', icon: Film, label: 'Cinematic', description: 'Dramatic wide-angle shot' },
   { id: 'eye-level', icon: User, label: 'Eye Level', description: 'Natural standing perspective' },
@@ -851,48 +854,37 @@ export function PremiumWorkspace({
                 )}
               </div>
 
-              {/* View Type Selector - appears when zone is selected */}
+              {/* Generate Isometric View - appears when zone is selected */}
               {selectedZoneId && zones.find(z => z.id === selectedZoneId) && (
                 <div className="p-3 border-t border-border/30">
                   <p className="text-[10px] font-medium text-muted-foreground mb-2 uppercase tracking-wide">
                     Generate View for "{zones.find(z => z.id === selectedZoneId)?.name}"
                   </p>
-                  <div className="grid grid-cols-2 gap-1.5">
-                    {viewTypeOptions.map((viewType) => (
-                      <Tooltip key={viewType.id}>
-                        <TooltipTrigger asChild>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="h-9 text-xs justify-start gap-2 hover:bg-primary/10 hover:border-primary/50"
-                            onClick={() => {
-                              const zone = zones.find(z => z.id === selectedZoneId);
-                              if (zone) {
-                                // Quick view buttons use default options
-                                onGenerateZoneView?.(zone, {
-                                  viewType: viewType.id,
-                                  styleRefUrls: [],
-                                  selectedProducts: [],
-                                  customPrompt: '',
-                                });
-                              }
-                            }}
-                            disabled={isGenerating}
-                          >
-                            <viewType.icon className="h-3.5 w-3.5" />
-                            <span>{viewType.label}</span>
-                          </Button>
-                        </TooltipTrigger>
-                        <TooltipContent side="left">
-                          <p className="text-xs">{viewType.description}</p>
-                        </TooltipContent>
-                      </Tooltip>
-                    ))}
-                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="w-full h-10 text-sm justify-center gap-2 hover:bg-primary/10 hover:border-primary/50"
+                    onClick={() => {
+                      const zone = zones.find(z => z.id === selectedZoneId);
+                      if (zone) {
+                        // Trigger zone view generation - always uses isometric via the full-screen modal
+                        onGenerateZoneView?.(zone, {
+                          viewType: 'isometric',
+                          styleRefUrls: [],
+                          selectedProducts: [],
+                          customPrompt: '',
+                        });
+                      }
+                    }}
+                    disabled={isGenerating}
+                  >
+                    <Eye className="h-4 w-4" />
+                    <span>Generate Isometric View</span>
+                  </Button>
                   {isGenerating && (
                     <div className="flex items-center gap-2 mt-2 text-xs text-muted-foreground">
                       <Loader2 className="h-3 w-3 animate-spin" />
-                      <span>Generating view...</span>
+                      <span>Generating isometric view...</span>
                     </div>
                   )}
                 </div>

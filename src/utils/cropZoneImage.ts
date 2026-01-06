@@ -2,7 +2,7 @@ import { PolygonPoint } from '@/components/canvas/ZoneSelector';
 
 /**
  * Crops a rectangular zone from an image using bounding box coordinates (percentages)
- * Optimized for rectangle zones - faster and more accurate than polygon cropping
+ * Enhanced for maximum accuracy with extensive validation and debugging
  */
 export async function cropRectangleFromImage(
   imageUrl: string,
@@ -14,13 +14,24 @@ export async function cropRectangleFromImage(
     
     img.onload = () => {
       try {
-        // VALIDATE input bounds
+        console.log('╔═══════════════════════════════════════════════════════════════╗');
+        console.log('║              ZONE CROPPING - ACCURACY MODE                    ║');
+        console.log('╚═══════════════════════════════════════════════════════════════╝');
+        
+        // STEP 1: VALIDATE input bounds
         if (typeof bounds.x_start !== 'number' || typeof bounds.y_start !== 'number' ||
             typeof bounds.x_end !== 'number' || typeof bounds.y_end !== 'number') {
           throw new Error('Invalid bounds: all coordinates must be numbers');
         }
         
-        // Round to 2 decimal places for precision
+        console.log('INPUT BOUNDS (raw):', {
+          x_start: bounds.x_start,
+          y_start: bounds.y_start,
+          x_end: bounds.x_end,
+          y_end: bounds.y_end,
+        });
+        
+        // STEP 2: Round to 2 decimal places for precision
         const roundedBounds = {
           x_start: Math.round(bounds.x_start * 100) / 100,
           y_start: Math.round(bounds.y_start * 100) / 100,
@@ -28,44 +39,53 @@ export async function cropRectangleFromImage(
           y_end: Math.round(bounds.y_end * 100) / 100,
         };
         
-        // CLAMP coordinates to valid range 0-100
-        const x_start = Math.max(0, Math.min(100, roundedBounds.x_start));
-        const y_start = Math.max(0, Math.min(100, roundedBounds.y_start));
-        const x_end = Math.max(0, Math.min(100, roundedBounds.x_end));
-        const y_end = Math.max(0, Math.min(100, roundedBounds.y_end));
+        // STEP 3: CLAMP coordinates to valid range 0-100
+        const clampedBounds = {
+          x_start: Math.max(0, Math.min(100, roundedBounds.x_start)),
+          y_start: Math.max(0, Math.min(100, roundedBounds.y_start)),
+          x_end: Math.max(0, Math.min(100, roundedBounds.x_end)),
+          y_end: Math.max(0, Math.min(100, roundedBounds.y_end)),
+        };
         
-        // Ensure end > start (swap if necessary)
-        const finalX1 = Math.min(x_start, x_end);
-        const finalY1 = Math.min(y_start, y_end);
-        const finalX2 = Math.max(x_start, x_end);
-        const finalY2 = Math.max(y_start, y_end);
+        // STEP 4: Ensure end > start (handle inverted selection)
+        const finalBounds = {
+          x_start: Math.min(clampedBounds.x_start, clampedBounds.x_end),
+          y_start: Math.min(clampedBounds.y_start, clampedBounds.y_end),
+          x_end: Math.max(clampedBounds.x_start, clampedBounds.x_end),
+          y_end: Math.max(clampedBounds.y_start, clampedBounds.y_end),
+        };
         
-        // Validate dimensions
-        const widthPercent = finalX2 - finalX1;
-        const heightPercent = finalY2 - finalY1;
+        // Calculate dimensions
+        const widthPercent = finalBounds.x_end - finalBounds.x_start;
+        const heightPercent = finalBounds.y_end - finalBounds.y_start;
         
+        console.log('FINAL BOUNDS (validated):', finalBounds);
+        console.log('ZONE SIZE:', `${widthPercent.toFixed(1)}% × ${heightPercent.toFixed(1)}%`);
+        
+        // STEP 5: Validate minimum dimensions
         if (widthPercent < 0.5 || heightPercent < 0.5) {
           throw new Error(`Zone too small: ${widthPercent.toFixed(1)}% x ${heightPercent.toFixed(1)}% (min 0.5%)`);
         }
         
-        console.log('=== CROP DEBUG ===');
-        console.log('Input bounds:', bounds);
-        console.log('Clamped & ordered bounds:', { x_start: finalX1, y_start: finalY1, x_end: finalX2, y_end: finalY2 });
-        console.log('Image natural dimensions:', img.naturalWidth, 'x', img.naturalHeight);
+        // STEP 6: Get image natural dimensions
+        const imgWidth = img.naturalWidth;
+        const imgHeight = img.naturalHeight;
         
-        // Calculate pixel coordinates from percentage values using natural dimensions
-        const cropX = Math.round((finalX1 / 100) * img.naturalWidth);
-        const cropY = Math.round((finalY1 / 100) * img.naturalHeight);
-        const cropWidth = Math.round((widthPercent / 100) * img.naturalWidth);
-        const cropHeight = Math.round((heightPercent / 100) * img.naturalHeight);
+        console.log('IMAGE DIMENSIONS:', `${imgWidth} × ${imgHeight}px`);
         
-        console.log('Crop rectangle (pixels):', { cropX, cropY, cropWidth, cropHeight });
+        // STEP 7: Calculate pixel coordinates from percentage values
+        const cropX = Math.round((finalBounds.x_start / 100) * imgWidth);
+        const cropY = Math.round((finalBounds.y_start / 100) * imgHeight);
+        const cropWidth = Math.round((widthPercent / 100) * imgWidth);
+        const cropHeight = Math.round((heightPercent / 100) * imgHeight);
         
-        // Ensure minimum canvas size
+        console.log('CROP RECT (pixels):', { cropX, cropY, cropWidth, cropHeight });
+        
+        // STEP 8: Ensure minimum canvas size
         const canvasWidth = Math.max(10, cropWidth);
         const canvasHeight = Math.max(10, cropHeight);
         
-        // Create canvas with the cropped dimensions
+        // STEP 9: Create canvas with the cropped dimensions
         const canvas = document.createElement('canvas');
         canvas.width = canvasWidth;
         canvas.height = canvasHeight;
@@ -76,29 +96,32 @@ export async function cropRectangleFromImage(
           return;
         }
         
-        // Draw the cropped region with high quality
+        // STEP 10: Draw the cropped region with high quality
         ctx.imageSmoothingEnabled = true;
         ctx.imageSmoothingQuality = 'high';
         ctx.drawImage(
           img,
-          cropX, cropY, cropWidth, cropHeight, // Source rect
-          0, 0, canvasWidth, canvasHeight      // Dest rect
+          cropX, cropY, cropWidth, cropHeight, // Source rect (from image)
+          0, 0, canvasWidth, canvasHeight      // Dest rect (to canvas)
         );
         
-        // Convert to base64 data URL (JPEG for smaller size, high quality)
+        // STEP 11: Convert to base64 data URL (JPEG for smaller size, high quality)
         const dataUrl = canvas.toDataURL('image/jpeg', 0.95);
         
-        console.log(`✓ Cropped: ${canvasWidth}x${canvasHeight}px from (${finalX1.toFixed(1)}%, ${finalY1.toFixed(1)}%) to (${finalX2.toFixed(1)}%, ${finalY2.toFixed(1)}%)`);
-        console.log('=== END CROP DEBUG ===');
+        console.log('╔═══════════════════════════════════════════════════════════════╗');
+        console.log(`║  ✓ CROP SUCCESS: ${canvasWidth}×${canvasHeight}px                          `);
+        console.log(`║  From (${finalBounds.x_start.toFixed(1)}%, ${finalBounds.y_start.toFixed(1)}%) to (${finalBounds.x_end.toFixed(1)}%, ${finalBounds.y_end.toFixed(1)}%)        `);
+        console.log('╚═══════════════════════════════════════════════════════════════╝');
         
         resolve(dataUrl);
       } catch (err) {
-        console.error('Crop error:', err);
+        console.error('CROP ERROR:', err);
         reject(err);
       }
     };
     
     img.onerror = () => {
+      console.error('Failed to load image for cropping');
       reject(new Error(`Failed to load image for cropping: ${imageUrl.substring(0, 100)}...`));
     };
     
