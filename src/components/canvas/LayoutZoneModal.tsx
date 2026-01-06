@@ -1,16 +1,17 @@
 import { useState, useEffect, useCallback } from 'react';
-import { X, Layers, Plus, Trash2, Camera, Edit3, Columns2 } from 'lucide-react';
+import { X, Layers, Plus, Trash2, Camera, Columns2 } from 'lucide-react';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import * as VisuallyHidden from '@radix-ui/react-visually-hidden';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { ZoneSelector, Zone, PolygonPoint } from './ZoneSelector';
+import { Zone, PolygonPoint } from './ZoneSelector';
 import { ZonePreviewConfirm, ZoneGenerationOptions } from './ZonePreviewConfirm';
-import { ViewType } from './PremiumWorkspace';
 import { CatalogFurnitureItem } from '@/services/catalogService';
+import { SnippingToolOverlay } from './SnippingToolOverlay';
 
 interface LayoutZoneModalProps {
   isOpen: boolean;
@@ -45,9 +46,11 @@ export function LayoutZoneModal({
 }: LayoutZoneModalProps) {
   const [zones, setZones] = useState<Zone[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [isDrawing, setIsDrawing] = useState(false);
+  const [isSnipping, setIsSnipping] = useState(false);
   const [selectedZoneId, setSelectedZoneId] = useState<string | null>(null);
   const [previewZone, setPreviewZone] = useState<Zone | null>(null);
+  const [pendingBounds, setPendingBounds] = useState<{ x_start: number; y_start: number; x_end: number; y_end: number } | null>(null);
+  const [newZoneName, setNewZoneName] = useState('');
 
   // Load zones when modal opens
   useEffect(() => {
@@ -85,11 +88,43 @@ export function LayoutZoneModal({
     }
   };
 
-  const handleZoneCreate = useCallback(async (zone: Omit<Zone, 'id'>) => {
-    await onZoneCreate(zone, layoutImageUrl);
+  const handleSnippingCapture = useCallback((bounds: { x_start: number; y_start: number; x_end: number; y_end: number }) => {
+    setPendingBounds(bounds);
+    setNewZoneName(`Zone ${zones.length + 1}`);
+    setIsSnipping(false);
+  }, [zones.length]);
+
+  const handleConfirmZone = useCallback(async () => {
+    if (!pendingBounds || !newZoneName.trim()) return;
+    
+    const { x_start, y_start, x_end, y_end } = pendingBounds;
+    
+    // Store as 4 corner points for backwards compatibility
+    const polygon_points: PolygonPoint[] = [
+      { x: x_start, y: y_start },  // top-left
+      { x: x_end, y: y_start },    // top-right
+      { x: x_end, y: y_end },      // bottom-right
+      { x: x_start, y: y_end },    // bottom-left
+    ];
+    
+    await onZoneCreate({
+      name: newZoneName.trim(),
+      polygon_points,
+      x_start,
+      y_start,
+      x_end,
+      y_end,
+    }, layoutImageUrl);
+    
     await loadZones();
-    setIsDrawing(false);
-  }, [onZoneCreate, layoutImageUrl]);
+    setPendingBounds(null);
+    setNewZoneName('');
+  }, [pendingBounds, newZoneName, onZoneCreate, layoutImageUrl]);
+
+  const handleCancelZone = useCallback(() => {
+    setPendingBounds(null);
+    setNewZoneName('');
+  }, []);
 
   const handleZoneDelete = useCallback(async (zoneId: string) => {
     await onZoneDelete(zoneId);
@@ -136,16 +171,39 @@ export function LayoutZoneModal({
           {/* Layout Canvas - Main Area */}
           <div className="flex-1 relative bg-muted/30 p-4 overflow-hidden">
             {layoutImageUrl ? (
-              <ZoneSelector
-                imageUrl={layoutImageUrl}
-                zones={zones}
-                onZoneCreate={handleZoneCreate}
-                onZoneDelete={handleZoneDelete}
-                onZoneSelect={handleZoneSelect}
-                selectedZoneId={selectedZoneId}
-                isDrawing={isDrawing}
-                onDrawingChange={setIsDrawing}
-              />
+              <div className="relative w-full h-full">
+                <img
+                  src={layoutImageUrl}
+                  alt="Layout"
+                  className="w-full h-full object-contain"
+                  draggable={false}
+                />
+                
+                {/* Zone overlays */}
+                <svg className="absolute inset-0 pointer-events-none w-full h-full">
+                  {zones.map((zone) => (
+                    <rect
+                      key={zone.id}
+                      x={`${zone.x_start}%`}
+                      y={`${zone.y_start}%`}
+                      width={`${zone.x_end - zone.x_start}%`}
+                      height={`${zone.y_end - zone.y_start}%`}
+                      className={cn(
+                        "transition-all cursor-pointer pointer-events-auto",
+                        selectedZoneId === zone.id
+                          ? "fill-primary/20 stroke-primary"
+                          : "fill-amber-500/10 stroke-amber-500/70 hover:fill-amber-500/20 hover:stroke-amber-400"
+                      )}
+                      strokeWidth="2"
+                      rx="2"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleZoneSelect(zone);
+                      }}
+                    />
+                  ))}
+                </svg>
+              </div>
             ) : (
               <div className="flex items-center justify-center h-full">
                 <div className="text-center">
@@ -165,19 +223,14 @@ export function LayoutZoneModal({
                 <span className="text-sm font-medium">Zones ({zones.length})</span>
                 <Button
                   size="sm"
-                  onClick={() => setIsDrawing(true)}
-                  disabled={!layoutImageUrl || isDrawing}
+                  onClick={() => setIsSnipping(true)}
+                  disabled={!layoutImageUrl || isSnipping}
                   className="gap-1.5"
                 >
                   <Plus className="h-3.5 w-3.5" />
                   Add Zone
                 </Button>
               </div>
-              {isDrawing && (
-                <div className="text-xs text-primary bg-primary/10 px-3 py-2 rounded-lg">
-                  Click and drag on the layout to select a rectangular area.
-                </div>
-              )}
             </div>
 
             {/* Zone List */}
@@ -313,6 +366,43 @@ export function LayoutZoneModal({
             }}
             onCancel={() => setPreviewZone(null)}
           />
+        )}
+
+        {/* Snipping Tool Overlay */}
+        {isSnipping && layoutImageUrl && (
+          <SnippingToolOverlay
+            imageUrl={layoutImageUrl}
+            onCapture={handleSnippingCapture}
+            onCancel={() => setIsSnipping(false)}
+          />
+        )}
+
+        {/* Zone Naming Modal */}
+        {pendingBounds && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[110]">
+            <div className="bg-card p-5 rounded-xl border border-border shadow-2xl max-w-sm w-full mx-4">
+              <h3 className="text-base font-semibold mb-4">Name this zone</h3>
+              <Input
+                value={newZoneName}
+                onChange={(e) => setNewZoneName(e.target.value)}
+                placeholder="e.g., Living Area, Kitchen Corner"
+                className="mb-4"
+                autoFocus
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') handleConfirmZone();
+                  if (e.key === 'Escape') handleCancelZone();
+                }}
+              />
+              <div className="flex gap-3">
+                <Button variant="outline" className="flex-1" onClick={handleCancelZone}>
+                  Cancel
+                </Button>
+                <Button className="flex-1" onClick={handleConfirmZone}>
+                  Create Zone
+                </Button>
+              </div>
+            </div>
+          </div>
         )}
       </DialogContent>
     </Dialog>
