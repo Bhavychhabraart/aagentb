@@ -151,6 +151,7 @@ serve(async (req) => {
       layoutBasedZone = false, // NEW: Flag indicating this is a layout-based zone generation
       preserveAspectRatio, // Aspect ratio to preserve from source image (e.g., '16:9', '4:3', '1:1')
       batchMarkers, // Batch marker staging - array of { position: {x,y}, product: {...} }
+      preAnalysis, // Pre-analyzed zone data from analyze-zone function (skips Stage 1 if provided)
     } = await req.json();
 
     // Use provided aspect ratio or default to 16:9
@@ -302,11 +303,22 @@ Output: The edited room image with ultra-photorealistic quality.`;
         // ═══════════════════════════════════════════════════════════════════════════
         // TWO-STAGE PIPELINE: Gemini 2.5 Analysis → Precise Prompt → Gemini 3 Gen
         // ═══════════════════════════════════════════════════════════════════════════
-        console.log('=== STAGE 1: ZONE ANALYSIS WITH GEMINI 2.5 PRO ===');
-        console.log('Analyzing cropped zone image to extract precise furniture layout...');
         
-        // STAGE 1: Analyze the zone with Gemini 2.5 Pro (text/vision)
-        const analysisPrompt = `You are an expert floor plan analyst. Analyze this 2D floor plan zone image and extract PRECISE information about every element visible.
+        let zoneAnalysis: any = null;
+        
+        // Check if pre-analysis was provided (from analyze-zone function)
+        if (preAnalysis && typeof preAnalysis === 'object') {
+          console.log('=== USING PRE-ANALYZED ZONE DATA (SKIPPING STAGE 1) ===');
+          console.log('Zone type:', preAnalysis.zoneType);
+          console.log('Furniture count:', preAnalysis.furniture?.length || 0);
+          console.log('Pre-analysis source: Client-side analyze-zone function');
+          zoneAnalysis = preAnalysis;
+        } else {
+          // STAGE 1: Analyze the zone with Gemini 2.5 Pro (text/vision)
+          console.log('=== STAGE 1: ZONE ANALYSIS WITH GEMINI 2.5 PRO ===');
+          console.log('No pre-analysis provided, performing live analysis...');
+          
+          const analysisPrompt = `You are an expert floor plan analyst. Analyze this 2D floor plan zone image and extract PRECISE information about every element visible.
 
 ANALYZE THE IMAGE AND RETURN A JSON OBJECT with this exact structure:
 
@@ -356,59 +368,57 @@ IMPORTANT RULES:
 
 Analyze the floor plan zone image now:`;
 
-        const analysisResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
-          method: 'POST',
-          headers: {
-            Authorization: `Bearer ${LOVABLE_API_KEY}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            model: 'google/gemini-2.5-pro',
-            messages: [{
-              role: 'user',
-              content: [
-                { type: 'image_url', image_url: { url: layoutZoneBase64 } },
-                { type: 'text', text: analysisPrompt }
-              ]
-            }],
-          }),
-        });
+          const analysisResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+            method: 'POST',
+            headers: {
+              Authorization: `Bearer ${LOVABLE_API_KEY}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              model: 'google/gemini-2.5-pro',
+              messages: [{
+                role: 'user',
+                content: [
+                  { type: 'image_url', image_url: { url: layoutZoneBase64 } },
+                  { type: 'text', text: analysisPrompt }
+                ]
+              }],
+            }),
+          });
 
-        if (!analysisResponse.ok) {
-          console.error('Gemini 2.5 analysis failed:', analysisResponse.status);
-          // Fall back to direct generation if analysis fails
-        }
-
-        let zoneAnalysis: any = null;
-        let analysisText = '';
-        
-        try {
-          const analysisData = await analysisResponse.json();
-          analysisText = analysisData.choices?.[0]?.message?.content || '';
-          console.log('Raw analysis response:', analysisText.substring(0, 500) + '...');
-          
-          // Extract JSON from the response (handle markdown code blocks)
-          let jsonStr = analysisText;
-          const jsonMatch = analysisText.match(/```(?:json)?\s*([\s\S]*?)```/);
-          if (jsonMatch) {
-            jsonStr = jsonMatch[1].trim();
+          if (!analysisResponse.ok) {
+            console.error('Gemini 2.5 analysis failed:', analysisResponse.status);
+            // Fall back to direct generation if analysis fails
           } else {
-            // Try to find raw JSON object
-            const rawJsonMatch = analysisText.match(/\{[\s\S]*\}/);
-            if (rawJsonMatch) {
-              jsonStr = rawJsonMatch[0];
+            try {
+              const analysisData = await analysisResponse.json();
+              const analysisText = analysisData.choices?.[0]?.message?.content || '';
+              console.log('Raw analysis response:', analysisText.substring(0, 500) + '...');
+              
+              // Extract JSON from the response (handle markdown code blocks)
+              let jsonStr = analysisText;
+              const jsonMatch = analysisText.match(/```(?:json)?\s*([\s\S]*?)```/);
+              if (jsonMatch) {
+                jsonStr = jsonMatch[1].trim();
+              } else {
+                // Try to find raw JSON object
+                const rawJsonMatch = analysisText.match(/\{[\s\S]*\}/);
+                if (rawJsonMatch) {
+                  jsonStr = rawJsonMatch[0];
+                }
+              }
+              
+              zoneAnalysis = JSON.parse(jsonStr);
+              console.log('=== ZONE ANALYSIS COMPLETE ===');
+              console.log('Zone type:', zoneAnalysis.zoneType);
+              console.log('Furniture count:', zoneAnalysis.furniture?.length || 0);
+              console.log('Architectural features:', zoneAnalysis.architecturalFeatures?.length || 0);
+              console.log('Scene description:', zoneAnalysis.sceneDescription);
+            } catch (parseError) {
+              console.error('Failed to parse zone analysis:', parseError);
+              console.log('Will proceed with basic prompt (analysis unavailable)');
             }
           }
-          
-          zoneAnalysis = JSON.parse(jsonStr);
-          console.log('=== ZONE ANALYSIS COMPLETE ===');
-          console.log('Zone type:', zoneAnalysis.zoneType);
-          console.log('Furniture count:', zoneAnalysis.furniture?.length || 0);
-          console.log('Architectural features:', zoneAnalysis.architecturalFeatures?.length || 0);
-          console.log('Scene description:', zoneAnalysis.sceneDescription);
-        } catch (parseError) {
-          console.error('Failed to parse zone analysis:', parseError);
-          console.log('Will proceed with basic prompt (analysis unavailable)');
         }
 
         // STAGE 2: Build PRECISE prompt from analysis
