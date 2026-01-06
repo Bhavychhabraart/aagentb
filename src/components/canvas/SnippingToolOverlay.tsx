@@ -10,7 +10,7 @@ import {
 
 interface SnippingToolOverlayProps {
   imageUrl: string;
-  onCapture: (bounds: { x_start: number; y_start: number; x_end: number; y_end: number }) => void;
+  onCapture: (croppedImageUrl: string) => void;
   onCancel: () => void;
 }
 
@@ -88,8 +88,8 @@ export function SnippingToolOverlay({ imageUrl, onCapture, onCancel }: SnippingT
     }
   }, [imageBounds]);
 
-  const handleMouseUp = useCallback((e: React.MouseEvent) => {
-    if (!isDragging || !dragStart || !dragEnd || !imageBounds || !containerRef.current) {
+  const handleMouseUp = useCallback(async (e: React.MouseEvent) => {
+    if (!isDragging || !dragStart || !dragEnd || !imageBounds || !containerRef.current || !imgRef.current) {
       setIsDragging(false);
       return;
     }
@@ -124,10 +124,30 @@ export function SnippingToolOverlay({ imageUrl, onCapture, onCancel }: SnippingT
       const x_end = Math.max(0, Math.min(100, Math.max(startCoords.x, endCoords.x)));
       const y_end = Math.max(0, Math.min(100, Math.max(startCoords.y, endCoords.y)));
       
-      // Brief flash animation before completing
-      setTimeout(() => {
-        onCapture({ x_start, y_start, x_end, y_end });
-      }, 150);
+      // Crop the image using canvas
+      const img = imgRef.current;
+      const naturalWidth = img.naturalWidth;
+      const naturalHeight = img.naturalHeight;
+      
+      const cropX = (x_start / 100) * naturalWidth;
+      const cropY = (y_start / 100) * naturalHeight;
+      const cropW = ((x_end - x_start) / 100) * naturalWidth;
+      const cropH = ((y_end - y_start) / 100) * naturalHeight;
+      
+      const canvas = document.createElement('canvas');
+      canvas.width = cropW;
+      canvas.height = cropH;
+      const ctx = canvas.getContext('2d');
+      
+      if (ctx) {
+        ctx.drawImage(img, cropX, cropY, cropW, cropH, 0, 0, cropW, cropH);
+        const croppedDataUrl = canvas.toDataURL('image/jpeg', 0.95);
+        
+        // Brief flash animation before completing
+        setTimeout(() => {
+          onCapture(croppedDataUrl);
+        }, 150);
+      }
     } else {
       setIsDragging(false);
       setDragStart(null);
