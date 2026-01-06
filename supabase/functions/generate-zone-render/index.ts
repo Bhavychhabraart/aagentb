@@ -35,7 +35,7 @@ serve(async (req) => {
       throw new Error('layoutZoneBase64 is required - the cropped zone image from snipping tool');
     }
 
-    console.log('=== GENERATE ZONE RENDER (Nano Banana Model) ===');
+    console.log('=== GENERATE ZONE RENDER (Gemini 3 Pro Image) ===');
     console.log('Layout zone image:', layoutZoneBase64 ? 'provided' : 'none');
     console.log('Style references:', styleRefUrls?.length || 0);
     console.log('Furniture items:', furnitureItems?.length || 0);
@@ -101,7 +101,7 @@ REQUIREMENTS:
     console.log('Prompt length:', prompt.length);
     console.log('Total images in request:', content.filter(c => c.type === 'image_url').length);
 
-    // Call Nano Banana model - proven to give 100% accurate renders
+    // Call Gemini 3 Pro Image model with structured analysis prompt
     const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -109,7 +109,7 @@ REQUIREMENTS:
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'google/gemini-2.5-flash-image-preview',
+        model: 'google/gemini-3-pro-image-preview',
         messages: [{ role: 'user', content }],
         modalities: ['image', 'text'],
       }),
