@@ -51,6 +51,7 @@ export interface ZoneGenerationOptions {
   selectedProducts: CatalogFurnitureItem[];
   customPrompt: string;
   preAnalysis?: ZoneAnalysis;
+  guideUrl?: string;
 }
 
 interface ZonePreviewConfirmProps {
@@ -85,11 +86,15 @@ export function ZonePreviewConfirm({
   const [isUploadingStyle, setIsUploadingStyle] = useState(false);
   const [showProductPicker, setShowProductPicker] = useState(false);
 
-  // NEW: Analysis state
+  // Analysis state
   const [analysisResult, setAnalysisResult] = useState<ZoneAnalysis | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [analysisError, setAnalysisError] = useState<string | null>(null);
   const [showFurnitureDetails, setShowFurnitureDetails] = useState(true);
+
+  // Guide state
+  const [guideUrl, setGuideUrl] = useState<string | null>(null);
+  const [isUploadingGuide, setIsUploadingGuide] = useState(false);
 
   useEffect(() => {
     const loadPreview = async () => {
@@ -147,8 +152,33 @@ export function ZonePreviewConfirm({
     setIsAnalyzing(true);
     setAnalysisError(null);
 
+    // Set a timeout to prevent infinite loading
+    const timeoutId = setTimeout(() => {
+      setIsAnalyzing(false);
+      setAnalysisError('Analysis timed out. Please try again.');
+      toast.error('Analysis timed out after 60 seconds');
+    }, 60000);
+
     try {
       console.log('=== CALLING ZONE ANALYSIS ===');
+      console.log('Preview URL length:', previewUrl.length);
+      console.log('Guide URL:', guideUrl || 'none');
+      
+      // Convert guide URL to base64 if present
+      let guideBase64: string | undefined;
+      if (guideUrl) {
+        try {
+          const guideResponse = await fetch(guideUrl);
+          const guideBlob = await guideResponse.blob();
+          guideBase64 = await new Promise((resolve) => {
+            const reader = new FileReader();
+            reader.onloadend = () => resolve(reader.result as string);
+            reader.readAsDataURL(guideBlob);
+          });
+        } catch (guideErr) {
+          console.warn('Failed to convert guide to base64:', guideErr);
+        }
+      }
       
       const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/analyze-zone`, {
         method: 'POST',
@@ -159,15 +189,20 @@ export function ZonePreviewConfirm({
         body: JSON.stringify({
           layoutZoneBase64: previewUrl,
           zoneName: zone.name,
+          guideBase64,
         }),
       });
 
+      clearTimeout(timeoutId);
+
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.error || 'Analysis failed');
+        const errorMsg = errorData.error || `Analysis failed (${response.status})`;
+        throw new Error(errorMsg);
       }
 
       const data = await response.json();
+      console.log('Analysis response:', data);
       
       if (data.success && data.analysis) {
         setAnalysisResult(data.analysis);
@@ -177,13 +212,43 @@ export function ZonePreviewConfirm({
         throw new Error(data.error || 'Analysis returned no results');
       }
     } catch (err) {
+      clearTimeout(timeoutId);
       console.error('Zone analysis failed:', err);
-      setAnalysisError(err instanceof Error ? err.message : 'Analysis failed');
-      toast.error('Failed to analyze zone');
+      const errorMsg = err instanceof Error ? err.message : 'Analysis failed';
+      setAnalysisError(errorMsg);
+      toast.error(`Analysis failed: ${errorMsg}`);
     } finally {
       setIsAnalyzing(false);
     }
-  }, [previewUrl, zone.name]);
+  }, [previewUrl, zone.name, guideUrl]);
+
+  // Handle guide upload
+  const handleGuideUpload = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    
+    setIsUploadingGuide(true);
+    try {
+      const fileName = `guides/${Date.now()}-${file.name}`;
+      const { error: uploadError } = await supabase.storage
+        .from('room-uploads')
+        .upload(fileName, file);
+      
+      if (uploadError) throw uploadError;
+      
+      const { data: { publicUrl } } = supabase.storage
+        .from('room-uploads')
+        .getPublicUrl(fileName);
+      
+      setGuideUrl(publicUrl);
+      toast.success('Design guide uploaded');
+    } catch (err) {
+      console.error('Guide upload failed:', err);
+      toast.error('Failed to upload design guide');
+    } finally {
+      setIsUploadingGuide(false);
+    }
+  }, []);
 
   const handleStyleRefUpload = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -234,13 +299,14 @@ export function ZonePreviewConfirm({
   };
 
   const handleConfirm = () => {
-    // Pass preAnalysis if available
+    // Pass preAnalysis and guideUrl if available
     onConfirm({
       viewType: 'isometric',
       styleRefUrls,
       selectedProducts,
       customPrompt,
       preAnalysis: analysisResult || undefined,
+      guideUrl: guideUrl || undefined,
     });
   };
 
@@ -440,6 +506,53 @@ export function ZonePreviewConfirm({
                   Click "Analyze" to detect furniture and layout from the floor plan. This helps generate more accurate results.
                 </p>
               )}
+            </div>
+          </div>
+
+          {/* Design Guide Section */}
+          <div>
+            <label className="text-sm font-medium mb-3 flex items-center gap-1.5">
+              <ImageIcon className="h-4 w-4 text-emerald-500" />
+              Design Guide
+              <span className="text-muted-foreground font-normal text-xs">(optional)</span>
+            </label>
+            <div className="flex items-start gap-3">
+              {guideUrl ? (
+                <div className="relative group">
+                  <img
+                    src={guideUrl}
+                    alt="Design guide"
+                    className="h-20 w-20 object-cover rounded-lg border border-border"
+                  />
+                  <button
+                    onClick={() => setGuideUrl(null)}
+                    className="absolute -top-1.5 -right-1.5 h-5 w-5 bg-destructive text-destructive-foreground rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity shadow-sm"
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                </div>
+              ) : (
+                <label className="h-20 w-20 border-2 border-dashed border-border rounded-lg flex flex-col items-center justify-center cursor-pointer hover:bg-muted/50 hover:border-muted-foreground/50 transition-all">
+                  {isUploadingGuide ? (
+                    <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+                  ) : (
+                    <>
+                      <Upload className="h-5 w-5 text-muted-foreground" />
+                      <span className="text-[10px] text-muted-foreground mt-1">Guide</span>
+                    </>
+                  )}
+                  <input
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={handleGuideUpload}
+                    disabled={isUploadingGuide}
+                  />
+                </label>
+              )}
+              <p className="text-xs text-muted-foreground flex-1">
+                Upload a design guide or style reference to help the AI understand specific layout patterns, furniture standards, or design rules.
+              </p>
             </div>
           </div>
 
