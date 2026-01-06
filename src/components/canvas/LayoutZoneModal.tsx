@@ -49,7 +49,7 @@ export function LayoutZoneModal({
   const [isSnipping, setIsSnipping] = useState(false);
   const [selectedZoneId, setSelectedZoneId] = useState<string | null>(null);
   const [previewZone, setPreviewZone] = useState<Zone | null>(null);
-  const [pendingBounds, setPendingBounds] = useState<{ x_start: number; y_start: number; x_end: number; y_end: number } | null>(null);
+  const [capturedImageUrl, setCapturedImageUrl] = useState<string | null>(null);
   const [newZoneName, setNewZoneName] = useState('');
 
   // Load zones when modal opens
@@ -88,41 +88,40 @@ export function LayoutZoneModal({
     }
   };
 
-  const handleSnippingCapture = useCallback((bounds: { x_start: number; y_start: number; x_end: number; y_end: number }) => {
-    setPendingBounds(bounds);
+  const handleSnippingCapture = useCallback((croppedImageUrl: string) => {
+    setCapturedImageUrl(croppedImageUrl);
     setNewZoneName(`Zone ${zones.length + 1}`);
     setIsSnipping(false);
   }, [zones.length]);
 
   const handleConfirmZone = useCallback(async () => {
-    if (!pendingBounds || !newZoneName.trim()) return;
+    if (!capturedImageUrl || !newZoneName.trim()) return;
     
-    const { x_start, y_start, x_end, y_end } = pendingBounds;
-    
-    // Store as 4 corner points for backwards compatibility
+    // For the new snipping tool flow, we save the cropped image as a zone thumbnail
+    // The zone bounds are set to full image since it's already cropped
     const polygon_points: PolygonPoint[] = [
-      { x: x_start, y: y_start },  // top-left
-      { x: x_end, y: y_start },    // top-right
-      { x: x_end, y: y_end },      // bottom-right
-      { x: x_start, y: y_end },    // bottom-left
+      { x: 0, y: 0 },
+      { x: 100, y: 0 },
+      { x: 100, y: 100 },
+      { x: 0, y: 100 },
     ];
     
     await onZoneCreate({
       name: newZoneName.trim(),
       polygon_points,
-      x_start,
-      y_start,
-      x_end,
-      y_end,
-    }, layoutImageUrl);
+      x_start: 0,
+      y_start: 0,
+      x_end: 100,
+      y_end: 100,
+    }, capturedImageUrl);
     
     await loadZones();
-    setPendingBounds(null);
+    setCapturedImageUrl(null);
     setNewZoneName('');
-  }, [pendingBounds, newZoneName, onZoneCreate, layoutImageUrl]);
+  }, [capturedImageUrl, newZoneName, onZoneCreate]);
 
   const handleCancelZone = useCallback(() => {
-    setPendingBounds(null);
+    setCapturedImageUrl(null);
     setNewZoneName('');
   }, []);
 
@@ -377,11 +376,21 @@ export function LayoutZoneModal({
           />
         )}
 
-        {/* Zone Naming Modal */}
-        {pendingBounds && (
+        {/* Zone Naming Modal with Preview */}
+        {capturedImageUrl && (
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[110]">
-            <div className="bg-card p-5 rounded-xl border border-border shadow-2xl max-w-sm w-full mx-4">
+            <div className="bg-card p-5 rounded-xl border border-border shadow-2xl max-w-md w-full mx-4">
               <h3 className="text-base font-semibold mb-4">Name this zone</h3>
+              
+              {/* Preview of cropped zone */}
+              <div className="mb-4 rounded-lg overflow-hidden border border-border bg-muted/30">
+                <img 
+                  src={capturedImageUrl} 
+                  alt="Cropped zone preview" 
+                  className="w-full h-40 object-contain"
+                />
+              </div>
+              
               <Input
                 value={newZoneName}
                 onChange={(e) => setNewZoneName(e.target.value)}
