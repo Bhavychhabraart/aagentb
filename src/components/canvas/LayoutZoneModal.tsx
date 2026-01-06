@@ -8,8 +8,9 @@ import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { ZoneSelector, Zone, PolygonPoint } from './ZoneSelector';
-import { ZonePreviewConfirm } from './ZonePreviewConfirm';
+import { ZonePreviewConfirm, ZoneGenerationOptions } from './ZonePreviewConfirm';
 import { ViewType } from './PremiumWorkspace';
+import { CatalogFurnitureItem } from '@/services/catalogService';
 
 interface LayoutZoneModalProps {
   isOpen: boolean;
@@ -19,9 +20,12 @@ interface LayoutZoneModalProps {
   renderUrl: string | null;
   onZoneCreate: (zone: Omit<Zone, 'id'>, layoutUrl: string) => Promise<void>;
   onZoneDelete: (zoneId: string) => Promise<void>;
-  onGenerateZoneView: (zone: Zone, viewType: ViewType) => void;
+  onGenerateZoneView: (zone: Zone, options: ZoneGenerationOptions) => void;
   onCompareZone?: (zone: Zone) => void;
   isGenerating: boolean;
+  styleRefUrls?: string[];
+  catalogItems?: CatalogFurnitureItem[];
+  onOpenCatalog?: () => void;
 }
 
 export function LayoutZoneModal({
@@ -35,6 +39,9 @@ export function LayoutZoneModal({
   onGenerateZoneView,
   onCompareZone,
   isGenerating,
+  styleRefUrls = [],
+  catalogItems = [],
+  onOpenCatalog,
 }: LayoutZoneModalProps) {
   const [zones, setZones] = useState<Zone[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -296,8 +303,11 @@ export function LayoutZoneModal({
             zone={previewZone}
             layoutImageUrl={layoutImageUrl}
             isGenerating={isGenerating}
-            onConfirm={(viewType) => {
-              onGenerateZoneView(previewZone, viewType);
+            existingStyleRefs={styleRefUrls}
+            catalogItems={catalogItems}
+            onOpenCatalog={onOpenCatalog}
+            onConfirm={(options) => {
+              onGenerateZoneView(previewZone, options);
               setPreviewZone(null);
               onClose();
             }}

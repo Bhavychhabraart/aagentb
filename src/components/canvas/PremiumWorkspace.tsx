@@ -35,6 +35,7 @@ import { CameraView, ZoneRegion, MulticamPanel } from './MulticamPanel';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
+import { ZoneGenerationOptions } from './ZonePreviewConfirm';
 
 export type ViewType = 'detail' | 'cinematic' | 'eye-level' | 'dramatic' | 'bird-eye';
 
@@ -90,7 +91,7 @@ interface PremiumWorkspaceProps {
   onZoneSelect?: (zone: Zone | null) => void;
   onStartZoneDrawing?: () => void;
   onStopZoneDrawing?: () => void;
-  onGenerateZoneView?: (zone: Zone, viewType: ViewType) => void;
+  onGenerateZoneView?: (zone: Zone, options: ZoneGenerationOptions) => void;
   onCompareZone?: (zone: Zone) => void;
   onToggleZonesPanel?: () => void;
   // Zone generation state
@@ -867,7 +868,13 @@ export function PremiumWorkspace({
                             onClick={() => {
                               const zone = zones.find(z => z.id === selectedZoneId);
                               if (zone) {
-                                onGenerateZoneView?.(zone, viewType.id);
+                                // Quick view buttons use default options
+                                onGenerateZoneView?.(zone, {
+                                  viewType: viewType.id,
+                                  styleRefUrls: [],
+                                  selectedProducts: [],
+                                  customPrompt: '',
+                                });
                               }
                             }}
                             disabled={isGenerating}

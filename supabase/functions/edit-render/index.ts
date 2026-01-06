@@ -238,7 +238,7 @@ Output: The edited room image with ultra-photorealistic quality.`;
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          model: 'google/gemini-2.5-flash-image-preview',
+          model: 'google/gemini-3-pro-image-preview',
           messages: [{ role: 'user', content }],
           modalities: ['image', 'text'],
           generationConfig: { aspectRatio: outputAspectRatio }
@@ -293,6 +293,8 @@ Output: The edited room image with ultra-photorealistic quality.`;
       if (layoutBasedZone && layoutZoneBase64) {
         // LAYOUT-BASED ZONE GENERATION - Uses 2D layout as source of truth
         console.log('Using LAYOUT-BASED zone generation mode');
+        console.log('Style refs provided:', styleRefUrls?.length || 0);
+        console.log('Furniture items provided:', furnitureItems?.length || 0);
         
         // Extract zone bounds from focusRegion for explicit coordinates
         const zoneBounds = focusRegion ? {
@@ -322,12 +324,85 @@ Output: The edited room image with ultra-photorealistic quality.`;
           renderIndex = imageIndex++;
         }
         
-        zonePrompt = `You are an expert interior designer and architectural renderer creating magazine-quality 3D visualizations from 2D floor plans.
-
+        // Add STYLE REFERENCE images (NEW)
+        const styleRefIndices: number[] = [];
+        if (styleRefUrls && styleRefUrls.length > 0) {
+          for (const styleUrl of styleRefUrls) {
+            content.push({ type: 'image_url', image_url: { url: styleUrl } });
+            styleRefIndices.push(imageIndex++);
+          }
+          console.log('Added style references as images:', styleRefIndices);
+        }
+        
+        // Add PRODUCT images (NEW)
+        const productIndices: { index: number; name: string; category: string }[] = [];
+        if (furnitureItems && furnitureItems.length > 0) {
+          for (const item of furnitureItems) {
+            if (item.imageUrl) {
+              content.push({ type: 'image_url', image_url: { url: item.imageUrl } });
+              productIndices.push({ 
+                index: imageIndex++, 
+                name: item.name, 
+                category: item.category 
+              });
+            }
+          }
+          console.log('Added product images:', productIndices.map(p => p.name));
+        }
+        
+        // Build enhanced image reference list
+        let imageRefList = `
 IMAGES PROVIDED:
-- IMAGE ${layoutZoneIndex}: CROPPED 2D FLOOR PLAN ZONE - THIS IS THE EXACT AREA YOU MUST RENDER IN 3D
-${fullLayoutIndex ? `- IMAGE ${fullLayoutIndex}: Full 2D floor plan (for overall spatial context)` : ''}
-${renderIndex ? `- IMAGE ${renderIndex}: Existing 3D render of the room (for style/material reference)` : ''}
+- IMAGE ${layoutZoneIndex}: CROPPED 2D FLOOR PLAN ZONE - THE EXACT AREA TO RENDER IN 3D
+${fullLayoutIndex ? `- IMAGE ${fullLayoutIndex}: Full 2D floor plan (overall spatial context)` : ''}
+${renderIndex ? `- IMAGE ${renderIndex}: Existing 3D render (style/material reference)` : ''}`;
+
+        if (styleRefIndices.length > 0) {
+          imageRefList += `\n\nSTYLE REFERENCES (MUST MATCH):`;
+          styleRefIndices.forEach((idx, i) => {
+            imageRefList += `\n- IMAGE ${idx}: Style Reference ${i + 1} - COPY THIS AESTHETIC EXACTLY`;
+          });
+        }
+        
+        if (productIndices.length > 0) {
+          imageRefList += `\n\nPRODUCTS TO INCLUDE (COPY EXACTLY):`;
+          productIndices.forEach((p) => {
+            imageRefList += `\n- IMAGE ${p.index}: "${p.name}" (${p.category}) - PLACE THIS PRODUCT in the zone`;
+          });
+        }
+        
+        // Build style reference instructions
+        const styleInstructions = styleRefIndices.length > 0 ? `
+╔═══════════════════════════════════════════════════════════════════════════════╗
+║                    STYLE REFERENCE MATCHING (CRITICAL)                         ║
+╠═══════════════════════════════════════════════════════════════════════════════╣
+${styleRefIndices.map((idx, i) => `║  Style Reference ${i + 1} (IMAGE ${idx}): COPY THIS AESTHETIC                    ║`).join('\n')}
+╚═══════════════════════════════════════════════════════════════════════════════╝
+
+STYLE MATCHING REQUIREMENTS:
+- MATCH the exact color palette, mood, and atmosphere from style references
+- REPLICATE lighting style (warm/cool, soft/dramatic, natural/artificial)  
+- USE SAME material choices and textures visible in style images
+- MAINTAIN design language consistency across the render
+- The generated zone MUST feel like it belongs in the same project as the style refs` : '';
+
+        // Build product placement instructions  
+        const productInstructions = productIndices.length > 0 ? `
+╔═══════════════════════════════════════════════════════════════════════════════╗
+║                    PRODUCT PLACEMENT (HIGHEST ACCURACY)                        ║
+╠═══════════════════════════════════════════════════════════════════════════════╣
+${productIndices.map(p => `║  "${p.name}" (${p.category}): COPY EXACTLY from IMAGE ${p.index}           ║`).join('\n')}
+╚═══════════════════════════════════════════════════════════════════════════════╝
+
+PRODUCT PLACEMENT REQUIREMENTS:
+${productIndices.map((p, i) => `${i + 1}. "${p.name}" from IMAGE ${p.index}:
+   - COPY the product EXACTLY as shown - same shape, color, material, proportions
+   - Place appropriately within the floor plan zone layout
+   - Scale realistically relative to room dimensions
+   - Apply proper shadows and lighting integration`).join('\n')}` : '';
+        
+        zonePrompt = `You are an expert interior designer and architectural renderer creating magazine-quality 3D visualizations from 2D floor plans.
+${imageRefList}
 
 ${zoneBounds ? `
 ╔═══════════════════════════════════════════════════════════════════════════════╗
@@ -341,9 +416,11 @@ ${zoneBounds ? `
 ║  Height:      ${zoneBounds.height.toFixed(1)}% of full layout                                        ║
 ╚═══════════════════════════════════════════════════════════════════════════════╝
 ` : ''}
+${styleInstructions}
+${productInstructions}
 
 ═══════════════════════════════════════════════════════════════
-     LAYOUT-TO-3D ZONE RENDER - HIGHEST ACCURACY MODE
+     LAYOUT-TO-3D ZONE RENDER - MAXIMUM ACCURACY MODE
 ═══════════════════════════════════════════════════════════════
 
 YOUR TASK:
@@ -364,11 +441,11 @@ CRITICAL INTERPRETATION REQUIREMENTS:
    - Maintain EXACT proportions and positions from the floor plan
    - Furniture placement must match the 2D layout precisely
    - Wall lengths and room shape must be accurate
-   - DO NOT add, remove, or reposition any elements
+   - DO NOT add, remove, or reposition any elements from the floor plan
 
 3. 3D INTERPRETATION:
    - Convert 2D symbols into appropriate 3D furniture pieces
-   - Use contextually appropriate furniture styles (modern, traditional, etc.)
+   ${productIndices.length > 0 ? `- USE the specific products provided (${productIndices.map(p => p.name).join(', ')})` : '- Use contextually appropriate furniture styles'}
    - Apply realistic materials: wood, fabric, metal, glass as appropriate
    - Add ceiling, lighting fixtures, and architectural details
 
@@ -383,7 +460,7 @@ CRITICAL INTERPRETATION REQUIREMENTS:
    - Frame the shot to feature the zone prominently
    - Use natural, professional interior photography composition
 
-${renderIndex ? `6. STYLE MATCHING:
+${renderIndex ? `6. EXISTING STYLE MATCHING:
    - Match the visual style, color palette, and materials from IMAGE ${renderIndex}
    - Use similar lighting mood and atmosphere
    - Maintain design consistency with existing renders` : ''}
@@ -393,6 +470,13 @@ ADDITIONAL DIRECTION: ${userPrompt}
 ⚠️ CRITICAL ANTI-ILLUSTRATION DIRECTIVE:
 NEVER produce cartoon, illustrated, stylized, CGI, or video game aesthetics.
 Output MUST be indistinguishable from professional architectural photography.
+
+VERIFICATION CHECKLIST:
+✓ Zone boundaries match the cropped layout area exactly
+✓ All furniture from floor plan is represented
+${styleRefIndices.length > 0 ? '✓ Style matches the provided reference images' : ''}
+${productIndices.length > 0 ? '✓ All specified products are placed correctly' : ''}
+✓ Photorealistic quality - no illustration or CGI look
 
 OUTPUT: A photorealistic 3D render of the floor plan zone with accurate furniture placement.
 ═══════════════════════════════════════════════════════════════`;
@@ -502,7 +586,7 @@ Output: A photorealistic interior photograph showing the focused view of the spe
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          model: 'google/gemini-2.5-flash-image-preview',
+          model: 'google/gemini-3-pro-image-preview',
           messages: [{ role: 'user', content }],
           modalities: ['image', 'text'],
           generationConfig: { aspectRatio: outputAspectRatio }
