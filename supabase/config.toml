@@ -56,3 +56,6 @@ verify_jwt = false
 
 [functions.analyze-zone]
 verify_jwt = false
+
+[functions.generate-zone-render]
+verify_jwt = false

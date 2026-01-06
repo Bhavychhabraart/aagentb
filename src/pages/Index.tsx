@@ -2914,29 +2914,18 @@ ABSOLUTE REQUIREMENTS FOR CONSISTENCY:
         imageUrl: p.imageUrl,
       }));
 
-      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/edit-render`, {
+      // Use direct Gemini 3 generation - same as homepage (no analysis step)
+      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-zone-render`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
         },
         body: JSON.stringify({
-          currentRenderUrl: currentRenderUrl || layoutImageUrl, // Use layout as base if no render
-          layoutImageUrl: layoutImageUrl, // Full layout for context
           layoutZoneBase64: layoutZoneBase64, // Cropped layout section (the source of truth)
-          userPrompt: zonePrompt,
-          focusRegion: {
-            x: zone.x_start,
-            y: zone.y_start,
-            width: zone.x_end - zone.x_start,
-            height: zone.y_end - zone.y_start,
-          },
-          viewType: options.viewType,
           styleRefUrls: allStyleRefs,
           furnitureItems: furnitureItems.length > 0 ? furnitureItems : undefined,
-          preserveAspectRatio: sourceAspectRatio,
-          layoutBasedZone: true, // Flag to use layout-based generation
-          preAnalysis: options.preAnalysis, // Pre-analyzed zone data (skips Stage 1 if provided)
+          customPrompt: options.customPrompt,
         }),
       });
 
