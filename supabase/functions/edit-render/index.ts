@@ -6,7 +6,16 @@ const corsHeaders = {
 };
 
 // Camera instruction presets for detailed view generation
+// ISOMETRIC is the PRIMARY view type for zone generation (maximum accuracy)
 const CAMERA_INSTRUCTIONS: Record<string, string> = {
+  'isometric': `Camera View: TRUE ISOMETRIC PROJECTION - MAXIMUM ACCURACY MODE
+   - 30-45 degree elevation angle from horizontal
+   - 45 degree rotation from room corner
+   - NO perspective distortion - all parallel lines remain parallel
+   - Equal visual weight to all three visible axes (X, Y, Z)
+   - Technical architectural visualization quality
+   - Shows furniture positions EXACTLY as they appear in the 2D floor plan
+   - The ENTIRE zone area must be visible with consistent scale throughout`,
   'eye-level': "Camera View: Standard Eye-Level perspective (approx 1.6m height).",
   'wide': "Camera View: Wide Angle Lens (16mm). Show 3 walls if possible to maximize space visibility.",
   'top-down': "Camera View: Isometric / 3/4 Top-Down Cutaway View. High angle looking down into the room.",
@@ -16,7 +25,6 @@ const CAMERA_INSTRUCTIONS: Record<string, string> = {
   'macro': "Camera View: Close-Up Detail Shot (Macro). Focus intensely on furniture materials, fabrics, and decor details with shallow depth of field.",
   'fisheye': "Camera View: Fish-Eye Lens (10mm). Artistic, distorted ultra-wide view emphasizing the scale of the room.",
   'straight-on': "Camera View: One-Point Perspective (Wes Anderson style). Perfectly symmetrical shot centered in the room, facing the back wall.",
-  'isometric': "Camera View: True Isometric Projection. Technical architectural view with parallel lines (no vanishing point), showing the layout clearly from a 45-degree angle.",
   'dramatic': "Camera View: Cinematic Low-Key. High contrast, moody lighting, emphasizing shadows and form. Low angle, 35mm lens.",
   'photographer': "Camera View: Editorial Style. Carefully composed shot from a standing height (1.7m), 50mm lens, perfect vertical lines, magazine quality.",
   'detail': "Camera View: Detail Shot. Close focus on specific furniture piece with shallow depth of field.",
@@ -401,7 +409,7 @@ ${productIndices.map((p, i) => `${i + 1}. "${p.name}" from IMAGE ${p.index}:
    - Scale realistically relative to room dimensions
    - Apply proper shadows and lighting integration`).join('\n')}` : '';
         
-        zonePrompt = `You are an expert interior designer and architectural renderer creating magazine-quality 3D visualizations from 2D floor plans.
+        zonePrompt = `You are an expert architectural renderer specializing in ISOMETRIC 3D VISUALIZATION from 2D floor plans.
 ${imageRefList}
 
 ${zoneBounds ? `
@@ -419,67 +427,118 @@ ${zoneBounds ? `
 ${styleInstructions}
 ${productInstructions}
 
-═══════════════════════════════════════════════════════════════
-     LAYOUT-TO-3D ZONE RENDER - MAXIMUM ACCURACY MODE
-═══════════════════════════════════════════════════════════════
+╔═══════════════════════════════════════════════════════════════════════════════╗
+║           ISOMETRIC 3D PROJECTION - 1000% LAYOUT ACCURACY MODE                ║
+╠═══════════════════════════════════════════════════════════════════════════════╣
+║  THIS IS AN ISOMETRIC VIEW ONLY - NO OTHER VIEW TYPE IS ACCEPTABLE            ║
+║  EVERY ELEMENT FROM THE 2D FLOOR PLAN MUST APPEAR IN THE 3D RENDER           ║
+║  POSITIONS, SCALE, AND PROPORTIONS MUST BE PIXEL-PERFECT                      ║
+╚═══════════════════════════════════════════════════════════════════════════════╝
 
 YOUR TASK:
-Transform the cropped 2D floor plan zone (IMAGE ${layoutZoneIndex}) into a photorealistic 3D interior render.
+Transform the cropped 2D floor plan zone (IMAGE ${layoutZoneIndex}) into a photorealistic ISOMETRIC 3D interior render.
 Render ONLY what appears within the specified bounding box - nothing more, nothing less.
 
-CRITICAL INTERPRETATION REQUIREMENTS:
+═══════════════════════════════════════════════════════════════
+               ISOMETRIC CAMERA REQUIREMENTS
+═══════════════════════════════════════════════════════════════
 
-1. FLOOR PLAN READING (HIGHEST PRIORITY):
-   - Interpret ALL furniture symbols, shapes, and icons from the 2D layout
-   - Rectangular shapes = tables, desks, beds, sofas (based on proportions)
-   - Circles/ovals = occasional tables, rugs, or seating arrangements
-   - Small squares near walls = chairs, side tables, plants
-   - Dashed lines = ceiling features, overhead elements
-   - Wall openings = windows or doors (interpret contextually)
+1. TRUE ISOMETRIC PROJECTION:
+   - Camera at EXACTLY 30-45 degree elevation angle
+   - Viewing direction at 45 degrees from room corner
+   - NO perspective distortion - parallel lines STAY parallel
+   - All three visible axes (X, Y, Z) have equal visual weight
+   - Like an architectural axonometric drawing but photorealistic
 
-2. SPATIAL ACCURACY:
-   - Maintain EXACT proportions and positions from the floor plan
-   - Furniture placement must match the 2D layout precisely
-   - Wall lengths and room shape must be accurate
-   - DO NOT add, remove, or reposition any elements from the floor plan
+2. FRAMING:
+   - The ENTIRE zone must be visible in the frame
+   - Camera positioned to show the floor plan area from corner
+   - Consistent scale across the entire image (no foreshortening)
+   - Ceiling should be visible but not dominating
 
-3. 3D INTERPRETATION:
-   - Convert 2D symbols into appropriate 3D furniture pieces
-   ${productIndices.length > 0 ? `- USE the specific products provided (${productIndices.map(p => p.name).join(', ')})` : '- Use contextually appropriate furniture styles'}
-   - Apply realistic materials: wood, fabric, metal, glass as appropriate
-   - Add ceiling, lighting fixtures, and architectural details
+═══════════════════════════════════════════════════════════════
+               LAYOUT ACCURACY REQUIREMENTS (NON-NEGOTIABLE)
+═══════════════════════════════════════════════════════════════
 
-4. PHOTOREALISTIC QUALITY:
-   - RED Cinema Camera / Architectural Digest magazine quality
-   - 8K resolution equivalent with natural depth of field
-   - Ray-traced global illumination with realistic shadows
-   - Physically-based materials with accurate reflections
+1. FLOOR PLAN TO 3D TRANSLATION:
+   - EVERY furniture shape in the 2D layout MUST appear in the render
+   - Rectangular outlines → appropriate furniture (sofa, table, bed)
+   - Circular shapes → round tables, rugs, ottomans
+   - L-shaped forms → sectional sofas, corner desks
+   - Small squares → chairs, side tables, lamps, plants
+   - Wall openings → windows (with glass) or doors
 
-5. CAMERA VIEW:
-   ${viewInstruction}
-   - Frame the shot to feature the zone prominently
-   - Use natural, professional interior photography composition
+2. POSITION MATCHING (CRITICAL):
+   - Furniture positions must EXACTLY match the floor plan
+   - If an item is 30% from left wall in 2D, it must be 30% from left in 3D
+   - Spacing between furniture pieces must be proportionally accurate
+   - Wall-to-furniture distances must be maintained
+   
+3. SCALE ACCURACY:
+   - Large items stay large, small items stay small
+   - Relative proportions between furniture pieces must match floor plan
+   - Room proportions (length:width ratio) must be exact
 
-${renderIndex ? `6. EXISTING STYLE MATCHING:
-   - Match the visual style, color palette, and materials from IMAGE ${renderIndex}
-   - Use similar lighting mood and atmosphere
-   - Maintain design consistency with existing renders` : ''}
+${productIndices.length > 0 ? `
+═══════════════════════════════════════════════════════════════
+               SPECIFIC PRODUCTS TO INCLUDE
+═══════════════════════════════════════════════════════════════
+${productIndices.map((p, i) => `
+${i + 1}. "${p.name}" (${p.category}) - SEE IMAGE ${p.index}
+   - COPY this product EXACTLY as shown in the reference image
+   - Same shape, color, material, and proportions
+   - Place at appropriate position according to floor plan
+   - Apply correct lighting and shadows
+`).join('')}
+` : ''}
 
-ADDITIONAL DIRECTION: ${userPrompt}
+${styleRefIndices.length > 0 ? `
+═══════════════════════════════════════════════════════════════
+               STYLE REFERENCE MATCHING
+═══════════════════════════════════════════════════════════════
+- Match the EXACT aesthetic from the style reference images
+- Copy the color palette, lighting mood, and atmosphere
+- Use similar materials and textures
+- The render should feel like part of the same design project
+` : ''}
 
-⚠️ CRITICAL ANTI-ILLUSTRATION DIRECTIVE:
-NEVER produce cartoon, illustrated, stylized, CGI, or video game aesthetics.
-Output MUST be indistinguishable from professional architectural photography.
+═══════════════════════════════════════════════════════════════
+               PHOTOREALISTIC QUALITY
+═══════════════════════════════════════════════════════════════
 
-VERIFICATION CHECKLIST:
-✓ Zone boundaries match the cropped layout area exactly
-✓ All furniture from floor plan is represented
+- RED Cinema Camera / Architectural Digest magazine quality
+- 8K resolution equivalent with crisp details
+- Ray-traced global illumination with natural shadows
+- Physically-based materials (wood grain, fabric weave, metal reflections)
+- Natural daylight or warm interior lighting
+- NO cartoon, illustration, CGI, or video game aesthetics
+
+${renderIndex ? `
+Match the visual style from IMAGE ${renderIndex}:
+- Same color palette and material choices
+- Similar lighting mood
+- Consistent design language
+` : ''}
+
+ADDITIONAL DIRECTION: ${userPrompt || 'Create a beautiful, realistic isometric view of this floor plan zone.'}
+
+═══════════════════════════════════════════════════════════════
+               FINAL VERIFICATION CHECKLIST
+═══════════════════════════════════════════════════════════════
+
+Before outputting, verify:
+✓ Isometric camera angle (30-45° elevation, corner view)
+✓ NO perspective distortion (parallel lines stay parallel)
+✓ EVERY furniture piece from floor plan is present
+✓ Positions match the 2D layout EXACTLY
+✓ Scale and proportions are accurate
+${productIndices.length > 0 ? '✓ All specified products are included and match their reference images' : ''}
 ${styleRefIndices.length > 0 ? '✓ Style matches the provided reference images' : ''}
-${productIndices.length > 0 ? '✓ All specified products are placed correctly' : ''}
-✓ Photorealistic quality - no illustration or CGI look
+✓ Photorealistic quality - looks like a real photograph
+✓ Zone boundaries respected - only the specified area is rendered
 
-OUTPUT: A photorealistic 3D render of the floor plan zone with accurate furniture placement.
-═══════════════════════════════════════════════════════════════`;
+OUTPUT: A photorealistic ISOMETRIC 3D visualization of the floor plan zone with 1000% layout accuracy.`;
+
       } else if (zoneImageBase64) {
         // RENDER-BASED ZONE (existing behavior) - Uses cropped render as reference
         console.log('Using RENDER-BASED zone generation mode (legacy)');
