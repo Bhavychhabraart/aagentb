@@ -3914,6 +3914,10 @@ ABSOLUTE REQUIREMENTS FOR CONSISTENCY:
             // Multicam history save props
             onSaveMulticamToHistory={handleSaveMulticamToHistory}
             userId={user.id}
+            // Zone generation input props
+            styleRefUrls={styleRefUrls}
+            catalogItems={catalogItems}
+            layoutImageUrl={layoutImageUrl}
           />
 
           {/* Selection is now handled inside PremiumWorkspace */}
