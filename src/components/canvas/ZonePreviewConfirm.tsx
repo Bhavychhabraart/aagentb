@@ -123,6 +123,18 @@ export function ZonePreviewConfirm({
       toast.error('Maximum 3 style references allowed');
       return;
     }
+
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+      toast.error('Please upload an image file');
+      return;
+    }
+
+    // Validate file size (max 10MB)
+    if (file.size > 10 * 1024 * 1024) {
+      toast.error('File size must be under 10MB');
+      return;
+    }
     
     setIsUploadingStyle(true);
     try {
@@ -131,7 +143,10 @@ export function ZonePreviewConfirm({
         .from('room-uploads')
         .upload(fileName, file);
       
-      if (uploadError) throw uploadError;
+      if (uploadError) {
+        console.error('Upload error:', uploadError);
+        throw new Error(uploadError.message || 'Failed to upload file');
+      }
       
       const { data: { publicUrl } } = supabase.storage
         .from('room-uploads')
@@ -141,9 +156,11 @@ export function ZonePreviewConfirm({
       toast.success('Style reference added');
     } catch (err) {
       console.error('Style upload failed:', err);
-      toast.error('Failed to upload style reference');
+      toast.error(err instanceof Error ? err.message : 'Failed to upload style reference');
     } finally {
       setIsUploadingStyle(false);
+      // Reset the input so the same file can be selected again
+      e.target.value = '';
     }
   }, [styleRefUrls.length]);
 

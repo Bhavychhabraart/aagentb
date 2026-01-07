@@ -65,7 +65,15 @@ export function MoodBoardUploadModal({
   };
 
   const handleAnalyze = async () => {
-    if (!file || !user) return;
+    if (!file) {
+      toast.error('Please select a file first');
+      return;
+    }
+    
+    if (!user) {
+      toast.error('Please log in to upload mood boards');
+      return;
+    }
 
     setStatus('uploading');
     setError(null);

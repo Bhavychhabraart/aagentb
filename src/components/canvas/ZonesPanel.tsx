@@ -254,6 +254,7 @@ export function ZonesPanel({
           existingStyleRefs={styleRefUrls}
           catalogItems={catalogItems}
           onOpenCatalog={onOpenCatalog}
+          projectId={projectId}
           onConfirm={(options) => {
             onGenerateZoneView(previewZone, options);
             setPreviewZone(null);
