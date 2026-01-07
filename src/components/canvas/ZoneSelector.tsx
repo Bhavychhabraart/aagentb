@@ -9,6 +9,7 @@ import {
   imagePercentageToPixel,
   type ImageBounds 
 } from '@/utils/imageContainBounds';
+import { useCameraShutter } from '@/hooks/useCameraShutter';
 
 export interface PolygonPoint {
   x: number;  // Percentage (0-100)
@@ -49,6 +50,7 @@ export function ZoneSelector({
 }: ZoneSelectorProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const imgRef = useRef<HTMLImageElement>(null);
+  const { playShutter } = useCameraShutter();
   
   // Rectangle drawing state
   const [dragStart, setDragStart] = useState<PolygonPoint | null>(null);
@@ -145,6 +147,9 @@ export function ZoneSelector({
     const height = Math.abs(dragEnd.y - dragStart.y);
     
     if (width >= 2 && height >= 2) {
+      // Play camera shutter sound
+      playShutter();
+      
       setPendingRect({ start: dragStart, end: dragEnd });
       setShowNameInput(true);
       setNewZoneName(`Zone ${zones.length + 1}`);
