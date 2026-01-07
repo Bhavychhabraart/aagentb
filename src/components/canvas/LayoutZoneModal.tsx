@@ -306,6 +306,7 @@ export function LayoutZoneModal({
             existingStyleRefs={styleRefUrls}
             catalogItems={catalogItems}
             onOpenCatalog={onOpenCatalog}
+            projectId={projectId}
             onConfirm={(options) => {
               onGenerateZoneView(previewZone, options);
               setPreviewZone(null);
