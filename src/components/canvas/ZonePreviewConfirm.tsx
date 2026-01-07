@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { X, Loader2, Upload, Plus, Sparkles, Image as ImageIcon, Maximize2, Grid3X3 } from 'lucide-react';
+import { X, Loader2, Upload, Plus, Sparkles, Image as ImageIcon, Maximize2, Grid3X3, FileImage, ChevronDown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { cropRectangleFromImage } from '@/utils/cropZoneImage';
@@ -8,6 +8,15 @@ import { CatalogFurnitureItem } from '@/services/catalogService';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { MoodBoardUploadModal } from './MoodBoardUploadModal';
+import { MoodBoardAnalysisPanel } from './MoodBoardAnalysisPanel';
+import { 
+  MoodBoardAnalysis, 
+  ProductExtraction,
+  getMoodBoards,
+  buildRenderPromptFromMoodBoard 
+} from '@/services/moodBoardService';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 
 // Only isometric view - single view type for maximum accuracy
 export type ViewType = 'isometric';
@@ -17,6 +26,7 @@ export interface ZoneGenerationOptions {
   styleRefUrls: string[];
   selectedProducts: CatalogFurnitureItem[];
   customPrompt: string;
+  moodBoardAnalysis?: MoodBoardAnalysis;
 }
 
 interface ZonePreviewConfirmProps {
@@ -28,6 +38,7 @@ interface ZonePreviewConfirmProps {
   existingStyleRefs?: string[];
   catalogItems?: CatalogFurnitureItem[];
   onOpenCatalog?: () => void;
+  projectId?: string;
 }
 
 export function ZonePreviewConfirm({
@@ -39,6 +50,7 @@ export function ZonePreviewConfirm({
   existingStyleRefs = [],
   catalogItems = [],
   onOpenCatalog,
+  projectId,
 }: ZonePreviewConfirmProps) {
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -50,6 +62,12 @@ export function ZonePreviewConfirm({
   const [customPrompt, setCustomPrompt] = useState('');
   const [isUploadingStyle, setIsUploadingStyle] = useState(false);
   const [showProductPicker, setShowProductPicker] = useState(false);
+  
+  // Mood board state
+  const [showMoodBoardUpload, setShowMoodBoardUpload] = useState(false);
+  const [moodBoardAnalysis, setMoodBoardAnalysis] = useState<MoodBoardAnalysis | null>(null);
+  const [showMoodBoardSection, setShowMoodBoardSection] = useState(false);
+  const [selectedMoodBoardProducts, setSelectedMoodBoardProducts] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     const loadPreview = async () => {
@@ -145,12 +163,44 @@ export function ZonePreviewConfirm({
     setSelectedProducts(prev => prev.filter(p => p.id !== productId));
   };
 
+  // Handle mood board analysis complete
+  const handleMoodBoardAnalysis = (analysis: MoodBoardAnalysis, moodBoardId: string) => {
+    setMoodBoardAnalysis(analysis);
+    setShowMoodBoardSection(true);
+    
+    // Auto-apply products and prompt from mood board
+    if (analysis.products?.length > 0) {
+      setSelectedMoodBoardProducts(new Set(analysis.products.map(p => p.name)));
+    }
+    
+    // Build and set custom prompt from mood board
+    const moodBoardPrompt = buildRenderPromptFromMoodBoard(analysis, zone.name);
+    if (moodBoardPrompt) {
+      setCustomPrompt(prev => prev ? `${prev}\n\n${moodBoardPrompt}` : moodBoardPrompt);
+    }
+    
+    toast.success('Mood board applied to zone generation');
+  };
+
+  const toggleMoodBoardProduct = (product: ProductExtraction) => {
+    setSelectedMoodBoardProducts(prev => {
+      const next = new Set(prev);
+      if (next.has(product.name)) {
+        next.delete(product.name);
+      } else {
+        next.add(product.name);
+      }
+      return next;
+    });
+  };
+
   const handleConfirm = () => {
     onConfirm({
       viewType: 'isometric',
       styleRefUrls,
       selectedProducts,
       customPrompt,
+      moodBoardAnalysis: moodBoardAnalysis || undefined,
     });
   };
 
@@ -248,6 +298,43 @@ export function ZonePreviewConfirm({
               </div>
             </div>
           </div>
+
+          {/* Mood Board Section */}
+          <Collapsible open={showMoodBoardSection} onOpenChange={setShowMoodBoardSection}>
+            <CollapsibleTrigger className="flex items-center justify-between w-full p-3 rounded-lg bg-gradient-to-r from-purple-500/10 to-pink-500/10 border border-purple-500/20 hover:border-purple-500/40 transition-colors">
+              <div className="flex items-center gap-2">
+                <FileImage className="h-4 w-4 text-purple-500" />
+                <span className="font-medium text-sm">Mood Board</span>
+                {moodBoardAnalysis && (
+                  <span className="text-xs text-purple-400">
+                    ({moodBoardAnalysis.products?.length || 0} products)
+                  </span>
+                )}
+              </div>
+              <ChevronDown className={cn(
+                "h-4 w-4 text-muted-foreground transition-transform",
+                showMoodBoardSection && "rotate-180"
+              )} />
+            </CollapsibleTrigger>
+            <CollapsibleContent className="mt-3">
+              {moodBoardAnalysis ? (
+                <MoodBoardAnalysisPanel
+                  analysis={moodBoardAnalysis}
+                  selectedProducts={selectedMoodBoardProducts}
+                  onProductSelect={toggleMoodBoardProduct}
+                />
+              ) : (
+                <Button
+                  variant="outline"
+                  className="w-full"
+                  onClick={() => setShowMoodBoardUpload(true)}
+                >
+                  <Upload className="h-4 w-4 mr-2" />
+                  Upload Mood Board
+                </Button>
+              )}
+            </CollapsibleContent>
+          </Collapsible>
 
           {/* Style Reference Section */}
           <div>
@@ -439,6 +526,16 @@ export function ZonePreviewConfirm({
           </Button>
         </div>
       </div>
+
+      {/* Mood Board Upload Modal */}
+      {projectId && (
+        <MoodBoardUploadModal
+          open={showMoodBoardUpload}
+          onOpenChange={setShowMoodBoardUpload}
+          projectId={projectId}
+          onAnalysisComplete={handleMoodBoardAnalysis}
+        />
+      )}
     </div>
   );
 }
