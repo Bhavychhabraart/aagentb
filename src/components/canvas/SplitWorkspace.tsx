@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { 
   Eye, Camera as CameraIcon, Plus, Lock, Unlock, Maximize2, Minimize2, Map, Sparkles,
   ZoomIn, ZoomOut, RotateCcw, Download, Crop, Undo2, Wand2, Video, LayoutGrid,
@@ -17,6 +17,7 @@ import { MulticamPanel, CameraView, ZoneRegion } from './MulticamPanel';
 import { CatalogFurnitureItem } from '@/services/catalogService';
 import { ZoneSelector, Zone } from './ZoneSelector';
 import { ZonesPanel } from './ZonesPanel';
+import { ZoneOverlay } from './ZoneOverlay';
 
 interface SplitWorkspaceProps {
   layoutImageUrl: string | null;
@@ -132,6 +133,10 @@ export function SplitWorkspace({
   const [showAIDirector, setShowAIDirector] = useState(false);
   const [showMulticam, setShowMulticam] = useState(false);
   const [showComparison, setShowComparison] = useState(false);
+  
+  // Refs for zone overlay positioning
+  const mainContainerRef = useRef<HTMLDivElement>(null);
+  const mainImageRef = useRef<HTMLImageElement>(null);
   
   const selectedCamera = cameras.find(c => c.id === selectedCameraId);
   const selectedZone = zones.find(z => z.id === selectedZoneId);
@@ -596,10 +601,12 @@ export function SplitWorkspace({
               {/* Bird's Eye Render */}
               <div className="absolute inset-0 flex items-center justify-center p-6">
                 <div 
+                  ref={mainContainerRef}
                   className="relative w-full h-full max-w-[90%] max-h-[85%] gradient-border gradient-border-subtle rounded-2xl overflow-hidden"
                   style={{ transform: `scale(${zoom})` }}
                 >
                   <img
+                    ref={mainImageRef}
                     src={birdEyeRenderUrl}
                     alt="Bird's Eye View"
                     className="w-full h-full object-contain bg-background"
@@ -645,77 +652,15 @@ export function SplitWorkspace({
                     </div>
                   )}
 
-                  {/* Zone Overlays when not drawing - now renders polygons */}
+                  {/* Zone Overlays - Using proper bounds calculation for accuracy */}
                   {!isDrawingZone && !selectionMode && zones.length > 0 && (
-                    <svg className="absolute inset-0 pointer-events-none w-full h-full">
-                      {zones.map((zone) => {
-                        // Render as polygon if polygon_points exist, otherwise fallback to rect
-                        if (zone.polygon_points && zone.polygon_points.length >= 3) {
-                          const points = zone.polygon_points.map(p => `${p.x}%,${p.y}%`).join(' ');
-                          return (
-                            <g key={zone.id}>
-                              <polygon
-                                points={zone.polygon_points.map(p => `${p.x},${p.y}`).join(' ')}
-                                className={cn(
-                                  "transition-all",
-                                  selectedZoneId === zone.id
-                                    ? "fill-primary/10 stroke-primary"
-                                    : "fill-amber-500/5 stroke-amber-500/50"
-                                )}
-                                strokeWidth="0.3"
-                                style={{
-                                  transform: 'scale(1)',
-                                  transformOrigin: 'center',
-                                }}
-                                vectorEffect="non-scaling-stroke"
-                              />
-                              {/* Zone label */}
-                              <foreignObject
-                                x={`${zone.x_start}%`}
-                                y={`${zone.y_start}%`}
-                                width="100"
-                                height="20"
-                                className="overflow-visible"
-                              >
-                                <div className="px-1.5 py-0.5 bg-black/60 rounded text-[10px] text-white font-medium w-fit">
-                                  {zone.name}
-                                </div>
-                              </foreignObject>
-                            </g>
-                          );
-                        }
-                        
-                        // Fallback to rectangle for legacy zones
-                        return (
-                          <g key={zone.id}>
-                            <rect
-                              x={`${zone.x_start}%`}
-                              y={`${zone.y_start}%`}
-                              width={`${zone.x_end - zone.x_start}%`}
-                              height={`${zone.y_end - zone.y_start}%`}
-                              className={cn(
-                                "transition-all",
-                                selectedZoneId === zone.id
-                                  ? "fill-primary/10 stroke-primary"
-                                  : "fill-amber-500/5 stroke-amber-500/50"
-                              )}
-                              strokeWidth="2"
-                            />
-                            <foreignObject
-                              x={`${zone.x_start}%`}
-                              y={`${zone.y_start}%`}
-                              width="100"
-                              height="20"
-                              className="overflow-visible"
-                            >
-                              <div className="px-1.5 py-0.5 bg-black/60 rounded text-[10px] text-white font-medium w-fit">
-                                {zone.name}
-                              </div>
-                            </foreignObject>
-                          </g>
-                        );
-                      })}
-                    </svg>
+                    <ZoneOverlay
+                      zones={zones}
+                      selectedZoneId={selectedZoneId || null}
+                      containerRef={mainContainerRef}
+                      imageRef={mainImageRef}
+                      onZoneClick={onZoneSelect}
+                    />
                   )}
 
                   {/* Locked overlay */}
