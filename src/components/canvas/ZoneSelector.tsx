@@ -61,6 +61,7 @@ export function ZoneSelector({
   const [newZoneName, setNewZoneName] = useState('');
   const [showNameInput, setShowNameInput] = useState(false);
   const [pendingRect, setPendingRect] = useState<{ start: PolygonPoint; end: PolygonPoint } | null>(null);
+  const [showFlash, setShowFlash] = useState(false);
   
   const [imageBounds, setImageBounds] = useState<ImageBounds | null>(null);
 
@@ -147,8 +148,10 @@ export function ZoneSelector({
     const height = Math.abs(dragEnd.y - dragStart.y);
     
     if (width >= 2 && height >= 2) {
-      // Play camera shutter sound
+      // Play camera shutter sound and flash effect
       playShutter();
+      setShowFlash(true);
+      setTimeout(() => setShowFlash(false), 150);
       
       setPendingRect({ start: dragStart, end: dragEnd });
       setShowNameInput(true);
@@ -243,6 +246,22 @@ export function ZoneSelector({
 
   return (
     <div className="relative w-full h-full">
+      {/* Camera flash overlay */}
+      {showFlash && (
+        <div 
+          className="absolute inset-0 z-50 pointer-events-none bg-white"
+          style={{
+            animation: 'flash 150ms ease-out forwards',
+          }}
+        />
+      )}
+      <style>{`
+        @keyframes flash {
+          0% { opacity: 0.9; }
+          100% { opacity: 0; }
+        }
+      `}</style>
+      
       <div
         ref={containerRef}
         className={cn(
