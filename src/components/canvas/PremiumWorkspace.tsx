@@ -563,7 +563,7 @@ export function PremiumWorkspace({
         )}
 
         <div className="flex-1 flex items-center justify-center p-6 sm:p-8 lg:p-12">
-          <div className="aspect-video-premium w-full max-w-[90%] lg:max-w-[85%] relative">
+          <div className="w-full h-full max-w-[90%] lg:max-w-[85%] max-h-full relative flex items-center justify-center">
             <div 
               ref={containerRef}
               className={cn(
@@ -579,7 +579,7 @@ export function PremiumWorkspace({
                     <img
                       src={renderUrl}
                       alt="Current render"
-                      className="w-full h-full object-cover"
+                      className="w-full h-full object-contain"
                       draggable={false}
                     />
                     
