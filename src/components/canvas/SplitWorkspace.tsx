@@ -68,6 +68,9 @@ interface SplitWorkspaceProps {
   onStartOver?: () => void;
   onUpscale?: () => void;
   isUpscaling?: boolean;
+  // Zone generation input props
+  styleRefUrls?: string[];
+  catalogItems?: CatalogFurnitureItem[];
 }
 
 export function SplitWorkspace({
@@ -118,6 +121,9 @@ export function SplitWorkspace({
   onStartOver,
   onUpscale,
   isUpscaling,
+  // Zone generation input props
+  styleRefUrls = [],
+  catalogItems = [],
 }: SplitWorkspaceProps) {
   const [isMinimapExpanded, setIsMinimapExpanded] = useState(false);
   const [zoom, setZoom] = useState(1);
@@ -774,6 +780,9 @@ export function SplitWorkspace({
                   onCompareZone={onCompareZone}
                   isGenerating={isMulticamGenerating}
                   onClose={onToggleZonesPanel}
+                  styleRefUrls={styleRefUrls}
+                  catalogItems={catalogItems}
+                  onOpenCatalog={onOpenFullCatalog}
                 />
               )}
             </>

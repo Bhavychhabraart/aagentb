@@ -36,6 +36,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { ZoneGenerationOptions } from './ZonePreviewConfirm';
+import { ZonesPanel } from './ZonesPanel';
 
 // ViewType now includes 'isometric' as the primary view type for zone generation
 export type ViewType = 'detail' | 'cinematic' | 'eye-level' | 'dramatic' | 'bird-eye' | 'isometric';
@@ -130,6 +131,10 @@ interface PremiumWorkspaceProps {
   // Multicam history save props
   onSaveMulticamToHistory?: (imageUrl: string, prompt: string, viewType: string) => void;
   userId?: string;
+  // Zone generation input props
+  styleRefUrls?: string[];
+  catalogItems?: CatalogFurnitureItem[];
+  layoutImageUrl?: string | null;
 }
 
 interface ToolbarItem {
@@ -209,6 +214,10 @@ export function PremiumWorkspace({
   // Multicam history save props
   onSaveMulticamToHistory,
   userId,
+  // Zone generation input props
+  styleRefUrls = [],
+  catalogItems = [],
+  layoutImageUrl,
 }: PremiumWorkspaceProps) {
   const [showDirectorInput, setShowDirectorInput] = useState(false);
   const [directorPrompt, setDirectorPrompt] = useState('');
@@ -753,144 +762,22 @@ export function PremiumWorkspace({
         )}
 
         {/* Zones Panel - Floating Right */}
-        {showZonesPanel && (
-          <div className="absolute right-4 top-24 z-20 w-72 animate-slide-in-right">
-            <div className="glass-premium rounded-xl overflow-hidden">
-              {/* Header */}
-              <div className="flex items-center justify-between p-3 border-b border-border/30">
-                <div className="flex items-center gap-2">
-                  <Layers className="h-4 w-4 text-primary" />
-                  <span className="text-sm font-medium">Zones</span>
-                  <span className="text-xs text-muted-foreground">({zones.length})</span>
-                </div>
-                <div className="flex items-center gap-1">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-7 text-xs"
-                    onClick={onStartZoneDrawing}
-                    disabled={!renderUrl}
-                  >
-                    <Plus className="h-3 w-3 mr-1" />
-                    Add
-                  </Button>
-                  <Button variant="ghost" size="icon" className="h-6 w-6" onClick={onToggleZonesPanel}>
-                    <X className="h-3 w-3" />
-                  </Button>
-                </div>
-              </div>
-
-              {/* Zones list */}
-              <div className="max-h-48 overflow-y-auto p-2">
-                {zones.length === 0 ? (
-                  <div className="text-center py-6 text-muted-foreground">
-                    <Layers className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                    <p className="text-xs">No zones defined</p>
-                    <p className="text-[10px] mt-1">Click "Add" to draw a zone</p>
-                  </div>
-                ) : (
-                  <div className="space-y-1">
-                    {zones.map((zone) => (
-                      <div
-                        key={zone.id}
-                        className={cn(
-                          "group flex items-center gap-2 p-2 rounded-lg transition-all cursor-pointer",
-                          selectedZoneId === zone.id
-                            ? "bg-primary/20 border border-primary/50"
-                            : "hover:bg-muted/30 border border-transparent"
-                        )}
-                        onClick={() => onZoneSelect?.(zone)}
-                      >
-                        <div 
-                          className="w-8 h-8 rounded bg-muted/50 relative overflow-hidden flex-shrink-0"
-                        >
-                          <div
-                            className="absolute bg-primary/60 border border-primary"
-                            style={{
-                              left: `${zone.x_start}%`,
-                              top: `${zone.y_start}%`,
-                              width: `${zone.x_end - zone.x_start}%`,
-                              height: `${zone.y_end - zone.y_start}%`,
-                            }}
-                          />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-xs font-medium truncate">{zone.name}</p>
-                          <p className="text-[10px] text-muted-foreground">
-                            {(zone.x_end - zone.x_start).toFixed(0)}% × {(zone.y_end - zone.y_start).toFixed(0)}%
-                          </p>
-                        </div>
-                        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                          {/* Compare zone button */}
-                          {onCompareZone && renderUrl && (
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-6 w-6 text-cyan-400 hover:text-cyan-300"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                onCompareZone(zone);
-                              }}
-                              title="Compare zone with generated render"
-                            >
-                              <Columns2 className="h-3 w-3" />
-                            </Button>
-                          )}
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-6 w-6 hover:text-destructive"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              onZoneDelete?.(zone.id);
-                            }}
-                          >
-                            <Trash2 className="h-3 w-3" />
-                          </Button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              {/* Generate Isometric View - appears when zone is selected */}
-              {selectedZoneId && zones.find(z => z.id === selectedZoneId) && (
-                <div className="p-3 border-t border-border/30">
-                  <p className="text-[10px] font-medium text-muted-foreground mb-2 uppercase tracking-wide">
-                    Generate View for "{zones.find(z => z.id === selectedZoneId)?.name}"
-                  </p>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="w-full h-10 text-sm justify-center gap-2 hover:bg-primary/10 hover:border-primary/50"
-                    onClick={() => {
-                      const zone = zones.find(z => z.id === selectedZoneId);
-                      if (zone) {
-                        // Trigger zone view generation - always uses isometric via the full-screen modal
-                        onGenerateZoneView?.(zone, {
-                          viewType: 'isometric',
-                          styleRefUrls: [],
-                          selectedProducts: [],
-                          customPrompt: '',
-                        });
-                      }
-                    }}
-                    disabled={isGenerating}
-                  >
-                    <Eye className="h-4 w-4" />
-                    <span>Generate Isometric View</span>
-                  </Button>
-                  {isGenerating && (
-                    <div className="flex items-center gap-2 mt-2 text-xs text-muted-foreground">
-                      <Loader2 className="h-3 w-3 animate-spin" />
-                      <span>Generating isometric view...</span>
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-          </div>
+        {showZonesPanel && projectId && onZoneSelect && onToggleZonesPanel && onGenerateZoneView && (
+          <ZonesPanel
+            projectId={projectId}
+            renderUrl={renderUrl}
+            layoutImageUrl={layoutImageUrl || null}
+            onZoneSelect={onZoneSelect}
+            selectedZoneId={selectedZoneId || null}
+            onEditZones={onStartZoneDrawing || (() => {})}
+            onGenerateZoneView={onGenerateZoneView}
+            onCompareZone={onCompareZone}
+            isGenerating={isGenerating}
+            onClose={onToggleZonesPanel}
+            styleRefUrls={styleRefUrls}
+            catalogItems={catalogItems}
+            onOpenCatalog={onOpenCatalog}
+          />
         )}
 
         {/* Render History Carousel */}
