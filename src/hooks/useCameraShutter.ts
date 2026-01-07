@@ -18,90 +18,81 @@ export function useCameraShutter() {
 
       const now = ctx.currentTime;
 
-      // Create noise buffer for shutter click
-      const bufferSize = ctx.sampleRate * 0.08; // 80ms
-      const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
-      const data = buffer.getChannelData(0);
+      // === MECHANICAL SHUTTER CLICK ===
+      const shutterBuffer = ctx.createBuffer(1, ctx.sampleRate * 0.06, ctx.sampleRate);
+      const shutterData = shutterBuffer.getChannelData(0);
 
-      // Generate filtered noise that sounds like a camera shutter
-      for (let i = 0; i < bufferSize; i++) {
-        const t = i / bufferSize;
-        // Sharp attack, quick decay envelope
-        const envelope = Math.exp(-t * 40) * (1 - Math.exp(-t * 500));
-        data[i] = (Math.random() * 2 - 1) * envelope;
+      for (let i = 0; i < shutterData.length; i++) {
+        const t = i / shutterData.length;
+        const envelope = Math.exp(-t * 50) * (1 - Math.exp(-t * 800));
+        shutterData[i] = (Math.random() * 2 - 1) * envelope;
       }
 
-      // Noise source
-      const noise = ctx.createBufferSource();
-      noise.buffer = buffer;
+      const shutterSource = ctx.createBufferSource();
+      shutterSource.buffer = shutterBuffer;
 
-      // Bandpass filter to shape the click sound
-      const filter = ctx.createBiquadFilter();
-      filter.type = 'bandpass';
-      filter.frequency.value = 2000;
-      filter.Q.value = 1;
+      const shutterFilter = ctx.createBiquadFilter();
+      shutterFilter.type = 'bandpass';
+      shutterFilter.frequency.value = 2500;
+      shutterFilter.Q.value = 0.8;
 
-      // High frequency click
-      const highClick = ctx.createOscillator();
-      highClick.type = 'sine';
-      highClick.frequency.value = 4000;
+      const shutterGain = ctx.createGain();
+      shutterGain.gain.value = 0.3;
 
-      const highGain = ctx.createGain();
-      highGain.gain.setValueAtTime(0.15, now);
-      highGain.gain.setTargetAtTime(0.001, now, 0.005);
+      shutterSource.connect(shutterFilter);
+      shutterFilter.connect(shutterGain);
+      shutterGain.connect(ctx.destination);
 
-      // Master gain
-      const masterGain = ctx.createGain();
-      masterGain.gain.value = 0.4;
+      shutterSource.start(now);
+      shutterSource.stop(now + 0.08);
 
-      // Connect nodes
-      noise.connect(filter);
-      filter.connect(masterGain);
-      
-      highClick.connect(highGain);
-      highGain.connect(masterGain);
-      
-      masterGain.connect(ctx.destination);
+      // === SATISFYING DING SOUND ===
+      // Primary tone
+      const ding1 = ctx.createOscillator();
+      ding1.type = 'sine';
+      ding1.frequency.value = 1200;
 
-      // Play sounds
-      noise.start(now);
-      noise.stop(now + 0.1);
-      
-      highClick.start(now);
-      highClick.stop(now + 0.03);
+      const ding1Gain = ctx.createGain();
+      ding1Gain.gain.setValueAtTime(0.25, now + 0.03);
+      ding1Gain.gain.exponentialRampToValueAtTime(0.001, now + 0.4);
 
-      // Second mechanical click (mirror slap simulation)
-      setTimeout(() => {
-        if (!audioContextRef.current) return;
-        const ctx2 = audioContextRef.current;
-        const now2 = ctx2.currentTime;
+      // Harmonic overtone
+      const ding2 = ctx.createOscillator();
+      ding2.type = 'sine';
+      ding2.frequency.value = 2400;
 
-        const clickBuffer = ctx2.createBuffer(1, ctx2.sampleRate * 0.04, ctx2.sampleRate);
-        const clickData = clickBuffer.getChannelData(0);
-        
-        for (let i = 0; i < clickData.length; i++) {
-          const t = i / clickData.length;
-          const env = Math.exp(-t * 60);
-          clickData[i] = (Math.random() * 2 - 1) * env * 0.3;
-        }
+      const ding2Gain = ctx.createGain();
+      ding2Gain.gain.setValueAtTime(0.12, now + 0.03);
+      ding2Gain.gain.exponentialRampToValueAtTime(0.001, now + 0.25);
 
-        const clickSource = ctx2.createBufferSource();
-        clickSource.buffer = clickBuffer;
-        
-        const clickFilter = ctx2.createBiquadFilter();
-        clickFilter.type = 'highpass';
-        clickFilter.frequency.value = 1500;
+      // Third harmonic for shimmer
+      const ding3 = ctx.createOscillator();
+      ding3.type = 'sine';
+      ding3.frequency.value = 3600;
 
-        const clickGain = ctx2.createGain();
-        clickGain.gain.value = 0.25;
+      const ding3Gain = ctx.createGain();
+      ding3Gain.gain.setValueAtTime(0.06, now + 0.03);
+      ding3Gain.gain.exponentialRampToValueAtTime(0.001, now + 0.15);
 
-        clickSource.connect(clickFilter);
-        clickFilter.connect(clickGain);
-        clickGain.connect(ctx2.destination);
-        
-        clickSource.start(now2);
-        clickSource.stop(now2 + 0.05);
-      }, 50);
+      // Connect ding oscillators
+      ding1.connect(ding1Gain);
+      ding1Gain.connect(ctx.destination);
+
+      ding2.connect(ding2Gain);
+      ding2Gain.connect(ctx.destination);
+
+      ding3.connect(ding3Gain);
+      ding3Gain.connect(ctx.destination);
+
+      // Start and stop ding sounds
+      ding1.start(now + 0.03);
+      ding1.stop(now + 0.5);
+
+      ding2.start(now + 0.03);
+      ding2.stop(now + 0.3);
+
+      ding3.start(now + 0.03);
+      ding3.stop(now + 0.2);
 
     } catch (error) {
       console.warn('Could not play shutter sound:', error);
