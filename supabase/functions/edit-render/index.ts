@@ -796,112 +796,141 @@ Use this mask as a precise boundary for your edits.`
         : '';
       
       if (catalogItem) {
-        // Catalog-based selective edit with product reference
-        selectivePrompt = `You are an expert architectural photographer performing precision INPAINTING.
+        // Catalog-based selective edit with product reference - STEP-BY-STEP TRAINING
+        selectivePrompt = `You are an expert at PRECISION INPAINTING. Follow these steps EXACTLY:
 
 ═══════════════════════════════════════════════════════════════
-     ⚠️⚠️⚠️ ABSOLUTE CRITICAL - IMAGE PRESERVATION ⚠️⚠️⚠️
+                    STEP-BY-STEP INPAINTING PROCESS
 ═══════════════════════════════════════════════════════════════
 
-🚨 NON-NEGOTIABLE RULES - VIOLATION = COMPLETE FAILURE:
-1. OUTPUT IMAGE MUST HAVE **IDENTICAL DIMENSIONS** AS IMAGE ${renderIndex}
-2. DO NOT CROP, ZOOM, PAN, TILT, OR REFRAME THE IMAGE - ANY CROPPING IS WRONG
-3. The ENTIRE original room must be visible in output - same framing, same boundaries
-4. If the input is 1920x1080, output MUST be 1920x1080 - EXACT SAME PIXELS
-5. Keep the EXACT same camera angle and field of view
-
-═══════════════════════════════════════════════════════════════
-     MANDATORY: ULTRA-PHOTOREALISTIC OUTPUT QUALITY
-═══════════════════════════════════════════════════════════════
-
-RENDERING STYLE: RED Cinema Camera / Architectural Digest quality
-⚠️ NEVER produce cartoon, illustrated, or CGI-looking results
-
-IMAGES PROVIDED:
-- IMAGE ${renderIndex}: The room to edit (PRESERVE EXACT DIMENSIONS AND FRAMING)
-${maskIndex ? `- IMAGE ${maskIndex}: BLACK & WHITE MASK (WHITE = edit zone, BLACK = preserve unchanged)` : ''}
-- IMAGE ${refIndex}: The product to place (COPY THIS EXACTLY)
-
-REGION TO EDIT:
+STEP 1: ANALYZE THE MASK
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+${maskIndex ? `Look at IMAGE ${maskIndex} (the mask):
+- WHITE pixels = the ONLY area you will modify
+- BLACK pixels = must remain PIXEL-PERFECT unchanged
+- Trace the exact boundary between white and black
+- This boundary is your editing limit` : `Use these coordinates as your editing boundary:
 - Position: ${Math.round(maskRegion.x)}% from left, ${Math.round(maskRegion.y)}% from top
-- Size: ${Math.round(maskRegion.width)}% width × ${Math.round(maskRegion.height)}% height
-${maskInstruction}
+- Size: ${Math.round(maskRegion.width)}% width × ${Math.round(maskRegion.height)}% height`}
 
-PRODUCT TO PLACE:
-- Name: ${catalogItem.name}
-- Category: ${catalogItem.category}
-- Description: ${catalogItem.description || 'Premium furniture piece'}
+STEP 2: STUDY THE PRODUCT REFERENCE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Look at IMAGE ${refIndex} carefully:
+- Product: "${catalogItem.name}" (${catalogItem.category})
+- Copy the EXACT shape and silhouette
+- Copy the EXACT colors - do not adjust
+- Copy the EXACT material textures
+- Copy ALL design details and features
 
-CRITICAL INPAINTING RULES:
-1. ${maskIndex ? 'ONLY edit pixels where the mask is WHITE - leave BLACK areas completely unchanged' : 'ONLY edit content within the specified region percentage coordinates'}
-2. The placed furniture must be a PIXEL-PERFECT copy of IMAGE ${refIndex}
-3. Copy the EXACT shape, color, material texture, and proportions from the reference
-4. Blend edges seamlessly with ray-traced lighting and realistic shadows
-5. Materials must look physically accurate with proper reflections
-6. Apply photorealistic shadows matching the room's lighting direction
-7. 🚨 NEVER CROP OR ZOOM - output must show the ENTIRE ROOM exactly as input
+STEP 3: PERFORM INPAINTING
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Working ONLY within the white mask area:
+- Remove whatever currently exists there
+- Place the product from IMAGE ${refIndex}
+- Scale appropriately for room perspective
+- The product's base should align with the floor plane
+
+STEP 4: BLEND SEAMLESSLY
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+- Match lighting direction from surrounding room
+- Add realistic shadow matching room's light source
+- Blend edges naturally with the background
+- Ensure materials have correct reflections
+
+═══════════════════════════════════════════════════════════════
+                    CRITICAL CONSTRAINTS
+═══════════════════════════════════════════════════════════════
+
+🚨 IMAGE PRESERVATION:
+- Output dimensions MUST equal IMAGE ${renderIndex} dimensions EXACTLY
+- DO NOT crop, zoom, pan, or reframe
+- The ENTIRE original room must be visible
+
+🚨 MASK BOUNDARY:
+- ONLY modify pixels in the white mask area
+- BLACK mask areas = copy from IMAGE ${renderIndex} unchanged
+
+🚨 PRODUCT FIDELITY:
+- Product must be IDENTICAL to IMAGE ${refIndex}
+- Same shape, same colors, same materials
 
 ${userPrompt ? `ADDITIONAL INSTRUCTIONS: ${userPrompt}` : ''}
 
-FINAL QUALITY CHECK: 
-✓ Output dimensions = Input dimensions (EXACT MATCH REQUIRED)
-✓ Areas outside edit zone = IDENTICAL to IMAGE ${renderIndex}
-✓ Result = professional photography, NOT illustration
-✓ Entire room visible with same boundaries as input
+═══════════════════════════════════════════════════════════════
+                    OUTPUT CHECKLIST
+═══════════════════════════════════════════════════════════════
+✓ Dimensions match input? YES
+✓ Areas outside mask unchanged? YES  
+✓ Product matches reference exactly? YES
+✓ Photorealistic quality? YES
+✓ Realistic shadows added? YES
 
-Output: The FULL room image (same dimensions) with ONLY the masked region modified.`;
+OUTPUT: The complete room with ONLY the masked area modified.`;
       } else if (referenceImageUrl) {
-        // Upload-based selective edit with reference image
-        selectivePrompt = `You are a precise image editor performing INPAINTING. Apply the reference image to the masked region.
+        // Upload-based selective edit with reference image - STEP-BY-STEP
+        selectivePrompt = `You are performing PRECISION INPAINTING. Follow these steps:
 
-IMAGES PROVIDED:
-- IMAGE ${renderIndex}: The room to edit
-${maskIndex ? `- IMAGE ${maskIndex}: BLACK & WHITE MASK (WHITE = edit zone, BLACK = preserve unchanged)` : ''}
-- IMAGE ${refIndex}: Reference image to apply
-
-REGION TO EDIT:
+STEP 1: ANALYZE THE MASK
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+${maskIndex ? `IMAGE ${maskIndex} shows the edit boundary:
+- WHITE = editable area
+- BLACK = preserve unchanged` : `Edit boundary coordinates:
 - Position: ${Math.round(maskRegion.x)}% from left, ${Math.round(maskRegion.y)}% from top
-- Size: ${Math.round(maskRegion.width)}% width × ${Math.round(maskRegion.height)}% height
-${maskInstruction}
+- Size: ${Math.round(maskRegion.width)}% × ${Math.round(maskRegion.height)}%`}
 
-CRITICAL INPAINTING RULES:
-1. ${maskIndex ? 'ONLY edit pixels where the mask is WHITE - leave BLACK areas completely unchanged' : 'ONLY edit content within the specified region percentage coordinates'}
-2. Apply the reference image naturally to the edit zone
-3. Blend edges seamlessly with surrounding elements
-4. Maintain consistent lighting and perspective
+STEP 2: UNDERSTAND THE REFERENCE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+IMAGE ${refIndex} is your reference - study it carefully.
 
-${userPrompt ? `INSTRUCTIONS: ${userPrompt}` : 'Apply the reference image to this area naturally.'}
+STEP 3: PERFORM INPAINTING
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+- Apply reference content to the white mask area only
+- Blend naturally with surroundings
+- Match room lighting and perspective
 
-Output: The room with ONLY the masked/specified region modified using the reference.`;
+STEP 4: VERIFY
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+- Black mask areas unchanged
+- Edges blend seamlessly
+- Same dimensions as input
+
+${userPrompt ? `INSTRUCTIONS: ${userPrompt}` : 'Apply the reference to the masked area naturally.'}
+
+OUTPUT: The room with ONLY the masked region modified.`;
       } else {
-        // Text-based selective edit
-        selectivePrompt = `You are a precise image editor performing INPAINTING. Edit ONLY the masked region of this room image.
+        // Text-based selective edit - STEP-BY-STEP
+        selectivePrompt = `You are performing PRECISION INPAINTING. Follow these steps:
 
-⚠️ CRITICAL - DO NOT CROP OR ZOOM:
-- Output image MUST have EXACT same dimensions as IMAGE ${renderIndex}
-- Keep the ENTIRE room visible with same framing and boundaries
-- NO cropping, zooming, panning, or reframing allowed
+STEP 1: ANALYZE THE MASK
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+${maskIndex ? `IMAGE ${maskIndex} defines your edit boundary:
+- WHITE pixels = modify this area
+- BLACK pixels = preserve EXACTLY as-is` : `Edit area coordinates:
+- Position: ${Math.round(maskRegion.x)}% from left, ${Math.round(maskRegion.y)}% from top  
+- Size: ${Math.round(maskRegion.width)}% × ${Math.round(maskRegion.height)}%`}
 
-IMAGES PROVIDED:
-- IMAGE ${renderIndex}: The room to edit (PRESERVE EXACT DIMENSIONS)
-${maskIndex ? `- IMAGE ${maskIndex}: BLACK & WHITE MASK (WHITE = edit zone, BLACK = preserve unchanged)` : ''}
+STEP 2: UNDERSTAND THE EDIT
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Instruction: ${userPrompt}
 
-REGION TO EDIT:
-- Position: ${Math.round(maskRegion.x)}% from left, ${Math.round(maskRegion.y)}% from top
-- Size: ${Math.round(maskRegion.width)}% width × ${Math.round(maskRegion.height)}% height
-${maskInstruction}
+STEP 3: PERFORM INPAINTING
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+- Modify ONLY the white mask area
+- Apply the requested edit
+- Match room lighting and perspective
+- Keep everything outside the mask IDENTICAL to IMAGE ${renderIndex}
 
-EDIT INSTRUCTION: ${userPrompt}
+STEP 4: BLEND & VERIFY
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+- Edges blend naturally
+- Consistent shadows and lighting
+- Same image dimensions as input
+- Black mask areas = pixel-perfect copy of original
 
-CRITICAL INPAINTING RULES:
-1. ${maskIndex ? 'ONLY edit pixels where the mask is WHITE - leave BLACK areas completely unchanged' : 'ONLY edit content within the specified region percentage coordinates'}
-2. Keep EVERYTHING outside the edit zone EXACTLY unchanged - pixel perfect
-3. Maintain consistent lighting, shadows, and perspective with surrounding areas
-4. The edit should blend seamlessly with the rest of the image
-5. Preserve the same camera angle and image quality
-6. 🚨 Output dimensions MUST match input dimensions exactly
+🚨 DO NOT: Crop, zoom, pan, or reframe the image
+🚨 Output dimensions MUST match IMAGE ${renderIndex} exactly
 
-Output: The FULL edited image (same dimensions as input) with ONLY the masked/specified region modified.`;
+OUTPUT: The complete image with ONLY the masked area modified.`;
       }
 
       content.push({ type: 'text', text: selectivePrompt });
@@ -986,78 +1015,100 @@ Output: The FULL edited image (same dimensions as input) with ONLY the masked/sp
         }
       }
 
-      // Build the batch prompt
+      // Build the batch prompt with PRECISION PLACEMENT instructions
       const replacementList = productImageRefs.map((ref, idx) => {
         const marker = typedBatchMarkers[ref.markerIdx];
         const posDesc = getPositionDescription(marker.position.x, marker.position.y);
-        return `${idx + 1}. At coordinates (${Math.round(marker.position.x)}%, ${Math.round(marker.position.y)}%): Place "${ref.product.name}" (${ref.product.category}) → Reference: IMAGE ${ref.imageIdx}
-   - Position: ${posDesc}
-   - Description: ${ref.product.description || 'Premium furniture piece'}`;
+        const xDesc = marker.position.x < 33 ? 'left third' : marker.position.x > 66 ? 'right third' : 'center';
+        const yDesc = marker.position.y < 33 ? 'upper third' : marker.position.y > 66 ? 'lower third' : 'middle';
+        return `MARKER #${idx + 1} - PRECISION PLACEMENT:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+• Pixel Position: ${Math.round(marker.position.x)}% from left edge, ${Math.round(marker.position.y)}% from top edge
+• Grid Location: ${xDesc}, ${yDesc} of image
+• Product's CENTER BOTTOM should align with this EXACT point
+• Position in room: ${posDesc}
+• Action: PLACE "${ref.product.name}" (${ref.product.category})
+• Reference Image: IMAGE ${ref.imageIdx} (COPY THIS EXACTLY)
+• Description: ${ref.product.description || 'Premium furniture piece'}`;
       }).join('\n\n');
 
-      const batchPrompt = `You are performing PRECISION FURNITURE INPAINTING on an existing room photograph.
+      const batchPrompt = `You are performing PRECISION PRODUCT PLACEMENT. Follow these steps EXACTLY:
 
 ═══════════════════════════════════════════════════════════════
-     🔒 CAMERA LOCK - ZERO MODIFICATION TO FRAME 🔒
+                    STEP-BY-STEP PLACEMENT PROCESS
 ═══════════════════════════════════════════════════════════════
 
-THIS IS AN INPAINTING TASK - NOT A RE-GENERATION:
-• The output MUST show the EXACT SAME VIEW as IMAGE ${baseImageIndex}
-• Every pixel along all 4 edges of IMAGE ${baseImageIndex} must appear in output
-• Camera position: LOCKED - do not move, pan, tilt, or zoom
-• Field of view: LOCKED - do not widen or narrow
-• Framing: LOCKED - do not crop, reframe, or change composition
+STEP 1: LOCK THE CAMERA
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+This is INPAINTING, not re-generation:
+- IMAGE ${baseImageIndex} framing is LOCKED
+- Every edge, corner, and boundary stays EXACTLY the same
+- Camera position: FROZEN - no pan, tilt, zoom
+- Field of view: FROZEN - no changes
+- Output must show 100% of IMAGE ${baseImageIndex}'s visible area
 
-❌ REJECT: Zooming in on furniture placement areas
-❌ REJECT: Cropping out any walls, ceiling, floor, or edges
-❌ REJECT: Changing the camera angle or perspective
-❌ REJECT: Re-composing the scene in any way
-❌ REJECT: Any output that doesn't show 100% of the original boundaries
+STEP 2: STUDY EACH MARKER POSITION
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+For each marker below:
+- Locate the EXACT pixel coordinates in IMAGE ${baseImageIndex}
+- Note what furniture (if any) currently exists there
+- Observe the depth/distance from camera at that position
+- This determines perspective scaling
 
-✅ REQUIRED: Output shows 100% of the original room boundaries
-✅ REQUIRED: All corners and edges match the input exactly
-✅ REQUIRED: Same exact framing and composition as input
+STEP 3: MATCH PRODUCTS TO REFERENCES
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+For each product reference image:
+- Copy the EXACT design, shape, and silhouette
+- Copy the EXACT colors - no adjustments
+- Copy the EXACT materials and textures
+- Copy ALL visible details and features
 
-═══════════════════════════════════════════════════════════════
-     FURNITURE INPAINTING - ${typedBatchMarkers.length} ITEMS
-═══════════════════════════════════════════════════════════════
-
-TASK: Add/replace furniture at specific coordinates WITHOUT changing anything else.
-
-BASE IMAGE: IMAGE ${baseImageIndex} (preserve this view EXACTLY - do NOT zoom or crop)
-
-PLACEMENT INSTRUCTIONS:
+STEP 4: PLACE AT PRECISE COORDINATES
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 ${replacementList}
 
+PLACEMENT RULES:
+- The marker coordinate = product's CENTER BOTTOM point
+- Scale based on depth: smaller if far, larger if close
+- If furniture exists at marker → REPLACE it
+- If empty space → ADD the product
+- Apply perspective matching room's vanishing point
+
+STEP 5: APPLY LIGHTING & SHADOWS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+For each placed product:
+- Observe room's light direction from IMAGE ${baseImageIndex}
+- Add realistic shadow in the correct direction
+- Match shadow softness to room's lighting
+- Add subtle contact shadows at base
+
+STEP 6: FINAL VERIFICATION
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Before outputting, verify:
+✓ All 4 edges of output match IMAGE ${baseImageIndex}? 
+✓ Products placed at EXACT marker coordinates?
+✓ Each product matches its reference image exactly?
+✓ Perspective scaling correct for depth?
+✓ Shadows match room lighting?
+✓ Photorealistic quality maintained?
+
 ═══════════════════════════════════════════════════════════════
-     PLACEMENT TECHNIQUE
+                    OUTPUT REQUIREMENTS  
 ═══════════════════════════════════════════════════════════════
 
-For each product:
-1. LOCATE the coordinate (X%, Y%) in the base image
-2. If furniture exists there → REPLACE it with the reference product
-3. If empty space → ADD the product naturally
-4. MATCH the product exactly from its reference image
-5. Apply correct perspective scaling for room depth
-6. Add realistic shadows matching room lighting
+🚨 MANDATORY:
+- Output dimensions = IMAGE ${baseImageIndex} dimensions (EXACT)
+- Output framing = IMAGE ${baseImageIndex} framing (EXACT)
+- All ${typedBatchMarkers.length} products placed at specified coordinates
+- Photorealistic quality - indistinguishable from real photo
 
-CRITICAL REMINDERS:
-• Do NOT focus or zoom on the furniture being placed
-• Keep the ENTIRE room visible at all times
-• The output must look like someone placed real furniture in the photo
-• Preserve the original photograph's framing completely
+❌ REJECT if:
+- Any cropping, zooming, or reframing
+- Products not at marker positions
+- Products don't match references
+- CGI or illustrated appearance
 
-═══════════════════════════════════════════════════════════════
-     OUTPUT REQUIREMENTS
-═══════════════════════════════════════════════════════════════
-
-• SAME DIMENSIONS as IMAGE ${baseImageIndex}
-• SAME FRAMING as IMAGE ${baseImageIndex}  
-• SAME VIEW as IMAGE ${baseImageIndex}
-• Photorealistic quality - indistinguishable from real photo
-• All ${typedBatchMarkers.length} products placed at specified coordinates
-
-OUTPUT: The COMPLETE, UNMODIFIED FRAME of the room with only the furniture changed.`;
+OUTPUT: The COMPLETE room with products placed PRECISELY at marker coordinates.`;
 
       content.push({ type: 'text', text: batchPrompt });
 
