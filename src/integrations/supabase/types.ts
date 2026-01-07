@@ -547,6 +547,112 @@ export type Database = {
         }
         Relationships: []
       }
+      mood_board_products: {
+        Row: {
+          category: string | null
+          created_at: string | null
+          description: string | null
+          id: string
+          image_url: string
+          linked_catalog_id: string | null
+          mood_board_id: string | null
+          name: string
+          placement_instruction: string | null
+          placement_zone: string | null
+          position_in_layout: Json | null
+        }
+        Insert: {
+          category?: string | null
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          image_url: string
+          linked_catalog_id?: string | null
+          mood_board_id?: string | null
+          name: string
+          placement_instruction?: string | null
+          placement_zone?: string | null
+          position_in_layout?: Json | null
+        }
+        Update: {
+          category?: string | null
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          image_url?: string
+          linked_catalog_id?: string | null
+          mood_board_id?: string | null
+          name?: string
+          placement_instruction?: string | null
+          placement_zone?: string | null
+          position_in_layout?: Json | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "mood_board_products_mood_board_id_fkey"
+            columns: ["mood_board_id"]
+            isOneToOne: false
+            referencedRelation: "mood_boards"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      mood_boards: {
+        Row: {
+          analysis: Json | null
+          created_at: string | null
+          extracted_products: Json | null
+          extracted_styles: Json | null
+          file_name: string
+          file_type: string | null
+          file_url: string
+          floor_plan_url: string | null
+          id: string
+          placement_instructions: Json | null
+          project_id: string | null
+          status: string | null
+          user_id: string
+        }
+        Insert: {
+          analysis?: Json | null
+          created_at?: string | null
+          extracted_products?: Json | null
+          extracted_styles?: Json | null
+          file_name: string
+          file_type?: string | null
+          file_url: string
+          floor_plan_url?: string | null
+          id?: string
+          placement_instructions?: Json | null
+          project_id?: string | null
+          status?: string | null
+          user_id: string
+        }
+        Update: {
+          analysis?: Json | null
+          created_at?: string | null
+          extracted_products?: Json | null
+          extracted_styles?: Json | null
+          file_name?: string
+          file_type?: string | null
+          file_url?: string
+          floor_plan_url?: string | null
+          id?: string
+          placement_instructions?: Json | null
+          project_id?: string | null
+          status?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "mood_boards_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       order_items: {
         Row: {
           catalog_item_id: string | null
