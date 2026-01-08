@@ -29,16 +29,12 @@ import { WorkspaceHeader } from '@/components/creation/WorkspaceHeader';
 import { FormSection } from '@/components/creation/FormSection';
 import { PreviewCanvas } from '@/components/creation/PreviewCanvas';
 import { CreationModeToggle } from '@/components/creation/CreationModeToggle';
+import { CatalogViewSwitcher, CatalogViewMode } from '@/components/catalog/CatalogViewSwitcher';
+import { HistoryProductView, GenerationHistoryItem } from '@/components/creation/HistoryProductView';
 
 const CATEGORIES = ['Furniture', 'Seating', 'Tables', 'Storage', 'Beds', 'Lighting', 'Rugs', 'Art', 'Decor', 'Tiles', 'Bath Ware', 'Vanity', 'Wardrobe', 'Kitchen', 'Outdoor', 'Office'];
 const STYLES = ['Modern', 'Traditional', 'Minimalist', 'Industrial', 'Scandinavian', 'Bohemian', 'Art Deco', 'Mid-Century'];
 
-interface GenerationHistoryItem {
-  id: string;
-  imageUrl: string;
-  prompt: string;
-  timestamp: Date;
-}
 
 // Animation variants
 const staggerContainer = {
@@ -93,6 +89,7 @@ export default function CreateCustomFurniture() {
   const [selectedCatalogItem, setSelectedCatalogItem] = useState<CatalogFurnitureItem | null>(null);
   const [isEditing, setIsEditing] = useState(false);
   const [showImageEditor, setShowImageEditor] = useState(false);
+  const [historyViewMode, setHistoryViewMode] = useState<CatalogViewMode>('grid');
 
   useEffect(() => {
     if (user) {
@@ -714,55 +711,38 @@ export default function CreateCustomFurniture() {
               </TabsList>
             </div>
 
-            <TabsContent value="history" className="flex-1 m-0 overflow-hidden">
-              <ScrollArea className="h-full">
-                <div className="p-3 space-y-2">
-                  <AnimatePresence>
-                    {generationHistory.length === 0 ? (
-                      <motion.div 
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        className="text-center py-12 text-muted-foreground"
-                      >
-                        <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-muted/50 flex items-center justify-center">
-                          <History className="h-8 w-8 opacity-40" />
-                        </div>
-                        <p className="text-sm font-medium">No history yet</p>
-                        <p className="text-xs text-muted-foreground/70 mt-1">Generated images will appear here</p>
-                      </motion.div>
-                    ) : (
-                      generationHistory.map((item, index) => (
-                        <motion.button
-                          key={item.id}
-                          initial={{ opacity: 0, x: 20 }}
-                          animate={{ opacity: 1, x: 0 }}
-                          transition={{ delay: index * 0.05 }}
-                          onClick={() => selectFromHistory(item)}
-                          className={cn(
-                            'w-full rounded-xl overflow-hidden border-2 transition-all duration-200',
-                            'hover:shadow-lg hover:scale-[1.02]',
-                            generatedImage === item.imageUrl
-                              ? 'border-primary ring-2 ring-primary/20 shadow-[0_0_20px_hsl(var(--primary)/0.2)]'
-                              : 'border-border/50 hover:border-primary/50'
-                          )}
-                        >
-                          <img 
-                            src={item.imageUrl} 
-                            alt="Generated" 
-                            className="w-full aspect-square object-cover"
-                          />
-                          <div className="p-2.5 bg-muted/30 text-left">
-                            <p className="text-xs text-muted-foreground line-clamp-2 leading-relaxed">
-                              {item.prompt}
-                            </p>
-                            <p className="text-[10px] text-muted-foreground/60 mt-1.5 font-mono">
-                              {item.timestamp.toLocaleTimeString()}
-                            </p>
-                          </div>
-                        </motion.button>
-                      ))
-                    )}
-                  </AnimatePresence>
+            <TabsContent value="history" className="flex-1 m-0 overflow-hidden flex flex-col">
+              {/* View Switcher */}
+              <div className="px-3 py-2 border-b border-border/30">
+                <CatalogViewSwitcher 
+                  view={historyViewMode} 
+                  onViewChange={setHistoryViewMode}
+                  compact
+                />
+              </div>
+              
+              <ScrollArea className="flex-1">
+                <div className="p-3">
+                  {generationHistory.length === 0 ? (
+                    <motion.div 
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      className="text-center py-12 text-muted-foreground"
+                    >
+                      <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-muted/50 flex items-center justify-center">
+                        <History className="h-8 w-8 opacity-40" />
+                      </div>
+                      <p className="text-sm font-medium">No history yet</p>
+                      <p className="text-xs text-muted-foreground/70 mt-1">Generated images will appear here</p>
+                    </motion.div>
+                  ) : (
+                    <HistoryProductView
+                      items={generationHistory}
+                      view={historyViewMode}
+                      selectedImageUrl={generatedImage}
+                      onSelectItem={selectFromHistory}
+                    />
+                  )}
                 </div>
               </ScrollArea>
             </TabsContent>
