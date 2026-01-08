@@ -291,8 +291,71 @@ export function HistoryProductView({ items, view, selectedImageUrl, onSelectItem
 
   // Realspace View - Products with AI room context generation
   if (view === 'realspace') {
+    const isGeneratingAny = generating.size > 0;
+    const itemsWithoutImages = items.filter(item => !realspaceImages.has(item.id));
+
+    const handleGenerateAll = async () => {
+      if (isGeneratingAny || itemsWithoutImages.length === 0) return;
+
+      // Add all items to generating set
+      setGenerating(new Set(itemsWithoutImages.map(item => item.id)));
+
+      for (const item of itemsWithoutImages) {
+        const roomType = roomTypes.get(item.id) || getRoomFromPrompt(item.prompt);
+
+        try {
+          const { data, error } = await supabase.functions.invoke('generate-realspace-image', {
+            body: {
+              productImageUrl: item.imageUrl,
+              productName: item.prompt.slice(0, 50),
+              roomType,
+            },
+          });
+
+          if (error) throw error;
+
+          if (data?.imageUrl) {
+            setRealspaceImages(prev => new Map(prev).set(item.id, data.imageUrl));
+          }
+        } catch (error) {
+          console.error('Error generating realspace image:', error);
+        }
+
+        // Remove from generating set
+        setGenerating(prev => {
+          const next = new Set(prev);
+          next.delete(item.id);
+          return next;
+        });
+      }
+
+      toast.success('All room views generated!');
+    };
+
     return (
       <div className="space-y-3">
+        {/* Generate All Button */}
+        {itemsWithoutImages.length > 0 && (
+          <Button
+            onClick={handleGenerateAll}
+            disabled={isGeneratingAny}
+            className="w-full gap-2"
+            variant="outline"
+          >
+            {isGeneratingAny ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Generating {generating.size} of {items.length}...
+              </>
+            ) : (
+              <>
+                <Sparkles className="h-4 w-4" />
+                Generate All Views ({itemsWithoutImages.length})
+              </>
+            )}
+          </Button>
+        )}
+
         {items.map((item, index) => {
           const isGenerating = generating.has(item.id);
           const generatedImage = realspaceImages.get(item.id);
