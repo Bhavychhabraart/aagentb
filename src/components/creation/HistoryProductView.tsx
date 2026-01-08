@@ -1,7 +1,13 @@
+import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Home } from 'lucide-react';
+import { Home, Sparkles, Loader2, RefreshCw } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { CatalogViewMode } from '@/components/catalog/CatalogViewSwitcher';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
 
 export interface GenerationHistoryItem {
   id: string;
@@ -17,12 +23,90 @@ interface HistoryProductViewProps {
   onSelectItem: (item: GenerationHistoryItem) => void;
 }
 
+const ROOM_OPTIONS = [
+  { value: 'living-room', label: 'Living Room' },
+  { value: 'bedroom', label: 'Bedroom' },
+  { value: 'dining-room', label: 'Dining Room' },
+  { value: 'office', label: 'Home Office' },
+  { value: 'outdoor', label: 'Outdoor Patio' },
+  { value: 'kitchen', label: 'Kitchen' },
+  { value: 'entryway', label: 'Entryway' },
+];
+
+const getRoomFromPrompt = (prompt: string): string => {
+  const lower = prompt.toLowerCase();
+  if (lower.includes('bedroom') || lower.includes('bed')) return 'bedroom';
+  if (lower.includes('office') || lower.includes('desk')) return 'office';
+  if (lower.includes('dining') || lower.includes('table')) return 'dining-room';
+  if (lower.includes('outdoor') || lower.includes('patio')) return 'outdoor';
+  if (lower.includes('kitchen')) return 'kitchen';
+  return 'living-room';
+};
+
+const getRoomLabel = (roomValue: string): string => {
+  const room = ROOM_OPTIONS.find(r => r.value === roomValue);
+  return room?.label || 'Living Room';
+};
+
 export function HistoryProductView({ items, view, selectedImageUrl, onSelectItem }: HistoryProductViewProps) {
+  const [generating, setGenerating] = useState<Set<string>>(new Set());
+  const [realspaceImages, setRealspaceImages] = useState<Map<string, string>>(new Map());
+  const [roomTypes, setRoomTypes] = useState<Map<string, string>>(new Map());
+
   if (items.length === 0) {
     return null;
   }
 
   const isSelected = (item: GenerationHistoryItem) => selectedImageUrl === item.imageUrl;
+
+  const handleGenerateRealspace = async (item: GenerationHistoryItem, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (generating.has(item.id)) return;
+
+    const roomType = roomTypes.get(item.id) || getRoomFromPrompt(item.prompt);
+
+    setGenerating(prev => new Set(prev).add(item.id));
+
+    try {
+      const { data, error } = await supabase.functions.invoke('generate-realspace-image', {
+        body: {
+          productImageUrl: item.imageUrl,
+          productName: item.prompt.slice(0, 50),
+          roomType,
+        },
+      });
+
+      if (error) throw error;
+
+      if (data?.imageUrl) {
+        setRealspaceImages(prev => new Map(prev).set(item.id, data.imageUrl));
+        toast.success('Room view generated!');
+      } else {
+        throw new Error('No image returned');
+      }
+    } catch (error: unknown) {
+      console.error('Error generating realspace image:', error);
+      const message = error instanceof Error ? error.message : 'Failed to generate room view';
+      toast.error(message);
+    } finally {
+      setGenerating(prev => {
+        const next = new Set(prev);
+        next.delete(item.id);
+        return next;
+      });
+    }
+  };
+
+  const handleRoomChange = (itemId: string, roomType: string) => {
+    setRoomTypes(prev => new Map(prev).set(itemId, roomType));
+    if (realspaceImages.has(itemId)) {
+      setRealspaceImages(prev => {
+        const next = new Map(prev);
+        next.delete(itemId);
+        return next;
+      });
+    }
+  };
 
   // Grid View - 2 column compact grid
   if (view === 'grid') {
@@ -205,53 +289,126 @@ export function HistoryProductView({ items, view, selectedImageUrl, onSelectItem
     );
   }
 
-  // Realspace View - Products with room context overlay
+  // Realspace View - Products with AI room context generation
   if (view === 'realspace') {
     return (
       <div className="space-y-3">
-        {items.map((item, index) => (
-          <motion.button
-            key={item.id}
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: index * 0.05 }}
-            onClick={() => onSelectItem(item)}
-            className={cn(
-              'w-full rounded-xl overflow-hidden border-2 transition-all duration-200 relative group',
-              'hover:shadow-lg',
-              isSelected(item)
-                ? 'border-primary ring-2 ring-primary/20 shadow-[0_0_20px_hsl(var(--primary)/0.2)]'
-                : 'border-border/50 hover:border-primary/50'
-            )}
-          >
-            {/* Background room effect */}
-            <div className="relative">
-              <img 
-                src={item.imageUrl} 
-                alt="Generated" 
-                className="w-full aspect-[16/10] object-cover"
-              />
-              {/* Gradient overlay to simulate room context */}
-              <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-black/20" />
-              
-              {/* Room context badge */}
-              <div className="absolute top-2 left-2 flex items-center gap-1 px-2 py-1 rounded-full bg-black/50 backdrop-blur-sm">
-                <Home className="h-3 w-3 text-white/80" />
-                <span className="text-[10px] text-white/80 font-medium">In Context</span>
-              </div>
+        {items.map((item, index) => {
+          const isGenerating = generating.has(item.id);
+          const generatedImage = realspaceImages.get(item.id);
+          const currentRoom = roomTypes.get(item.id) || getRoomFromPrompt(item.prompt);
 
-              {/* Info overlay at bottom */}
-              <div className="absolute bottom-0 left-0 right-0 p-3 text-left">
-                <p className="text-xs text-white font-medium line-clamp-1">
-                  Custom Design
-                </p>
-                <p className="text-[10px] text-white/70 line-clamp-1 mt-0.5">
-                  {item.prompt}
-                </p>
+          return (
+            <motion.div
+              key={item.id}
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: index * 0.05 }}
+              className={cn(
+                'rounded-xl overflow-hidden border-2 transition-all duration-200 relative group',
+                'hover:shadow-lg',
+                isSelected(item)
+                  ? 'border-primary ring-2 ring-primary/20 shadow-[0_0_20px_hsl(var(--primary)/0.2)]'
+                  : 'border-border/50 hover:border-primary/50'
+              )}
+            >
+              {/* Image area */}
+              <button
+                onClick={() => onSelectItem(item)}
+                className="w-full relative"
+              >
+                {generatedImage ? (
+                  <img 
+                    src={generatedImage} 
+                    alt="Generated room view" 
+                    className="w-full aspect-[16/10] object-cover"
+                  />
+                ) : (
+                  <div className="relative">
+                    <img 
+                      src={item.imageUrl} 
+                      alt="Generated" 
+                      className="w-full aspect-[16/10] object-cover"
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-black/20" />
+                  </div>
+                )}
+                
+                {/* Room context badge */}
+                <Badge
+                  variant="secondary"
+                  className="absolute top-2 left-2 gap-1 bg-background/80 backdrop-blur-sm"
+                >
+                  <Home className="h-3 w-3" />
+                  {getRoomLabel(currentRoom)}
+                </Badge>
+
+                {/* Generate button */}
+                <div className="absolute bottom-2 right-2">
+                  <Button
+                    size="sm"
+                    variant={generatedImage ? 'outline' : 'default'}
+                    className="gap-1.5 bg-background/90 backdrop-blur-sm hover:bg-background text-xs h-7"
+                    onClick={(e) => handleGenerateRealspace(item, e)}
+                    disabled={isGenerating}
+                  >
+                    {isGenerating ? (
+                      <>
+                        <Loader2 className="h-3 w-3 animate-spin" />
+                        Generating...
+                      </>
+                    ) : generatedImage ? (
+                      <>
+                        <RefreshCw className="h-3 w-3" />
+                        Regenerate
+                      </>
+                    ) : (
+                      <>
+                        <Sparkles className="h-3 w-3" />
+                        See in Room
+                      </>
+                    )}
+                  </Button>
+                </div>
+
+                {/* Info overlay at bottom */}
+                {!generatedImage && (
+                  <div className="absolute bottom-0 left-0 right-24 p-3 text-left">
+                    <p className="text-xs text-white font-medium line-clamp-1">
+                      Custom Design
+                    </p>
+                    <p className="text-[10px] text-white/70 line-clamp-1 mt-0.5">
+                      {item.prompt}
+                    </p>
+                  </div>
+                )}
+              </button>
+
+              {/* Room selector */}
+              <div className="p-2 bg-muted/30 flex items-center gap-2">
+                <span className="text-[10px] text-muted-foreground">Room:</span>
+                <Select
+                  value={currentRoom}
+                  onValueChange={(value) => handleRoomChange(item.id, value)}
+                >
+                  <SelectTrigger className="h-6 text-[10px] w-auto min-w-[100px]">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {ROOM_OPTIONS.map((room) => (
+                      <SelectItem key={room.value} value={room.value} className="text-xs">
+                        {room.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <span className="text-[9px] text-muted-foreground/60 font-mono ml-auto">
+                  {item.timestamp.toLocaleTimeString()}
+                </span>
               </div>
-            </div>
-          </motion.button>
-        ))}
+            </motion.div>
+          );
+        })}
       </div>
     );
   }
