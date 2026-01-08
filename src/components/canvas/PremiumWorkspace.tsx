@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { cn } from '@/lib/utils';
 import { 
   MousePointer2, 
@@ -228,6 +228,22 @@ export function PremiumWorkspace({
   // Selection tool state (internal)
   const [selectionStart, setSelectionStart] = useState<{ x: number; y: number } | null>(null);
   const [selectionCurrent, setSelectionCurrent] = useState<{ x: number; y: number } | null>(null);
+  
+  // Image dimensions state for proper aspect ratio handling
+  const [imageDimensions, setImageDimensions] = useState<{ width: number; height: number } | null>(null);
+  
+  // Load image dimensions when renderUrl changes
+  useEffect(() => {
+    if (renderUrl) {
+      const img = new Image();
+      img.onload = () => {
+        setImageDimensions({ width: img.naturalWidth, height: img.naturalHeight });
+      };
+      img.src = renderUrl;
+    } else {
+      setImageDimensions(null);
+    }
+  }, [renderUrl]);
 
   // Get selected zone from zones array
   const selectedZone = zones.find(z => z.id === selectedZoneId);
@@ -563,7 +579,14 @@ export function PremiumWorkspace({
         )}
 
         <div className="flex-1 flex items-center justify-center p-6 sm:p-8 lg:p-12">
-          <div className="w-full h-full max-w-[90%] lg:max-w-[85%] max-h-full relative flex items-center justify-center">
+          <div 
+            className="relative flex items-center justify-center"
+            style={imageDimensions ? {
+              aspectRatio: `${imageDimensions.width} / ${imageDimensions.height}`,
+              maxHeight: '100%',
+              maxWidth: '100%',
+            } : { width: '100%', height: '100%', maxWidth: '90%' }}
+          >
             <div 
               ref={containerRef}
               className={cn(
