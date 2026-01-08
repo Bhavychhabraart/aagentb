@@ -1,8 +1,9 @@
 import { useState, useEffect, useMemo } from 'react';
-import { Search, Check, Loader2, Library, Package } from 'lucide-react';
+import { Search, Check, Loader2, Library, Package, LayoutGrid, List } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { cn } from '@/lib/utils';
 import { fetchFurnitureCatalog, CatalogFurnitureItem } from '@/services/catalogService';
 import { supabase } from '@/integrations/supabase/client';
@@ -39,6 +40,7 @@ export function SelectiveEditCatalog({ selectedItem, onItemSelect }: SelectiveEd
   const [activeTab, setActiveTab] = useState('catalog');
   const [catalogDisplayLimit, setCatalogDisplayLimit] = useState(40);
   const [customDisplayLimit, setCustomDisplayLimit] = useState(40);
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
 
   useEffect(() => {
     const loadCatalog = async () => {
@@ -254,7 +256,7 @@ export function SelectiveEditCatalog({ selectedItem, onItemSelect }: SelectiveEd
           </TabsTrigger>
         </TabsList>
 
-        {/* Search and Category - shared */}
+        {/* Search and View Toggle */}
         <div className="flex gap-2 mt-3">
           <div className="relative flex-1">
             <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
@@ -265,6 +267,10 @@ export function SelectiveEditCatalog({ selectedItem, onItemSelect }: SelectiveEd
               className="pl-8 h-8 text-xs"
             />
           </div>
+          <ToggleGroup type="single" value={viewMode} onValueChange={(v) => v && setViewMode(v as 'grid' | 'list')} className="bg-muted/50 p-0.5 rounded">
+            <ToggleGroupItem value="grid" className="h-7 w-7 p-0"><LayoutGrid className="h-3.5 w-3.5" /></ToggleGroupItem>
+            <ToggleGroupItem value="list" className="h-7 w-7 p-0"><List className="h-3.5 w-3.5" /></ToggleGroupItem>
+          </ToggleGroup>
         </div>
 
         {/* Category Navigation */}
