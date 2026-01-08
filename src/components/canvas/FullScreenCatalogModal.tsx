@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef, useEffect } from 'react';
+import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import { X, Search, Loader2, Check, Plus, ShoppingBag, Maximize2, Sparkles } from 'lucide-react';
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import * as VisuallyHidden from '@radix-ui/react-visually-hidden';
@@ -7,6 +7,8 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { CatalogFurnitureItem } from '@/services/catalogService';
+import { CategoryNav } from '@/components/catalog/CategoryNav';
+import { CATALOG_CATEGORIES } from '@/config/catalogCategories';
 
 interface FullScreenCatalogModalProps {
   isOpen: boolean;
@@ -43,6 +45,7 @@ export function FullScreenCatalogModal({
 }: FullScreenCatalogModalProps) {
   const [searchQuery, setSearchQuery] = useState(initialSearchQuery);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(suggestedCategory || null);
+  const [selectedSubcategory, setSelectedSubcategory] = useState<string | null>(null);
   const [displayCount, setDisplayCount] = useState(ITEMS_PER_PAGE);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
@@ -52,38 +55,32 @@ export function FullScreenCatalogModal({
       setDisplayCount(ITEMS_PER_PAGE);
       setSearchQuery(initialSearchQuery);
       setSelectedCategory(suggestedCategory || null);
+      setSelectedSubcategory(null);
     }
   }, [isOpen, initialSearchQuery, suggestedCategory]);
 
   // Reset display count when filters change
   useEffect(() => {
     setDisplayCount(ITEMS_PER_PAGE);
-  }, [searchQuery, selectedCategory]);
+  }, [searchQuery, selectedCategory, selectedSubcategory]);
 
-  // Define preferred category order for consistent display
-  const CATEGORY_ORDER = [
-    'Seating', 'Tables', 'Storage', 'Lighting', 'Bedroom',
-    'Outdoor', 'Hospitality', 'Walls', 'Mosaics', 'Decor', 'Art', 'Rugs', 'Decoration'
-  ];
-  
-  const categories = [...new Set(catalogItems.map(item => item.category))]
-    .sort((a, b) => {
-      const indexA = CATEGORY_ORDER.indexOf(a);
-      const indexB = CATEGORY_ORDER.indexOf(b);
-      // Categories not in the order list go to the end
-      if (indexA === -1 && indexB === -1) return a.localeCompare(b);
-      if (indexA === -1) return 1;
-      if (indexB === -1) return -1;
-      return indexA - indexB;
-    });
+  // Calculate item counts per category
+  const categoryItemCounts = useMemo(() => {
+    const counts: Record<string, number> = {};
+    for (const cat of CATALOG_CATEGORIES) {
+      counts[cat.id] = catalogItems.filter(item => item.category === cat.id).length;
+    }
+    return counts;
+  }, [catalogItems]);
 
   const filteredItems = catalogItems.filter(item => {
     const matchesCategory = !selectedCategory || item.category === selectedCategory;
+    const matchesSubcategory = !selectedSubcategory || item.subcategory === selectedSubcategory;
     const matchesSearch = !searchQuery ||
       item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       item.category.toLowerCase().includes(searchQuery.toLowerCase()) ||
       item.brand?.toLowerCase().includes(searchQuery.toLowerCase());
-    return matchesCategory && matchesSearch;
+    return matchesCategory && matchesSubcategory && matchesSearch;
   });
 
   const displayedItems = filteredItems.slice(0, displayCount);
@@ -152,37 +149,22 @@ export function FullScreenCatalogModal({
             )}
           </div>
 
-          {/* Categories */}
-          <div className="flex gap-2 flex-wrap">
-            <button
-              onClick={() => setSelectedCategory(null)}
-              className={cn(
-                "text-sm px-3 py-1.5 rounded-full transition-colors",
-                selectedCategory === null
-                  ? "bg-primary text-primary-foreground"
-                  : "bg-muted text-muted-foreground hover:bg-muted/80"
-              )}
-            >
-              All ({catalogItems.length})
-            </button>
-            {categories.map((cat) => {
-              const count = catalogItems.filter(i => i.category === cat).length;
-              return (
-                <button
-                  key={cat}
-                  onClick={() => setSelectedCategory(cat)}
-                  className={cn(
-                    "text-sm px-3 py-1.5 rounded-full transition-colors",
-                    selectedCategory === cat
-                      ? "bg-primary text-primary-foreground"
-                      : "bg-muted text-muted-foreground hover:bg-muted/80"
-                  )}
-                >
-                  {cat} ({count})
-                </button>
-              );
-            })}
-          </div>
+          {/* Category Navigation */}
+          <CategoryNav
+            categories={CATALOG_CATEGORIES}
+            selectedCategory={selectedCategory}
+            selectedSubcategory={selectedSubcategory}
+            onCategorySelect={(cat) => {
+              setSelectedCategory(cat);
+              setSelectedSubcategory(null);
+            }}
+            onSubcategorySelect={(cat, subcat) => {
+              setSelectedCategory(cat);
+              setSelectedSubcategory(subcat);
+            }}
+            itemCounts={categoryItemCounts}
+            totalCount={catalogItems.length}
+          />
 
           {/* Results info */}
           <div className="flex items-center justify-between text-sm text-muted-foreground">

@@ -8,6 +8,7 @@ export interface CatalogFurnitureItem {
   id: string;
   name: string;
   category: string;
+  subcategory?: string;
   description?: string;
   price?: number;
   imageUrl?: string;
@@ -71,48 +72,117 @@ function getBentchairImageUrl(product: BentchairProduct): string | null {
   return null;
 }
 
-function inferCategory(category: string, title: string): string {
+interface CategoryResult {
+  category: string;
+  subcategory?: string;
+}
+
+function inferCategoryAndSubcategory(category: string, title: string): CategoryResult {
   const t = title.toLowerCase();
   const c = category.toLowerCase();
 
-  // Rugs and Art
-  if (c.includes('rug') || t.includes('rug')) return 'Rugs';
-  if (c.includes('art') || t.includes('art') || t.includes('painting') || t.includes('print')) return 'Art';
+  // Rugs
+  if (c.includes('rug') || t.includes('rug')) {
+    if (t.includes('hand-knotted') || t.includes('hand knotted')) return { category: 'Rugs', subcategory: 'Hand-Knotted' };
+    if (t.includes('hand-tufted') || t.includes('hand tufted')) return { category: 'Rugs', subcategory: 'Hand-Tufted' };
+    if (t.includes('flat weave') || t.includes('flatweave')) return { category: 'Rugs', subcategory: 'Flat Weave' };
+    return { category: 'Rugs' };
+  }
   
-  // Seating
-  if (t.includes('sofa') || t.includes('couch') || c.includes('sofa')) return 'Seating';
-  if (t.includes('chair') || t.includes('seat') || t.includes('armchair') || t.includes('stool')) return 'Seating';
+  // Art
+  if (c.includes('art') || t.includes('art') || t.includes('painting') || t.includes('print')) {
+    if (t.includes('painting')) return { category: 'Art', subcategory: 'Paintings' };
+    if (t.includes('print')) return { category: 'Art', subcategory: 'Prints' };
+    if (t.includes('sculpture')) return { category: 'Art', subcategory: 'Sculptures' };
+    return { category: 'Art' };
+  }
   
-  // Tables
-  if (t.includes('dining table') || c.includes('dining')) return 'Tables';
-  if (t.includes('coffee') || t.includes('center')) return 'Tables';
-  if (t.includes('side table') || t.includes('end table') || t.includes('console')) return 'Tables';
-  
-  // Bedroom
-  if (t.includes('bed') || t.includes('mattress') || t.includes('headboard')) return 'Bedroom';
-  
-  // Storage
-  if (t.includes('cabinet') || t.includes('tv') || t.includes('shelf') || t.includes('bookcase')) return 'Storage';
+  // Outdoor - check before general seating
+  if (c.includes('outdoor') || t.includes('patio') || t.includes('garden') || t.includes('outdoor')) {
+    if (t.includes('chair') || t.includes('seat')) return { category: 'Outdoor', subcategory: 'Outdoor Chairs' };
+    if (t.includes('sofa') || t.includes('couch')) return { category: 'Outdoor', subcategory: 'Outdoor Sofas' };
+    if (t.includes('table')) return { category: 'Outdoor', subcategory: 'Outdoor Tables' };
+    return { category: 'Outdoor' };
+  }
   
   // Lighting
-  if (c.includes('lighting') || t.includes('lamp') || t.includes('light') || t.includes('chandelier') || t.includes('sconce') || t.includes('pendant')) return 'Lighting';
-  
-  // Outdoor
-  if (c.includes('outdoor') || t.includes('patio') || t.includes('garden') || t.includes('outdoor')) return 'Outdoor';
+  if (c.includes('lighting') || t.includes('lamp') || t.includes('light') || t.includes('chandelier') || t.includes('sconce') || t.includes('pendant')) {
+    if (t.includes('table lamp') || t.includes('desk lamp')) return { category: 'Lighting', subcategory: 'Table Lamps' };
+    if (t.includes('floor lamp')) return { category: 'Lighting', subcategory: 'Floor Lamps' };
+    if (t.includes('ceiling') || t.includes('wall') || t.includes('chandelier') || t.includes('pendant') || t.includes('sconce')) 
+      return { category: 'Lighting', subcategory: 'Ceiling & Wall Lights' };
+    return { category: 'Lighting' };
+  }
   
   // Hospitality
-  if (c.includes('hospitality') || t.includes('hospitality') || t.includes('hotel')) return 'Hospitality';
+  if (c.includes('hospitality') || t.includes('hospitality') || t.includes('hotel')) {
+    if (t.includes('bar chair') || t.includes('bar stool')) return { category: 'Hospitality', subcategory: 'Bar Chairs' };
+    if (t.includes('bar table')) return { category: 'Hospitality', subcategory: 'Bar Tables' };
+    if (t.includes('dining chair')) return { category: 'Hospitality', subcategory: 'Hospitality Dining Chairs' };
+    if (t.includes('lounge chair')) return { category: 'Hospitality', subcategory: 'Hospitality Lounge Chairs' };
+    if (t.includes('sofa')) return { category: 'Hospitality', subcategory: 'Hospitality Sofas' };
+    if (t.includes('coffee table')) return { category: 'Hospitality', subcategory: 'Coffee Tables' };
+    if (t.includes('dining table')) return { category: 'Hospitality', subcategory: 'Dining Tables' };
+    return { category: 'Hospitality' };
+  }
+  
+  // Seating
+  if (t.includes('sofa') || t.includes('couch') || c.includes('sofa')) return { category: 'Seating', subcategory: 'Sofas' };
+  if (t.includes('armchair') || t.includes('arm chair')) return { category: 'Seating', subcategory: 'Armchairs' };
+  if (t.includes('dining chair')) return { category: 'Seating', subcategory: 'Dining Chairs' };
+  if (t.includes('lounge chair')) return { category: 'Seating', subcategory: 'Lounge Chairs' };
+  if (t.includes('stool')) return { category: 'Seating', subcategory: 'Stools' };
+  if (t.includes('bench')) return { category: 'Seating', subcategory: 'Benches' };
+  if (t.includes('chair') || t.includes('seat')) return { category: 'Seating' };
+  
+  // Tables
+  if (t.includes('dining table') || c.includes('dining')) return { category: 'Tables', subcategory: 'Dining Tables' };
+  if (t.includes('coffee table') || t.includes('center table')) return { category: 'Tables', subcategory: 'Coffee Tables' };
+  if (t.includes('side table') || t.includes('end table')) return { category: 'Tables', subcategory: 'Side Tables' };
+  if (t.includes('console')) return { category: 'Tables', subcategory: 'Console Tables' };
+  if (t.includes('table')) return { category: 'Tables' };
+  
+  // Bedroom
+  if (t.includes('bed') || t.includes('mattress') || t.includes('headboard')) {
+    if (t.includes('nightstand') || t.includes('bedside')) return { category: 'Bedroom', subcategory: 'Nightstands' };
+    if (t.includes('dresser')) return { category: 'Bedroom', subcategory: 'Dressers' };
+    return { category: 'Bedroom', subcategory: 'Beds' };
+  }
+  
+  // Storage
+  if (t.includes('cabinet') || t.includes('tv') || t.includes('shelf') || t.includes('bookcase')) {
+    if (t.includes('tv') || t.includes('media')) return { category: 'Storage', subcategory: 'TV Units' };
+    if (t.includes('shelf') || t.includes('bookcase')) return { category: 'Storage', subcategory: 'Shelves' };
+    return { category: 'Storage', subcategory: 'Cabinets' };
+  }
   
   // Walls
-  if (c.includes('wall') || t.includes('wall panel') || t.includes('wallpaper') || t.includes('wall art')) return 'Walls';
+  if (c.includes('wall') || t.includes('wall panel') || t.includes('wallpaper') || t.includes('wall art')) {
+    if (t.includes('mirror')) return { category: 'Walls', subcategory: 'Mirrors' };
+    if (t.includes('wallpaper')) return { category: 'Walls', subcategory: 'Wallpapers' };
+    return { category: 'Walls' };
+  }
   
   // Mosaics
-  if (c.includes('mosaic') || t.includes('mosaic') || t.includes('tile')) return 'Mosaics';
+  if (c.includes('mosaic') || t.includes('mosaic') || t.includes('tile')) {
+    if (t.includes('floor')) return { category: 'Mosaics', subcategory: 'Floor Mosaics' };
+    if (t.includes('wall')) return { category: 'Mosaics', subcategory: 'Wall Mosaics' };
+    return { category: 'Mosaics' };
+  }
   
   // Decor
-  if (c.includes('decor') || t.includes('vase') || t.includes('sculpture') || t.includes('accessory') || t.includes('mirror') || t.includes('clock')) return 'Decor';
+  if (c.includes('decor') || t.includes('vase') || t.includes('sculpture') || t.includes('accessory') || t.includes('mirror') || t.includes('clock')) {
+    if (t.includes('vase') || t.includes('planter')) {
+      if (t.includes('floor')) return { category: 'Decor', subcategory: 'Floor Planters' };
+      return { category: 'Decor', subcategory: 'Vases & Planters' };
+    }
+    if (t.includes('tray') || t.includes('bowl') || t.includes('pot')) return { category: 'Decor', subcategory: 'Trays & Bowls' };
+    if (t.includes('brass')) return { category: 'Decor', subcategory: 'Brass Decor' };
+    if (t.includes('mirror')) return { category: 'Walls', subcategory: 'Mirrors' };
+    return { category: 'Decor' };
+  }
   
-  return 'Decor';
+  return { category: 'Decor' };
 }
 
 async function fetchCategory(href: string): Promise<BentchairProduct[]> {
@@ -228,13 +298,14 @@ export async function fetchFurnitureCatalog(): Promise<CatalogFurnitureItem[]> {
     const bentchairAdapted: CatalogFurnitureItem[] = allBentchairProducts.map(p => {
       const title = p.product_name || p.title || p.name || 'Unknown Item';
       const category = p.cat_name || p._inferred_category || 'Decor';
-      const inferredCat = inferCategory(category, title);
+      const { category: inferredCat, subcategory } = inferCategoryAndSubcategory(category, title);
       const imageUrl = getBentchairImageUrl(p);
 
       return {
         id: p.id ? p.id.toString() : Math.random().toString(36).substring(7),
         name: title,
         category: inferredCat,
+        subcategory,
         description: `BentStudio Collection: ${title}. A premium ${category} piece.`,
         imageUrl: imageUrl || undefined,
         price: p.price ? parseFloat(p.price.toString()) : 0,
