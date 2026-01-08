@@ -1,28 +1,26 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Input } from '@/components/ui/input';
-import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Search, Check, Package } from 'lucide-react';
 import { fetchFurnitureCatalog, CatalogFurnitureItem } from '@/services/catalogService';
 import { cn } from '@/lib/utils';
 import { formatINR } from '@/utils/formatCurrency';
+import { CategoryNav } from '@/components/catalog/CategoryNav';
+import { CATALOG_CATEGORIES } from '@/config/catalogCategories';
+import { Badge } from '@/components/ui/badge';
 
 interface CatalogPickerSectionProps {
   onSelect: (item: CatalogFurnitureItem) => void;
   selectedItemId: string | null;
 }
 
-const CATEGORIES = [
-  'All', 'Seating', 'Tables', 'Storage', 'Lighting', 'Bedroom', 
-  'Outdoor', 'Hospitality', 'Walls', 'Mosaics', 'Decor', 'Art', 'Rugs', 'Decoration'
-];
-
 export function CatalogPickerSection({ onSelect, selectedItemId }: CatalogPickerSectionProps) {
   const [catalogItems, setCatalogItems] = useState<CatalogFurnitureItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState('All');
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const [selectedSubcategory, setSelectedSubcategory] = useState<string | null>(null);
 
   useEffect(() => {
     loadCatalog();
@@ -40,11 +38,20 @@ export function CatalogPickerSection({ onSelect, selectedItemId }: CatalogPicker
     }
   };
 
+  const categoryItemCounts = useMemo(() => {
+    const counts: Record<string, number> = {};
+    for (const cat of CATALOG_CATEGORIES) {
+      counts[cat.id] = catalogItems.filter(item => item.category === cat.id).length;
+    }
+    return counts;
+  }, [catalogItems]);
+
   const filteredItems = catalogItems.filter(item => {
     const matchesSearch = item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       item.description?.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesCategory = selectedCategory === 'All' || item.category === selectedCategory;
-    return matchesSearch && matchesCategory;
+    const matchesCategory = !selectedCategory || item.category === selectedCategory;
+    const matchesSubcategory = !selectedSubcategory || item.subcategory === selectedSubcategory;
+    return matchesSearch && matchesCategory && matchesSubcategory;
   });
 
   if (isLoading) {
@@ -78,19 +85,23 @@ export function CatalogPickerSection({ onSelect, selectedItemId }: CatalogPicker
         />
       </div>
 
-      {/* Category Filters */}
-      <div className="flex flex-wrap gap-2">
-        {CATEGORIES.map(cat => (
-          <Badge
-            key={cat}
-            variant={selectedCategory === cat ? 'default' : 'outline'}
-            className="cursor-pointer transition-colors"
-            onClick={() => setSelectedCategory(cat)}
-          >
-            {cat}
-          </Badge>
-        ))}
-      </div>
+      {/* Category Navigation */}
+      <CategoryNav
+        categories={CATALOG_CATEGORIES}
+        selectedCategory={selectedCategory}
+        selectedSubcategory={selectedSubcategory}
+        onCategorySelect={(cat) => {
+          setSelectedCategory(cat);
+          setSelectedSubcategory(null);
+        }}
+        onSubcategorySelect={(cat, subcat) => {
+          setSelectedCategory(cat);
+          setSelectedSubcategory(subcat);
+        }}
+        itemCounts={categoryItemCounts}
+        totalCount={catalogItems.length}
+        compact
+      />
 
       {/* Items Grid */}
       <ScrollArea className="h-[280px]">

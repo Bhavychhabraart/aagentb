@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Search, Check, Loader2, Library, Package } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -7,6 +7,8 @@ import { cn } from '@/lib/utils';
 import { fetchFurnitureCatalog, CatalogFurnitureItem } from '@/services/catalogService';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
+import { CategoryNav } from '@/components/catalog/CategoryNav';
+import { CATALOG_CATEGORIES } from '@/config/catalogCategories';
 
 interface SelectiveEditCatalogProps {
   selectedItem: CatalogFurnitureItem | null;
@@ -25,8 +27,6 @@ interface CustomFurnitureItem {
   created_at: string;
 }
 
-const CATEGORIES = ['All', 'Seating', 'Tables', 'Lighting', 'Bedroom', 'Storage', 'Decoration'];
-
 export function SelectiveEditCatalog({ selectedItem, onItemSelect }: SelectiveEditCatalogProps) {
   const { user } = useAuth();
   const [catalog, setCatalog] = useState<CatalogFurnitureItem[]>([]);
@@ -34,7 +34,8 @@ export function SelectiveEditCatalog({ selectedItem, onItemSelect }: SelectiveEd
   const [isLoading, setIsLoading] = useState(true);
   const [customLoading, setCustomLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
-  const [activeCategory, setActiveCategory] = useState('All');
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const [selectedSubcategory, setSelectedSubcategory] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState('catalog');
   const [catalogDisplayLimit, setCatalogDisplayLimit] = useState(40);
   const [customDisplayLimit, setCustomDisplayLimit] = useState(40);
@@ -80,19 +81,28 @@ export function SelectiveEditCatalog({ selectedItem, onItemSelect }: SelectiveEd
     loadCustomItems();
   }, [user]);
 
+  const categoryItemCounts = useMemo(() => {
+    const counts: Record<string, number> = {};
+    for (const cat of CATALOG_CATEGORIES) {
+      counts[cat.id] = catalog.filter(item => item.category === cat.id).length;
+    }
+    return counts;
+  }, [catalog]);
+
   const filteredCatalogItems = catalog.filter(item => {
     const matchesSearch = searchQuery === '' || 
       item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       item.category.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesCategory = activeCategory === 'All' || item.category === activeCategory;
-    return matchesSearch && matchesCategory;
+    const matchesCategory = !selectedCategory || item.category === selectedCategory;
+    const matchesSubcategory = !selectedSubcategory || item.subcategory === selectedSubcategory;
+    return matchesSearch && matchesCategory && matchesSubcategory;
   });
 
   const filteredCustomItems = customItems.filter(item => {
     const matchesSearch = searchQuery === '' || 
       item.item_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       item.item_category.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesCategory = activeCategory === 'All' || item.item_category === activeCategory;
+    const matchesCategory = !selectedCategory || item.item_category === selectedCategory;
     return matchesSearch && matchesCategory;
   });
 
@@ -257,23 +267,23 @@ export function SelectiveEditCatalog({ selectedItem, onItemSelect }: SelectiveEd
           </div>
         </div>
 
-        {/* Category Pills */}
-        <div className="flex gap-1.5 flex-wrap mt-2">
-          {CATEGORIES.map(cat => (
-            <button
-              key={cat}
-              onClick={() => setActiveCategory(cat)}
-              className={cn(
-                "px-2.5 py-1 text-xs rounded-full transition-colors",
-                activeCategory === cat
-                  ? "bg-primary text-primary-foreground"
-                  : "bg-muted text-muted-foreground hover:bg-muted/80"
-              )}
-            >
-              {cat}
-            </button>
-          ))}
-        </div>
+        {/* Category Navigation */}
+        <CategoryNav
+          categories={CATALOG_CATEGORIES}
+          selectedCategory={selectedCategory}
+          selectedSubcategory={selectedSubcategory}
+          onCategorySelect={(cat) => {
+            setSelectedCategory(cat);
+            setSelectedSubcategory(null);
+          }}
+          onSubcategorySelect={(cat, subcat) => {
+            setSelectedCategory(cat);
+            setSelectedSubcategory(subcat);
+          }}
+          itemCounts={categoryItemCounts}
+          totalCount={catalog.length}
+          compact
+        />
 
         {/* Catalog Tab Content */}
         <TabsContent value="catalog" className="mt-2">
