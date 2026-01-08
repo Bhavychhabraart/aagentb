@@ -62,3 +62,6 @@ verify_jwt = false
 
 [functions.analyze-mood-board]
 verify_jwt = false
+
+[functions.generate-realspace-image]
+verify_jwt = false
