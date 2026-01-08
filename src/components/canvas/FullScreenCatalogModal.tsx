@@ -9,6 +9,8 @@ import { cn } from '@/lib/utils';
 import { CatalogFurnitureItem } from '@/services/catalogService';
 import { CategoryNav } from '@/components/catalog/CategoryNav';
 import { CATALOG_CATEGORIES } from '@/config/catalogCategories';
+import { CatalogViewSwitcher, CatalogViewMode } from '@/components/catalog/CatalogViewSwitcher';
+import { CatalogProductView } from '@/components/catalog/CatalogProductView';
 
 interface FullScreenCatalogModalProps {
   isOpen: boolean;
@@ -47,7 +49,16 @@ export function FullScreenCatalogModal({
   const [selectedCategory, setSelectedCategory] = useState<string | null>(suggestedCategory || null);
   const [selectedSubcategory, setSelectedSubcategory] = useState<string | null>(null);
   const [displayCount, setDisplayCount] = useState(ITEMS_PER_PAGE);
+  const [viewMode, setViewMode] = useState<CatalogViewMode>(() => {
+    const saved = localStorage.getItem('catalogViewMode');
+    return (saved as CatalogViewMode) || 'grid';
+  });
   const scrollContainerRef = useRef<HTMLDivElement>(null);
+
+  // Persist view mode
+  useEffect(() => {
+    localStorage.setItem('catalogViewMode', viewMode);
+  }, [viewMode]);
 
   // Reset on open with initial values
   useEffect(() => {
@@ -129,24 +140,27 @@ export function FullScreenCatalogModal({
 
         {/* Filters */}
         <div className="p-4 border-b border-border space-y-3 shrink-0">
-          {/* Search */}
-          <div className="relative max-w-md">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              type="text"
-              placeholder="Search by name, category, or brand..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-10 pr-10 bg-muted/50"
-            />
-            {searchQuery && (
-              <button
-                onClick={() => setSearchQuery('')}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-              >
-                <X className="h-4 w-4" />
-              </button>
-            )}
+          {/* Search and View Switcher */}
+          <div className="flex items-center gap-4">
+            <div className="relative flex-1 max-w-md">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                type="text"
+                placeholder="Search by name, category, or brand..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-10 pr-10 bg-muted/50"
+              />
+              {searchQuery && (
+                <button
+                  onClick={() => setSearchQuery('')}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              )}
+            </div>
+            <CatalogViewSwitcher view={viewMode} onViewChange={setViewMode} />
           </div>
 
           {/* Category Navigation */}
@@ -192,18 +206,13 @@ export function FullScreenCatalogModal({
               <p className="text-sm">Try adjusting your search or filters</p>
             </div>
           ) : (
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
-              {displayedItems.map((item) => (
-                <LargeCatalogCard
-                  key={item.id}
-                  item={item}
-                  isStaged={stagedItemIds.includes(item.id)}
-                  onToggleStage={() => onToggleStage(item)}
-                  onPreview={() => onPreviewItem(item)}
-                  selectionMode={selectionMode}
-                />
-              ))}
-            </div>
+            <CatalogProductView
+              items={displayedItems}
+              view={viewMode}
+              selectedItems={stagedItemIds}
+              onToggleItem={onToggleStage}
+              onPreviewItem={onPreviewItem}
+            />
           )}
           {hasMore && (
             <div className="flex justify-center py-6">
