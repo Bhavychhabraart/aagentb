@@ -2,15 +2,15 @@ import { useState, useEffect, useMemo } from 'react';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Search, Check, Package } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Search, Package, Maximize2 } from 'lucide-react';
 import { fetchFurnitureCatalog, CatalogFurnitureItem } from '@/services/catalogService';
 import { cn } from '@/lib/utils';
-import { formatINR } from '@/utils/formatCurrency';
 import { CategoryNav } from '@/components/catalog/CategoryNav';
 import { CATALOG_CATEGORIES } from '@/config/catalogCategories';
-import { Badge } from '@/components/ui/badge';
 import { CatalogViewSwitcher, CatalogViewMode } from '@/components/catalog/CatalogViewSwitcher';
 import { CatalogProductView } from '@/components/catalog/CatalogProductView';
+import { FullScreenCatalogModal } from '@/components/canvas/FullScreenCatalogModal';
 
 interface CatalogPickerSectionProps {
   onSelect: (item: CatalogFurnitureItem) => void;
@@ -24,6 +24,7 @@ export function CatalogPickerSection({ onSelect, selectedItemId }: CatalogPicker
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [selectedSubcategory, setSelectedSubcategory] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<CatalogViewMode>('grid');
+  const [isFullScreenOpen, setIsFullScreenOpen] = useState(false);
 
   useEffect(() => {
     loadCatalog();
@@ -57,6 +58,11 @@ export function CatalogPickerSection({ onSelect, selectedItemId }: CatalogPicker
     return matchesSearch && matchesCategory && matchesSubcategory;
   });
 
+  const handleFullScreenSelect = (item: CatalogFurnitureItem) => {
+    onSelect(item);
+    setIsFullScreenOpen(false);
+  };
+
   if (isLoading) {
     return (
       <div className="space-y-4">
@@ -89,6 +95,15 @@ export function CatalogPickerSection({ onSelect, selectedItemId }: CatalogPicker
           />
         </div>
         <CatalogViewSwitcher view={viewMode} onViewChange={setViewMode} compact />
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-9 w-9 shrink-0"
+          onClick={() => setIsFullScreenOpen(true)}
+          title="Full screen catalog"
+        >
+          <Maximize2 className="h-4 w-4" />
+        </Button>
       </div>
 
       {/* Category Navigation */}
@@ -128,6 +143,19 @@ export function CatalogPickerSection({ onSelect, selectedItemId }: CatalogPicker
           </div>
         )}
       </ScrollArea>
+
+      {/* Full Screen Catalog Modal */}
+      <FullScreenCatalogModal
+        isOpen={isFullScreenOpen}
+        onClose={() => setIsFullScreenOpen(false)}
+        catalogItems={catalogItems}
+        stagedItemIds={selectedItemId ? [selectedItemId] : []}
+        onToggleStage={handleFullScreenSelect}
+        onPreviewItem={handleFullScreenSelect}
+        title="Select Base Item"
+        subtitle="Choose a product to customize"
+        selectionMode
+      />
     </div>
   );
 }

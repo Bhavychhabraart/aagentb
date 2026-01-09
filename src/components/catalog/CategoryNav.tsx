@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { ChevronDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { CategoryConfig } from '@/config/catalogCategories';
@@ -24,10 +25,51 @@ export function CategoryNav({
   totalCount = 0,
   compact = false,
 }: CategoryNavProps) {
-  const [hoveredCategory, setHoveredCategory] = useState<string | null>(null);
+  const [expandedCategory, setExpandedCategory] = useState<string | null>(null);
+  const [dropdownPosition, setDropdownPosition] = useState({ top: 0, left: 0 });
+  const containerRef = useRef<HTMLDivElement>(null);
+  const buttonRefs = useRef<Map<string, HTMLButtonElement>>(new Map());
+
+  // Click outside handler
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        setExpandedCategory(null);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const handleCategoryClick = (categoryId: string, hasSubcategories: boolean, e: React.MouseEvent) => {
+    if (hasSubcategories) {
+      e.stopPropagation();
+      if (expandedCategory === categoryId) {
+        setExpandedCategory(null);
+      } else {
+        const button = buttonRefs.current.get(categoryId);
+        if (button) {
+          const rect = button.getBoundingClientRect();
+          setDropdownPosition({ 
+            top: rect.bottom + 4, 
+            left: Math.max(8, rect.left) // Ensure it doesn't go off screen
+          });
+        }
+        setExpandedCategory(categoryId);
+      }
+    } else {
+      onCategorySelect(categoryId);
+      setExpandedCategory(null);
+    }
+  };
+
+  const handleSubcategoryClick = (categoryId: string, subcategoryId: string) => {
+    onSubcategorySelect(categoryId, subcategoryId);
+    setExpandedCategory(null);
+  };
 
   return (
-    <div className="relative">
+    <div className="relative" ref={containerRef}>
       {/* Main category bar */}
       <nav className={cn(
         "flex items-center gap-1 overflow-x-auto scrollbar-hide",
@@ -35,7 +77,10 @@ export function CategoryNav({
       )}>
         {/* All button */}
         <button
-          onClick={() => onCategorySelect(null)}
+          onClick={() => {
+            onCategorySelect(null);
+            setExpandedCategory(null);
+          }}
           className={cn(
             "whitespace-nowrap px-3 py-2 text-xs font-medium uppercase tracking-wide transition-colors relative",
             compact && "px-2 py-1.5 text-[10px]",
@@ -56,23 +101,21 @@ export function CategoryNav({
         {/* Category buttons */}
         {categories.map((category) => {
           const isSelected = selectedCategory === category.id;
-          const isHovered = hoveredCategory === category.id;
+          const isExpanded = expandedCategory === category.id;
           const hasSubcategories = category.subcategories.length > 0;
           const count = itemCounts[category.id] || 0;
 
           return (
-            <div
-              key={category.id}
-              className="relative"
-              onMouseEnter={() => setHoveredCategory(category.id)}
-              onMouseLeave={() => setHoveredCategory(null)}
-            >
+            <div key={category.id} className="relative">
               <button
-                onClick={() => onCategorySelect(category.id)}
+                ref={(el) => {
+                  if (el) buttonRefs.current.set(category.id, el);
+                }}
+                onClick={(e) => handleCategoryClick(category.id, hasSubcategories, e)}
                 className={cn(
                   "flex items-center gap-1 whitespace-nowrap px-3 py-2 text-xs font-medium uppercase tracking-wide transition-colors relative",
                   compact && "px-2 py-1.5 text-[10px]",
-                  isSelected || isHovered
+                  isSelected || isExpanded
                     ? "text-foreground"
                     : "text-muted-foreground hover:text-foreground"
                 )}
@@ -84,40 +127,41 @@ export function CategoryNav({
                 {hasSubcategories && (
                   <ChevronDown className={cn(
                     "h-3 w-3 transition-transform",
-                    isHovered && "rotate-180"
+                    isExpanded && "rotate-180"
                   )} />
                 )}
                 {isSelected && (
                   <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary" />
                 )}
               </button>
-
-              {/* Subcategory dropdown */}
-              {hasSubcategories && isHovered && (
-                <div className="absolute top-full left-0 z-50 mt-1 min-w-[180px] py-2 bg-popover border border-border rounded-lg shadow-lg">
-                  {category.subcategories.map((sub) => (
-                    <button
-                      key={sub.id}
-                      onClick={() => {
-                        onSubcategorySelect(category.id, sub.id);
-                        setHoveredCategory(null);
-                      }}
-                      className={cn(
-                        "w-full text-left px-4 py-2 text-sm transition-colors",
-                        selectedSubcategory === sub.id
-                          ? "bg-primary/10 text-primary font-medium"
-                          : "text-foreground hover:bg-muted"
-                      )}
-                    >
-                      {sub.label}
-                    </button>
-                  ))}
-                </div>
-              )}
             </div>
           );
         })}
       </nav>
+
+      {/* Portal-rendered subcategory dropdown */}
+      {expandedCategory && createPortal(
+        <div 
+          className="fixed z-[100] min-w-[180px] py-2 bg-popover border border-border rounded-lg shadow-lg animate-in fade-in-0 zoom-in-95"
+          style={{ top: dropdownPosition.top, left: dropdownPosition.left }}
+        >
+          {categories.find(c => c.id === expandedCategory)?.subcategories.map((sub) => (
+            <button
+              key={sub.id}
+              onClick={() => handleSubcategoryClick(expandedCategory, sub.id)}
+              className={cn(
+                "w-full text-left px-4 py-2 text-sm transition-colors",
+                selectedSubcategory === sub.id
+                  ? "bg-primary/10 text-primary font-medium"
+                  : "text-foreground hover:bg-muted"
+              )}
+            >
+              {sub.label}
+            </button>
+          ))}
+        </div>,
+        document.body
+      )}
 
       {/* Active subcategory indicator */}
       {selectedSubcategory && (
