@@ -149,16 +149,10 @@ export function PreviewCanvas({
         </AnimatePresence>
       </motion.div>
 
-      {/* Preview Area with Dot Grid Background */}
+      {/* Preview Area with White Background */}
       <div className="flex-1 relative overflow-hidden">
-        {/* Dot Grid Background */}
-        <div 
-          className="absolute inset-0 opacity-30"
-          style={{
-            backgroundImage: `radial-gradient(circle at 1px 1px, hsl(var(--border)) 1px, transparent 0)`,
-            backgroundSize: '24px 24px',
-          }}
-        />
+        {/* Pure White Background */}
+        <div className="absolute inset-0 bg-white" />
         
         {/* Center Content */}
         <div className="absolute inset-0 flex items-center justify-center p-8">
@@ -172,10 +166,10 @@ export function PreviewCanvas({
               height: `${Math.min(550, 500 * (zoom / 100))}px`,
             }}
           >
-            {/* Glass Container */}
+            {/* White Container */}
             <div className={cn(
               "w-full h-full rounded-2xl overflow-hidden",
-              "glass-premium border border-border/30",
+              "bg-white border border-border/20 shadow-sm",
               "flex items-center justify-center",
               "transition-all duration-300"
             )}>
