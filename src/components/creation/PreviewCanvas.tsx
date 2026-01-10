@@ -17,6 +17,11 @@ interface PreviewCanvasProps {
   onShare?: () => void;
   onDownload?: () => void;
   className?: string;
+  adjustments?: {
+    brightness: number;
+    contrast: number;
+    saturation: number;
+  };
 }
 
 export function PreviewCanvas({
@@ -29,6 +34,7 @@ export function PreviewCanvas({
   onShare,
   onDownload,
   className,
+  adjustments,
 }: PreviewCanvasProps) {
   const minZoom = 25;
   const maxZoom = 200;
@@ -205,6 +211,11 @@ export function PreviewCanvas({
                     animate={{ opacity: 1, scale: 1 }}
                     exit={{ opacity: 0, scale: 0.95 }}
                     transition={{ duration: 0.3 }}
+                    style={{
+                      filter: adjustments
+                        ? `brightness(${adjustments.brightness}%) contrast(${adjustments.contrast}%) saturate(${adjustments.saturation}%)`
+                        : undefined,
+                    }}
                   />
                 ) : (
                   <motion.div

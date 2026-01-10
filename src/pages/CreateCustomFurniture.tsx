@@ -32,6 +32,7 @@ import { CreationModeToggle } from '@/components/creation/CreationModeToggle';
 import { CatalogViewSwitcher, CatalogViewMode } from '@/components/catalog/CatalogViewSwitcher';
 import { HistoryProductView, GenerationHistoryItem } from '@/components/creation/HistoryProductView';
 import { AngleGeneratorPanel } from '@/components/creation/AngleGeneratorPanel';
+import { ImageAdjustmentsPanel, ImageAdjustments, DEFAULT_ADJUSTMENTS } from '@/components/creation/ImageAdjustmentsPanel';
 
 const CATEGORIES = ['Furniture', 'Seating', 'Tables', 'Storage', 'Beds', 'Lighting', 'Rugs', 'Art', 'Decor', 'Tiles', 'Bath Ware', 'Vanity', 'Wardrobe', 'Kitchen', 'Outdoor', 'Office'];
 const STYLES = ['Modern', 'Traditional', 'Minimalist', 'Industrial', 'Scandinavian', 'Bohemian', 'Art Deco', 'Mid-Century'];
@@ -93,6 +94,8 @@ export default function CreateCustomFurniture() {
   const [historyViewMode, setHistoryViewMode] = useState<CatalogViewMode>('grid');
   const [angleImages, setAngleImages] = useState<Map<string, string>>(new Map());
   const [generatingAngle, setGeneratingAngle] = useState<string | null>(null);
+  const [imageAdjustments, setImageAdjustments] = useState<ImageAdjustments>(DEFAULT_ADJUSTMENTS);
+  const [isApplyingAdjustments, setIsApplyingAdjustments] = useState(false);
 
   useEffect(() => {
     if (user) {
@@ -378,6 +381,65 @@ export default function CreateCustomFurniture() {
     } finally {
       setGeneratingAngle(null);
     }
+  };
+
+  const handleApplyAdjustments = async () => {
+    if (!generatedImage) return;
+    
+    setIsApplyingAdjustments(true);
+    try {
+      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/adjust-image-lighting`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+        },
+        body: JSON.stringify({
+          sourceImageUrl: generatedImage,
+          brightness: imageAdjustments.brightness,
+          contrast: imageAdjustments.contrast,
+          saturation: imageAdjustments.saturation,
+          shadowIntensity: imageAdjustments.shadowIntensity,
+          lightingStyle: imageAdjustments.lightingStyle,
+          productName: name,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || 'Failed to apply adjustments');
+      }
+
+      const { imageUrl } = await response.json();
+      if (imageUrl) {
+        setGeneratedImage(imageUrl);
+        // Reset adjustments after applying
+        setImageAdjustments(DEFAULT_ADJUSTMENTS);
+        
+        // Add to history
+        setGenerationHistory(prev => [{
+          id: Date.now().toString(),
+          imageUrl,
+          prompt: `Adjusted: ${imageAdjustments.lightingStyle} lighting, ${imageAdjustments.shadowIntensity} shadows`,
+          timestamp: new Date(),
+        }, ...prev].slice(0, 10));
+        
+        toast({ title: 'Adjustments applied!', description: 'Image updated with new lighting.' });
+      }
+    } catch (error) {
+      console.error('Adjustment failed:', error);
+      toast({ 
+        variant: 'destructive', 
+        title: 'Adjustment failed', 
+        description: error instanceof Error ? error.message : 'Unknown error' 
+      });
+    } finally {
+      setIsApplyingAdjustments(false);
+    }
+  };
+
+  const handleResetAdjustments = () => {
+    setImageAdjustments(DEFAULT_ADJUSTMENTS);
   };
 
   if (!user) {
@@ -722,7 +784,25 @@ export default function CreateCustomFurniture() {
             onShare={handleShare}
             onDownload={handleDownload}
             className="flex-1"
+            adjustments={{
+              brightness: imageAdjustments.brightness,
+              contrast: imageAdjustments.contrast,
+              saturation: imageAdjustments.saturation,
+            }}
           />
+          
+          {/* Image Adjustments Panel - appears after generation */}
+          <AnimatePresence>
+            {generatedImage && !isGenerating && (
+              <ImageAdjustmentsPanel
+                adjustments={imageAdjustments}
+                onAdjustmentsChange={setImageAdjustments}
+                onApply={handleApplyAdjustments}
+                onReset={handleResetAdjustments}
+                isApplying={isApplyingAdjustments}
+              />
+            )}
+          </AnimatePresence>
           
           {/* Angle Generator Panel - appears after generation */}
           <AnimatePresence>

@@ -68,3 +68,6 @@ verify_jwt = false
 
 [functions.generate-product-angle]
 verify_jwt = false
+
+[functions.adjust-image-lighting]
+verify_jwt = false
