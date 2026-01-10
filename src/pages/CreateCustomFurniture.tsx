@@ -31,6 +31,7 @@ import { PreviewCanvas } from '@/components/creation/PreviewCanvas';
 import { CreationModeToggle } from '@/components/creation/CreationModeToggle';
 import { CatalogViewSwitcher, CatalogViewMode } from '@/components/catalog/CatalogViewSwitcher';
 import { HistoryProductView, GenerationHistoryItem } from '@/components/creation/HistoryProductView';
+import { AngleGeneratorPanel } from '@/components/creation/AngleGeneratorPanel';
 
 const CATEGORIES = ['Furniture', 'Seating', 'Tables', 'Storage', 'Beds', 'Lighting', 'Rugs', 'Art', 'Decor', 'Tiles', 'Bath Ware', 'Vanity', 'Wardrobe', 'Kitchen', 'Outdoor', 'Office'];
 const STYLES = ['Modern', 'Traditional', 'Minimalist', 'Industrial', 'Scandinavian', 'Bohemian', 'Art Deco', 'Mid-Century'];
@@ -90,6 +91,8 @@ export default function CreateCustomFurniture() {
   const [isEditing, setIsEditing] = useState(false);
   const [showImageEditor, setShowImageEditor] = useState(false);
   const [historyViewMode, setHistoryViewMode] = useState<CatalogViewMode>('grid');
+  const [angleImages, setAngleImages] = useState<Map<string, string>>(new Map());
+  const [generatingAngle, setGeneratingAngle] = useState<string | null>(null);
 
   useEffect(() => {
     if (user) {
@@ -332,6 +335,48 @@ export default function CreateCustomFurniture() {
       link.href = generatedImage;
       link.download = formatDownloadFilename('customlibrary', name || 'furniture', 'png');
       link.click();
+    }
+  };
+
+  const handleGenerateAngle = async (angle: string, customPrompt?: string) => {
+    if (!generatedImage) return;
+    
+    setGeneratingAngle(angle);
+    try {
+      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-product-angle`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+        },
+        body: JSON.stringify({
+          sourceImageUrl: generatedImage,
+          angle,
+          customPrompt,
+          productName: name,
+          category,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || 'Failed to generate angle');
+      }
+
+      const { imageUrl } = await response.json();
+      if (imageUrl) {
+        setAngleImages(prev => new Map(prev).set(angle, imageUrl));
+        toast({ title: `${angle.charAt(0).toUpperCase() + angle.slice(1)} view generated!` });
+      }
+    } catch (error) {
+      console.error('Angle generation failed:', error);
+      toast({ 
+        variant: 'destructive', 
+        title: 'Generation failed', 
+        description: error instanceof Error ? error.message : 'Unknown error' 
+      });
+    } finally {
+      setGeneratingAngle(null);
     }
   };
 
@@ -665,17 +710,33 @@ export default function CreateCustomFurniture() {
           </div>
         </motion.div>
 
-        {/* Center - Preview Canvas */}
-        <PreviewCanvas
-          generatedImage={generatedImage}
-          isGenerating={isGenerating}
-          zoom={zoom}
-          onZoomChange={setZoom}
-          onRefine={() => setShowImageEditor(true)}
-          onRegenerate={handleGenerate}
-          onShare={handleShare}
-          onDownload={handleDownload}
-        />
+        {/* Center - Preview Canvas with Angle Generator */}
+        <div className="flex-1 flex flex-col overflow-hidden">
+          <PreviewCanvas
+            generatedImage={generatedImage}
+            isGenerating={isGenerating}
+            zoom={zoom}
+            onZoomChange={setZoom}
+            onRefine={() => setShowImageEditor(true)}
+            onRegenerate={handleGenerate}
+            onShare={handleShare}
+            onDownload={handleDownload}
+            className="flex-1"
+          />
+          
+          {/* Angle Generator Panel - appears after generation */}
+          <AnimatePresence>
+            {generatedImage && !isGenerating && (
+              <AngleGeneratorPanel
+                sourceImage={generatedImage}
+                angleImages={angleImages}
+                generatingAngle={generatingAngle}
+                onGenerateAngle={handleGenerateAngle}
+                productName={name}
+              />
+            )}
+          </AnimatePresence>
+        </div>
 
         {/* Right Panel - History, BOM & Technical Drawings */}
         <motion.div 

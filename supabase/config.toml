@@ -65,3 +65,6 @@ verify_jwt = false
 
 [functions.generate-realspace-image]
 verify_jwt = false
+
+[functions.generate-product-angle]
+verify_jwt = false
