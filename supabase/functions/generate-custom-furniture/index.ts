@@ -28,7 +28,7 @@ serve(async (req) => {
 
     console.log('Generating custom furniture:', { prompt, category, hasReference: !!referenceImageUrl });
 
-    // Build a more explicit generation prompt that forces image output
+    // Build a more explicit generation prompt that forces image output with pure white background
     const furnitureCategory = category || 'Furniture';
     const enhancedPrompt = `GENERATE AN IMAGE: Create a professional product photograph of custom furniture.
 
@@ -36,13 +36,15 @@ Description: ${prompt}
 Category: ${furnitureCategory}
 
 Requirements for the image:
-- Professional studio lighting with soft shadows
-- Clean white or neutral gradient background  
-- High-end furniture catalog photography style
+- PURE WHITE BACKGROUND (#FFFFFF) - absolutely no gradients, shadows, or variations
+- Professional studio lighting, evenly lit with no harsh shadows on background
+- High-end furniture catalog photography style (like IKEA or West Elm catalogs)
 - Photorealistic rendering, 8K quality
-- Single isolated furniture piece, no background clutter
+- Single isolated furniture piece floating on pure white
 - Show the furniture from a 3/4 angle for best visibility
 - Crisp, sharp details on materials and textures
+- Product photography for e-commerce - clean cut-out style
+- The background MUST be completely flat white with no floor or surface visible
 
 Generate this furniture image now.`;
 
