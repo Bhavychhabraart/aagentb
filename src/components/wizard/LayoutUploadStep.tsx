@@ -44,7 +44,14 @@ export function LayoutUploadStep({
 
     setIsUploading(true);
     try {
-      const fileName = `${Date.now()}-${file.name}`;
+      // Sanitize filename: replace spaces with underscores, remove special chars
+      const sanitizedName = file.name
+        .replace(/\s+/g, '_')
+        .replace(/[^a-zA-Z0-9_.-]/g, '')
+        .toLowerCase();
+      const fileExt = sanitizedName.split('.').pop() || 'png';
+      const baseName = sanitizedName.replace(/\.[^/.]+$/, '') || 'layout';
+      const fileName = `${Date.now()}-${baseName}.${fileExt}`;
       const { data, error } = await supabase.storage
         .from('layouts')
         .upload(fileName, file);
