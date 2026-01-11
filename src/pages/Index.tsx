@@ -1,7 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
-import { useOnboarding } from '@/hooks/useOnboarding';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { AppSidebar } from '@/components/layout/AppSidebar';
@@ -43,7 +42,6 @@ import { AutoFurnishPanel } from '@/components/canvas/AutoFurnishPanel';
 import { FullScreenCatalogModal } from '@/components/canvas/FullScreenCatalogModal';
 import { MarkerStagingPanel, StagingMarker } from '@/components/canvas/MarkerStagingPanel';
 import { MarkerProductSourceModal } from '@/components/canvas/MarkerProductSourceModal';
-import { TutorialOverlay, workspaceTutorialSteps } from '@/components/onboarding';
 import { Button } from '@/components/ui/button';
 import { Move, Plus } from 'lucide-react';
 import { formatDownloadFilename } from '@/utils/formatDownloadFilename';
@@ -88,16 +86,7 @@ const Index = () => {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const { toast } = useToast();
-  
-  // Onboarding tutorial hook
-  const {
-    showTutorial,
-    currentStep,
-    nextStep,
-    prevStep,
-    skipTutorial,
-    completeTutorial,
-  } = useOnboarding();
+
   const [currentProjectId, setCurrentProjectId] = useState<string | null>(null);
   const [currentRoomId, setCurrentRoomId] = useState<string | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -3840,7 +3829,6 @@ ABSOLUTE REQUIREMENTS FOR CONSISTENCY:
           )}
           
           {/* Premium Workspace */}
-          <div className="flex-1 flex" data-tutorial="canvas">
           <PremiumWorkspace
             renderUrl={currentRenderUrl || roomPhotoUrl}
             isGenerating={isGenerating}
@@ -3931,7 +3919,6 @@ ABSOLUTE REQUIREMENTS FOR CONSISTENCY:
             catalogItems={catalogItems}
             layoutImageUrl={layoutImageUrl}
           />
-          </div>
 
           {/* Selection is now handled inside PremiumWorkspace */}
 
@@ -4307,16 +4294,6 @@ ABSOLUTE REQUIREMENTS FOR CONSISTENCY:
         projectId={currentProjectId}
         renderId={currentRenderId}
         onProductCreated={handleCustomProductCreated}
-      />
-
-      {/* Onboarding Tutorial Overlay */}
-      <TutorialOverlay
-        isVisible={showTutorial}
-        currentStep={currentStep}
-        onNext={() => nextStep(workspaceTutorialSteps.length)}
-        onPrev={prevStep}
-        onSkip={skipTutorial}
-        onComplete={completeTutorial}
       />
     </div>
   </SidebarProvider>

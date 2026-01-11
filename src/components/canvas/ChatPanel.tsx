@@ -147,7 +147,7 @@ export function ChatPanel({
   const isAgentBActive = agentBState !== 'idle' && agentBState !== 'generating';
 
   return (
-    <div className="flex flex-col h-full glass-premium border-l border-border/30" data-tutorial="chat-panel">
+    <div className="flex flex-col h-full glass-premium border-l border-border/30">
       {/* Header */}
       <div className="px-4 py-3 border-b border-border/30 flex items-center justify-between bg-background/30">
         <div className="flex items-center gap-2">
