@@ -3,6 +3,7 @@ import { AnimatePresence } from "framer-motion";
 import Index from "@/pages/Index";
 import Auth from "@/pages/Auth";
 import Landing from "@/pages/Landing";
+import MoodBoardWorkspace from "@/pages/MoodBoardWorkspace";
 import Dashboard from "@/pages/Dashboard";
 import NotFound from "@/pages/NotFound";
 import VendorDashboard from "@/pages/VendorDashboard";
@@ -20,7 +21,8 @@ export const AnimatedRoutes = () => {
   return (
     <AnimatePresence mode="wait">
       <Routes location={location} key={location.pathname}>
-        <Route path="/" element={<Landing />} />
+        <Route path="/" element={<MoodBoardWorkspace />} />
+        <Route path="/landing" element={<Landing />} />
         <Route path="/auth" element={<Auth />} />
         <Route path="/dashboard" element={<Dashboard />} />
         <Route path="/workspace" element={<Index />} />
