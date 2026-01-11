@@ -458,6 +458,77 @@ export type Database = {
         }
         Relationships: []
       }
+      design_wizard_sessions: {
+        Row: {
+          boq_data: Json | null
+          color_palette: string[] | null
+          created_at: string | null
+          current_step: number | null
+          custom_products: Json | null
+          generated_render_url: string | null
+          id: string
+          layout_file_url: string | null
+          layout_thumbnail_url: string | null
+          mood_board_data: Json | null
+          placed_products: Json | null
+          project_id: string | null
+          room_dimensions: Json | null
+          room_type: string | null
+          status: string | null
+          style_references: Json | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          boq_data?: Json | null
+          color_palette?: string[] | null
+          created_at?: string | null
+          current_step?: number | null
+          custom_products?: Json | null
+          generated_render_url?: string | null
+          id?: string
+          layout_file_url?: string | null
+          layout_thumbnail_url?: string | null
+          mood_board_data?: Json | null
+          placed_products?: Json | null
+          project_id?: string | null
+          room_dimensions?: Json | null
+          room_type?: string | null
+          status?: string | null
+          style_references?: Json | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          boq_data?: Json | null
+          color_palette?: string[] | null
+          created_at?: string | null
+          current_step?: number | null
+          custom_products?: Json | null
+          generated_render_url?: string | null
+          id?: string
+          layout_file_url?: string | null
+          layout_thumbnail_url?: string | null
+          mood_board_data?: Json | null
+          placed_products?: Json | null
+          project_id?: string | null
+          room_dimensions?: Json | null
+          room_type?: string | null
+          status?: string | null
+          style_references?: Json | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "design_wizard_sessions_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       layouts: {
         Row: {
           canvas_data: Json | null

@@ -13,6 +13,7 @@ import AgentBOnboarding from "@/pages/AgentBOnboarding";
 import AgentBBrain from "@/pages/AgentBBrain";
 import DrawingToolWorkspace from "@/pages/DrawingToolWorkspace";
 import SharedProductView from "@/pages/SharedProductView";
+import DesignWizard from "@/pages/DesignWizard";
 
 export const AnimatedRoutes = () => {
   const location = useLocation();
@@ -34,6 +35,8 @@ export const AnimatedRoutes = () => {
         <Route path="/custom-furniture" element={<CustomFurnitureLibrary />} />
         <Route path="/shared/:shareToken" element={<SharedProductView />} />
         <Route path="/tools/:toolType" element={<DrawingToolWorkspace />} />
+        <Route path="/design-wizard" element={<DesignWizard />} />
+        <Route path="/design-wizard/:sessionId" element={<DesignWizard />} />
         <Route path="*" element={<NotFound />} />
       </Routes>
     </AnimatePresence>
