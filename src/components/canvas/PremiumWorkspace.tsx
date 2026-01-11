@@ -146,6 +146,7 @@ interface ToolbarItem {
   active?: boolean;
   shortcut?: string;
   group?: string;
+  dataTutorial?: string;
 }
 
 export function PremiumWorkspace({
@@ -293,6 +294,7 @@ export function PremiumWorkspace({
       active: showAutoFurnish,
       shortcut: 'A',
       group: 'ai',
+      dataTutorial: 'furnish-btn',
     },
   ];
 
@@ -306,6 +308,7 @@ export function PremiumWorkspace({
       active: showMulticamPanel,
       shortcut: 'V',
       group: 'view',
+      dataTutorial: 'views-btn',
     },
     {
       id: 'zones',
@@ -316,6 +319,7 @@ export function PremiumWorkspace({
       active: showZonesPanel,
       shortcut: 'Z',
       group: 'view',
+      dataTutorial: 'zones-btn',
     },
     {
       id: 'compare',
@@ -384,6 +388,7 @@ export function PremiumWorkspace({
       active: showAssetsPanel,
       shortcut: 'G',
       group: 'panels',
+      dataTutorial: 'assets-btn',
     },
   ];
 
@@ -452,6 +457,7 @@ export function PremiumWorkspace({
             <button
               onClick={item.onClick}
               disabled={item.disabled}
+              data-tutorial={item.dataTutorial}
               className={cn(
                 'toolbar-item-premium',
                 'flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg',
@@ -480,7 +486,7 @@ export function PremiumWorkspace({
     <TooltipProvider delayDuration={200}>
       <div className="flex-1 flex flex-col bg-gradient-premium relative overflow-hidden">
         {/* Floating Premium Toolbar - Reorganized with Groups */}
-        <div className="absolute top-6 left-1/2 -translate-x-1/2 z-30 animate-fade-in">
+        <div className="absolute top-6 left-1/2 -translate-x-1/2 z-30 animate-fade-in" data-tutorial="toolbar">
           <div className="glass-premium rounded-2xl px-2 py-1.5 flex items-center gap-0.5">
             {/* Selection Tools */}
             {renderToolGroup(selectionTools)}

@@ -1528,6 +1528,39 @@ export type Database = {
         }
         Relationships: []
       }
+      user_onboarding: {
+        Row: {
+          completed_at: string | null
+          created_at: string | null
+          id: string
+          skipped_at: string | null
+          updated_at: string | null
+          user_id: string
+          workspace_tutorial_completed: boolean | null
+          workspace_tutorial_step: number | null
+        }
+        Insert: {
+          completed_at?: string | null
+          created_at?: string | null
+          id?: string
+          skipped_at?: string | null
+          updated_at?: string | null
+          user_id: string
+          workspace_tutorial_completed?: boolean | null
+          workspace_tutorial_step?: number | null
+        }
+        Update: {
+          completed_at?: string | null
+          created_at?: string | null
+          id?: string
+          skipped_at?: string | null
+          updated_at?: string | null
+          user_id?: string
+          workspace_tutorial_completed?: boolean | null
+          workspace_tutorial_step?: number | null
+        }
+        Relationships: []
+      }
       user_roles: {
         Row: {
           created_at: string
