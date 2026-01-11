@@ -62,7 +62,7 @@ export function RenderHistoryCarousel({
   };
 
   return (
-    <div className="absolute bottom-24 left-1/2 -translate-x-1/2 z-20 w-full max-w-2xl px-4">
+    <div className="absolute bottom-24 left-1/2 -translate-x-1/2 z-20 w-full max-w-2xl px-4" data-tutorial="render-history">
       <div className="glass-premium rounded-xl border border-border/20 overflow-hidden">
         {/* Header - Always visible, clickable to toggle */}
         <div className="flex items-center justify-between p-3">
